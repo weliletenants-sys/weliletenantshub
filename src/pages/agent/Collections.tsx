@@ -1,4 +1,5 @@
 import AgentLayout from "@/components/AgentLayout";
+import { CollectionsSkeleton } from "@/components/TenantDetailSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, AlertCircle } from "lucide-react";
@@ -88,7 +89,10 @@ const AgentCollections = () => {
 
   return (
     <AgentLayout currentPage="/agent/collections">
-      <div className="space-y-6">
+      {loading ? (
+        <CollectionsSkeleton />
+      ) : (
+        <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Today's Collections</h1>
           <p className="text-muted-foreground">Track and manage payments due today</p>
@@ -168,6 +172,7 @@ const AgentCollections = () => {
           </CardContent>
         </Card>
       </div>
+      )}
     </AgentLayout>
   );
 };
