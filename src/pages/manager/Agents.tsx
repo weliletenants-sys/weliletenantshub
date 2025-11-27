@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRealtimeAgents, useRealtimeAllTenants, useRealtimeProfiles, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
-import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
 interface AgentWithDetails {
   id: string;
@@ -39,6 +40,7 @@ const ManagerAgents = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalAgents, setTotalAgents] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
   
   // Enable real-time updates
   useRealtimeAgents();
@@ -47,15 +49,35 @@ const ManagerAgents = () => {
 
   const fetchAgents = async () => {
     try {
-      // First get total count
-      const { count } = await supabase
-        .from("agents")
-        .select("*", { count: "exact", head: true });
+      // Build the query for profiles search
+      let profilesQuery = supabase
+        .from("profiles")
+        .select("id, full_name, phone_number, role")
+        .eq("role", "agent");
 
-      setTotalAgents(count || 0);
+      // Apply search filter if search query exists
+      if (searchQuery.trim()) {
+        profilesQuery = profilesQuery.or(
+          `full_name.ilike.%${searchQuery}%,phone_number.ilike.%${searchQuery}%`
+        );
+      }
 
-      // Fetch paginated agents with all details
-      const { data: agentsData, error: agentsError } = await supabase
+      const { data: matchingProfiles, error: profilesError } = await profilesQuery;
+      
+      if (profilesError) throw profilesError;
+
+      const matchingUserIds = matchingProfiles?.map(p => p.id) || [];
+
+      if (matchingUserIds.length === 0 && searchQuery.trim()) {
+        // No matching profiles found
+        setAgents([]);
+        setTotalAgents(0);
+        setLoading(false);
+        return;
+      }
+
+      // Build agents query
+      let agentsQuery = supabase
         .from("agents")
         .select(`
           *,
@@ -64,8 +86,20 @@ const ManagerAgents = () => {
             phone_number,
             role
           )
-        `)
-        .order("created_at", { ascending: false })
+        `, { count: "exact" })
+        .order("created_at", { ascending: false });
+
+      // Filter by matching user IDs if search is active
+      if (searchQuery.trim() && matchingUserIds.length > 0) {
+        agentsQuery = agentsQuery.in("user_id", matchingUserIds);
+      }
+
+      // Get total count
+      const { count } = await agentsQuery;
+      setTotalAgents(count || 0);
+
+      // Apply pagination
+      const { data: agentsData, error: agentsError } = await agentsQuery
         .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
 
       if (agentsError) throw agentsError;
@@ -106,8 +140,9 @@ const ManagerAgents = () => {
   };
 
   useEffect(() => {
+    setLoading(true);
     fetchAgents();
-  }, [currentPage, pageSize]);
+  }, [currentPage, pageSize, searchQuery]);
 
   useEffect(() => {
     // Listen for real-time updates and refetch
@@ -139,6 +174,11 @@ const ManagerAgents = () => {
     }
   };
 
+  const handleSearch = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
   return (
     <ManagerLayout currentPage="/manager/agents">
       <div className="space-y-6">
@@ -158,10 +198,23 @@ const ManagerAgents = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>All Agents</CardTitle>
-            <CardDescription>
-              Total: {totalAgents} agent{totalAgents !== 1 ? 's' : ''}
-            </CardDescription>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <CardTitle>All Agents</CardTitle>
+                <CardDescription>
+                  Total: {totalAgents} agent{totalAgents !== 1 ? 's' : ''}
+                </CardDescription>
+              </div>
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name or phone..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="overflow-x-auto">
