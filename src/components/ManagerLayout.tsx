@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import WelileLogo from "./WelileLogo";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Users, CheckSquare, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, CheckSquare, LogOut, Settings } from "lucide-react";
 import { toast } from "sonner";
 
 interface ManagerLayoutProps {
@@ -37,6 +37,7 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
     { icon: LayoutDashboard, label: "Dashboard", path: "/manager/dashboard" },
     { icon: Users, label: "Agents", path: "/manager/agents" },
     { icon: CheckSquare, label: "Verifications", path: "/manager/verifications" },
+    { icon: Settings, label: "Settings", path: "/manager/settings" },
   ];
 
   if (isLoading) {

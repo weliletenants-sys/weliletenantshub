@@ -1,20 +1,97 @@
 import AgentLayout from "@/components/AgentLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { TrendingUp, Wallet, Target } from "lucide-react";
+import { TrendingUp, Wallet, Target, DollarSign } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const AgentEarnings = () => {
-  // Mock data - would be fetched from database
-  const earnings = {
-    thisMonth: 2340000,
-    lastMonth: 1890000,
-    walletBalance: 487000,
-    portfolioValue: 14200000,
+  const [loading, setLoading] = useState(true);
+  const [earnings, setEarnings] = useState({
+    thisMonth: 0,
+    lastMonth: 0,
+    walletBalance: 0,
+    portfolioValue: 0,
     portfolioLimit: 20000000,
-    collectionRate: 96,
+    collectionRate: 0,
+  });
+  const [recentCollections, setRecentCollections] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchEarningsData();
+  }, []);
+
+  const fetchEarningsData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: agentData } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!agentData) return;
+
+      // Get current month's collections
+      const now = new Date();
+      const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+      const { data: thisMonthCollections } = await supabase
+        .from('collections')
+        .select('amount, commission, collection_date, tenants(tenant_name)')
+        .eq('agent_id', agentData.id)
+        .gte('collection_date', firstDayThisMonth.toISOString().split('T')[0])
+        .order('collection_date', { ascending: false });
+
+      const { data: lastMonthCollections } = await supabase
+        .from('collections')
+        .select('commission')
+        .eq('agent_id', agentData.id)
+        .gte('collection_date', firstDayLastMonth.toISOString().split('T')[0])
+        .lte('collection_date', lastDayLastMonth.toISOString().split('T')[0]);
+
+      const thisMonthTotal = (thisMonthCollections || []).reduce((sum, c) => sum + c.commission, 0);
+      const lastMonthTotal = (lastMonthCollections || []).reduce((sum, c) => sum + c.commission, 0);
+
+      setEarnings({
+        thisMonth: thisMonthTotal,
+        lastMonth: lastMonthTotal,
+        walletBalance: agentData.monthly_earnings || 0,
+        portfolioValue: agentData.portfolio_value || 0,
+        portfolioLimit: agentData.portfolio_limit || 20000000,
+        collectionRate: agentData.collection_rate || 0,
+      });
+
+      setRecentCollections(thisMonthCollections?.slice(0, 10) || []);
+    } catch (error) {
+      console.error('Error fetching earnings:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const growthRate = ((earnings.thisMonth - earnings.lastMonth) / earnings.lastMonth * 100).toFixed(1);
+  const growthRate = earnings.lastMonth > 0 
+    ? ((earnings.thisMonth - earnings.lastMonth) / earnings.lastMonth * 100).toFixed(1)
+    : '0';
+
+  if (loading) {
+    return (
+      <AgentLayout currentPage="/agent/earnings">
+        <div className="space-y-6">
+          <Skeleton className="h-8 w-64" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-32" />)}
+          </div>
+          <Skeleton className="h-64" />
+        </div>
+      </AgentLayout>
+    );
+  }
 
   return (
     <AgentLayout currentPage="/agent/earnings">
@@ -94,7 +171,7 @@ const AgentEarnings = () => {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Collection Rate</span>
-                <span className="font-bold text-success">{earnings.collectionRate}%</span>
+                <span className="font-bold text-success">{earnings.collectionRate.toFixed(1)}%</span>
               </div>
               <Progress value={earnings.collectionRate} className="h-3" />
               <p className="text-xs text-muted-foreground">
@@ -105,6 +182,42 @@ const AgentEarnings = () => {
             </div>
           </CardContent>
         </Card>
+
+        {recentCollections.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Collections This Month</CardTitle>
+              <CardDescription>Your latest commission earnings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {recentCollections.map((collection, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <DollarSign className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{collection.tenants?.tenant_name || 'Unknown'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(collection.collection_date).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-success">+UGX {collection.commission.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">Commission</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </AgentLayout>
   );
