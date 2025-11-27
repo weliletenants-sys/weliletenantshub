@@ -7,9 +7,10 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
-import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus } from "lucide-react";
+import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
+import QuickPaymentDialog from "@/components/QuickPaymentDialog";
 
 const AgentDashboard = () => {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ const AgentDashboard = () => {
   const [tenantsDueToday, setTenantsDueToday] = useState(0);
   const [overdueTenants, setOverdueTenants] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
 
   useEffect(() => {
     fetchAgentData();
@@ -191,15 +193,33 @@ const AgentDashboard = () => {
             <p className="text-muted-foreground">Welcome back! Here's your overview</p>
           </div>
 
-          {/* Prominent Add New Tenant Button */}
-          <Button 
-            size="lg" 
-            className="w-full md:w-auto text-lg font-bold shadow-lg hover:shadow-xl transition-all"
-            onClick={() => navigate("/agent/new-tenant")}
-          >
-            <Plus className="h-6 w-6 mr-2" />
-            Add New Tenant
-          </Button>
+          {/* Quick Action Buttons */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button 
+              size="lg" 
+              className="text-lg font-bold shadow-lg hover:shadow-xl transition-all"
+              onClick={() => navigate("/agent/new-tenant")}
+            >
+              <Plus className="h-6 w-6 mr-2" />
+              Add New Tenant
+            </Button>
+            
+            <Button 
+              size="lg" 
+              variant="secondary"
+              className="text-lg font-bold shadow-lg hover:shadow-xl transition-all"
+              onClick={() => setQuickPaymentOpen(true)}
+            >
+              <Zap className="h-6 w-6 mr-2" />
+              Quick Payment
+            </Button>
+          </div>
+
+          <QuickPaymentDialog
+            open={quickPaymentOpen}
+            onOpenChange={setQuickPaymentOpen}
+            onSuccess={fetchAgentData}
+          />
 
           {/* Overdue Payment Notifications */}
           {overdueTenants.length > 0 && (
