@@ -187,6 +187,58 @@ function TenantDetailPage() {
 - Optimistic updates work offline (queued for sync)
 - Realtime events catch up when reconnected
 
+## Visual Feedback
+
+### Real-Time Sync Indicators
+
+#### 1. **RealtimeSyncIndicator** 
+Live status badge showing connection and sync state:
+
+```tsx
+<RealtimeSyncIndicator 
+  lastSyncTime={lastSyncTime} 
+  compact={false}
+/>
+```
+
+**States**:
+- **Live (Green)**: Connected with active sync - shows green badge with WiFi icon
+- **Syncing (Animated)**: Pulse animation during active data sync
+- **Offline (Gray)**: Disconnected - shows WiFi off icon
+
+**Animations**:
+- Ping effect on WiFi icon during sync
+- Badge pulse when data updates
+- 2-second animation duration
+
+#### 2. **SyncPulse**
+Animated pulse indicator for cards/sections:
+
+```tsx
+<div className="relative">
+  <SyncPulse show={isSyncing} />
+  <Card>...</Card>
+</div>
+```
+
+**Visual**:
+- Green pulsing dot in top-right corner
+- Shows during active realtime updates
+- Automatically hides after sync completes
+
+#### 3. **DataSyncBadge**
+Combined status with text label:
+
+```tsx
+<DataSyncBadge 
+  isSyncing={false}
+  lastSyncTime={lastSyncTime}
+  label="Tenants"
+/>
+```
+
+**Usage**: Table headers, section titles showing sync status
+
 ## Testing Realtime Sync
 
 ### Manual Testing Steps
@@ -210,6 +262,7 @@ function TenantDetailPage() {
 5. **Test cross-agent sync**
    - Device A: Agent 1 adds tenant
    - Device B: Manager sees tenant in system totals instantly
+   - **Visual**: Green "Live" badge pulses, sync pulse appears on cards
 
 ### Console Monitoring
 Check browser console for realtime events:
@@ -217,6 +270,24 @@ Check browser console for realtime events:
 Realtime tenant change: {eventType: "INSERT", new: {...}}
 Realtime collection change: {eventType: "UPDATE", new: {...}}
 ```
+
+### Visual Indicator Testing
+
+1. **Sync badge animations**
+   - Make change on Device A
+   - Watch "Live" badge pulse on Device B (2 seconds)
+   - Green pulse dot appears on updated cards
+
+2. **Online/Offline transitions**
+   - Disconnect network
+   - Badge changes to gray "Offline" with WiFi off icon
+   - Reconnect network
+   - Badge returns to green "Live" with WiFi icon
+
+3. **Multiple simultaneous updates**
+   - Multiple agents add tenants at once
+   - All devices show sync animations
+   - No animation conflicts or jitter
 
 ## Security
 
@@ -253,12 +324,14 @@ Only matching rows trigger events.
 
 ## Future Enhancements
 
+- [x] Visual sync indicators with animations
 - [ ] Presence indicators (show who's viewing tenant)
 - [ ] Conflict resolution for concurrent edits
 - [ ] Optimistic UI for realtime events (pre-render)
 - [ ] Realtime notifications for overdue tenants
 - [ ] Batch updates compression for high-frequency changes
 - [ ] Selective field subscriptions (reduce payload size)
+- [ ] Sound notifications for high-priority realtime events
 
 ## Best Practices
 

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import AgentLayout from "@/components/AgentLayout";
 import { TenantListSkeleton } from "@/components/TenantDetailSkeleton";
 import { RefreshIndicator } from "@/components/RefreshIndicator";
+import { RealtimeSyncIndicator } from "@/components/RealtimeSyncIndicator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus, AlertCircle } from "lucide-react";
 import { useTenantListPrefetch } from "@/hooks/useTenantPrefetch";
 import { useRealtimeTenants } from "@/hooks/useRealtimeSubscription";
+import { useRealtimeSyncStatus } from "@/hooks/useRealtimeSyncStatus";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Tenant = Tables<'tenants'>;
@@ -82,6 +84,9 @@ const AgentTenants = () => {
   
   // Enable real-time updates for tenants
   useRealtimeTenants(agentId);
+  
+  // Track sync status for visual indicators
+  const { lastSyncTime } = useRealtimeSyncStatus('tenants');
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -137,6 +142,7 @@ const AgentTenants = () => {
             <h1 className="text-3xl font-bold flex items-center gap-3">
               My Tenants
               <RefreshIndicator isRefreshing={isFetching && !isLoading} />
+              <RealtimeSyncIndicator lastSyncTime={lastSyncTime} compact />
             </h1>
             <p className="text-muted-foreground">Manage and track your tenant portfolio</p>
           </div>

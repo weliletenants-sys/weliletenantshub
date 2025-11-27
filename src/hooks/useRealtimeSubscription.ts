@@ -8,6 +8,18 @@ type Tenant = Tables<'tenants'>;
 type Collection = Tables<'collections'>;
 type Agent = Tables<'agents'>;
 
+// Global sync state management
+let syncCallbacks: Set<(table: string) => void> = new Set();
+
+export const registerSyncCallback = (callback: (table: string) => void) => {
+  syncCallbacks.add(callback);
+  return () => syncCallbacks.delete(callback);
+};
+
+const notifySyncEvent = (table: string) => {
+  syncCallbacks.forEach(callback => callback(table));
+};
+
 /**
  * Real-time subscription hook for tenants
  * Automatically updates React Query cache when tenants change
@@ -30,6 +42,9 @@ export const useRealtimeTenants = (agentId: string | null | undefined) => {
         },
         (payload: RealtimePostgresChangesPayload<Tenant>) => {
           console.log('Realtime tenant change:', payload);
+
+          // Notify sync indicators
+          notifySyncEvent('tenants');
 
           // Invalidate tenant list queries
           queryClient.invalidateQueries({ queryKey: ['tenants', agentId] });
@@ -78,6 +93,9 @@ export const useRealtimeCollections = (tenantId: string | undefined) => {
         (payload: RealtimePostgresChangesPayload<Collection>) => {
           console.log('Realtime collection change:', payload);
 
+          // Notify sync indicators
+          notifySyncEvent('collections');
+
           // Invalidate collections query
           queryClient.invalidateQueries({ queryKey: ['collections', tenantId] });
 
@@ -112,6 +130,9 @@ export const useRealtimeAllTenants = () => {
         },
         (payload: RealtimePostgresChangesPayload<Tenant>) => {
           console.log('Realtime tenant change (manager):', payload);
+
+          // Notify sync indicators
+          notifySyncEvent('tenants');
 
           // Invalidate all tenant-related queries
           queryClient.invalidateQueries({ queryKey: ['tenants'] });
@@ -150,6 +171,9 @@ export const useRealtimeAllCollections = () => {
         (payload: RealtimePostgresChangesPayload<Collection>) => {
           console.log('Realtime collection change (manager):', payload);
 
+          // Notify sync indicators
+          notifySyncEvent('collections');
+
           // Invalidate collections queries
           queryClient.invalidateQueries({ queryKey: ['collections'] });
         }
@@ -181,6 +205,9 @@ export const useRealtimeAgents = () => {
         },
         (payload: RealtimePostgresChangesPayload<Agent>) => {
           console.log('Realtime agent change:', payload);
+
+          // Notify sync indicators
+          notifySyncEvent('agents');
 
           // Invalidate agent queries
           queryClient.invalidateQueries({ queryKey: ['agents'] });
