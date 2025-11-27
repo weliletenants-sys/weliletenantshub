@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { Skeleton } from "@/components/ui/skeleton";
 import { clearOldCaches } from "@/lib/cacheManager";
 import SplashScreen from "@/components/SplashScreen";
+import { useInstallReminder } from "@/hooks/useInstallReminder";
 
 // Eagerly load critical pages
 import Index from "./pages/Index";
@@ -62,6 +63,9 @@ const App = () => {
     const hasShownSplash = sessionStorage.getItem('splashShown');
     return !hasShownSplash;
   });
+
+  // Initialize install reminder system
+  useInstallReminder();
 
   // Initialize cache cleanup on app start
   useEffect(() => {
