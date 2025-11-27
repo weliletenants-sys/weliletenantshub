@@ -103,7 +103,11 @@ const AgentTenants = () => {
                   </TableHeader>
                   <TableBody>
                     {tenants.map((tenant) => (
-                      <TableRow key={tenant.id} className="cursor-pointer hover:bg-muted/50">
+                      <TableRow 
+                        key={tenant.id} 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => navigate(`/agent/tenants/${tenant.id}`)}
+                      >
                         <TableCell className="font-medium">{tenant.tenant_name}</TableCell>
                         <TableCell>{tenant.tenant_phone}</TableCell>
                         <TableCell>UGX {parseFloat(tenant.rent_amount).toLocaleString()}</TableCell>
