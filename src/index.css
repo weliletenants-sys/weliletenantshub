@@ -134,6 +134,8 @@ All colors MUST be HSL.
 .swipe-container {
   touch-action: pan-y pinch-zoom;
   user-select: none;
+  /* iOS Safari momentum scrolling */
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Tab Transition Animations */
@@ -144,12 +146,25 @@ All colors MUST be HSL.
 @layer base {
   * {
     @apply border-border;
+    /* iOS-specific touch optimizations */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
   }
 
   body {
     @apply bg-background text-foreground;
     font-size: 16px;
     line-height: 1.6;
+    /* iOS Safari specific fixes */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Prevent iOS bounce scroll on body */
+    overscroll-behavior: none;
+    /* Safe area padding for iPhone notch and home indicator */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   h1 {
@@ -174,10 +189,27 @@ All colors MUST be HSL.
 
   button {
     @apply text-base;
+    /* iOS button styling fixes */
+    -webkit-appearance: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   input, textarea, select {
     @apply text-base;
+    /* iOS form element fixes */
+    -webkit-appearance: none;
+    border-radius: 0;
+  }
+
+  /* Prevent iOS zoom on input focus */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="password"],
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 
   /* Increased spacing for interactive elements */
