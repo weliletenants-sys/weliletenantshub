@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface TenantData {
   id: string;
@@ -51,7 +52,8 @@ const ManagerPortfolioBreakdown = () => {
   const [rangeName, setRangeName] = useState("");
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [tenantPages, setTenantPages] = useState<Record<string, number>>({});
-  const [tenantPageSize] = useState(10);
+  const [tenantPageSizes, setTenantPageSizes] = useState<Record<string, number>>({});
+  const defaultPageSize = 10;
 
   // Load saved ranges from localStorage on mount
   useEffect(() => {
@@ -238,14 +240,26 @@ const ManagerPortfolioBreakdown = () => {
     setTenantPages(prev => ({ ...prev, [agentId]: page }));
   };
 
+  const getTenantPageSize = (agentId: string) => {
+    return tenantPageSizes[agentId] || defaultPageSize;
+  };
+
+  const setTenantPageSize = (agentId: string, size: number) => {
+    setTenantPageSizes(prev => ({ ...prev, [agentId]: size }));
+    // Reset to page 1 when changing page size
+    setTenantPage(agentId, 1);
+  };
+
   const getPaginatedTenants = (tenants: TenantData[], agentId: string) => {
     const currentPage = getTenantPage(agentId);
-    const startIndex = (currentPage - 1) * tenantPageSize;
-    const endIndex = startIndex + tenantPageSize;
+    const pageSize = getTenantPageSize(agentId);
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
     return {
       tenants: tenants.slice(startIndex, endIndex),
-      totalPages: Math.ceil(tenants.length / tenantPageSize),
+      totalPages: Math.ceil(tenants.length / pageSize),
       currentPage,
+      pageSize,
       startIndex: startIndex + 1,
       endIndex: Math.min(endIndex, tenants.length),
       totalTenants: tenants.length,
@@ -912,40 +926,62 @@ const ManagerPortfolioBreakdown = () => {
                                   
                                   {/* Pagination Controls */}
                                   {paginationData.totalPages > 1 && (
-                                    <div className="flex items-center justify-between pt-4 mt-4 border-t">
-                                      <div className="text-sm text-muted-foreground">
-                                        Showing {paginationData.startIndex} to {paginationData.endIndex} of {paginationData.totalTenants} tenants
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-sm text-muted-foreground">
-                                          Page {paginationData.currentPage} of {paginationData.totalPages}
-                                        </span>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setTenantPage(portfolio.id, paginationData.currentPage - 1);
-                                            haptics.light();
-                                          }}
-                                          disabled={paginationData.currentPage === 1}
-                                        >
-                                          <ChevronLeft className="h-4 w-4" />
-                                          Previous
-                                        </Button>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setTenantPage(portfolio.id, paginationData.currentPage + 1);
-                                            haptics.light();
-                                          }}
-                                          disabled={paginationData.currentPage === paginationData.totalPages}
-                                        >
-                                          Next
-                                          <ChevronRight className="h-4 w-4" />
-                                        </Button>
+                                    <div className="flex flex-col gap-4 pt-4 mt-4 border-t">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                          <div className="text-sm text-muted-foreground">
+                                            Showing {paginationData.startIndex} to {paginationData.endIndex} of {paginationData.totalTenants} tenants
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-sm text-muted-foreground">Per page:</span>
+                                            <Select
+                                              value={paginationData.pageSize.toString()}
+                                              onValueChange={(value) => {
+                                                setTenantPageSize(portfolio.id, parseInt(value));
+                                                haptics.light();
+                                              }}
+                                            >
+                                              <SelectTrigger className="w-20 h-8 bg-background">
+                                                <SelectValue />
+                                              </SelectTrigger>
+                                              <SelectContent className="bg-background z-50">
+                                                <SelectItem value="5">5</SelectItem>
+                                                <SelectItem value="10">10</SelectItem>
+                                                <SelectItem value="20">20</SelectItem>
+                                                <SelectItem value="50">50</SelectItem>
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm text-muted-foreground">
+                                            Page {paginationData.currentPage} of {paginationData.totalPages}
+                                          </span>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setTenantPage(portfolio.id, paginationData.currentPage - 1);
+                                              haptics.light();
+                                            }}
+                                            disabled={paginationData.currentPage === 1}
+                                          >
+                                            <ChevronLeft className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setTenantPage(portfolio.id, paginationData.currentPage + 1);
+                                              haptics.light();
+                                            }}
+                                            disabled={paginationData.currentPage === paginationData.totalPages}
+                                          >
+                                            <ChevronRight className="h-4 w-4" />
+                                          </Button>
+                                        </div>
                                       </div>
                                     </div>
                                   )}
