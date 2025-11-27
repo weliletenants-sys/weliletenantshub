@@ -354,8 +354,12 @@ const ManagerAgentDetail = () => {
                         </TableRow>
                       ) : (
                         tenants.map((tenant) => (
-                          <TableRow key={tenant.id}>
-                            <TableCell className="font-medium">{tenant.tenant_name}</TableCell>
+                          <TableRow 
+                            key={tenant.id}
+                            className="cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => navigate(`/manager/tenants/${tenant.id}`)}
+                          >
+                            <TableCell className="font-medium text-primary hover:underline">{tenant.tenant_name}</TableCell>
                             <TableCell>{tenant.tenant_phone}</TableCell>
                             <TableCell>UGX {parseFloat(tenant.rent_amount?.toString() || '0').toLocaleString()}</TableCell>
                             <TableCell>
