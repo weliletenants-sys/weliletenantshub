@@ -50,15 +50,21 @@ const ManagerSettings = () => {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (profileError) throw profileError;
+
+      if (!profileData) {
+        toast.error('Profile not found. Please contact support.');
+        navigate('/login');
+        return;
+      }
 
       const { data: managerData } = await supabase
         .from('service_centre_managers')
         .select('area')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       setProfile({
         full_name: profileData.full_name || '',
