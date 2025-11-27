@@ -27,6 +27,11 @@ export default {
         '4xl': ['2.25rem', { lineHeight: '1.2' }],
         '5xl': ['3rem', { lineHeight: '1.1' }],
       },
+      spacing: {
+        'safe': '0.75rem',
+        'safe-lg': '1rem',
+        'safe-xl': '1.5rem',
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

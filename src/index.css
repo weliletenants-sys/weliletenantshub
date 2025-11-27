@@ -179,6 +179,32 @@ All colors MUST be HSL.
   input, textarea, select {
     @apply text-base;
   }
+
+  /* Increased spacing for interactive elements */
+  button + button,
+  a + a,
+  input + input,
+  button + a,
+  a + button {
+    margin-top: 0.75rem;
+  }
+
+  /* Form field spacing */
+  form > * + * {
+    margin-top: 1rem;
+  }
+
+  /* Card spacing */
+  [class*="card"] + [class*="card"],
+  [class*="Card"] + [class*="Card"] {
+    margin-top: 1rem;
+  }
+
+  /* List item spacing for clickable items */
+  [role="button"] + [role="button"],
+  [role="link"] + [role="link"] {
+    margin-top: 0.75rem;
+  }
 }
 
 /* Print styles for receipts */
