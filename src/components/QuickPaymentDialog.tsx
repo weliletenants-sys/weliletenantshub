@@ -25,9 +25,10 @@ interface QuickPaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  tenant?: Tenant;
 }
 
-const QuickPaymentDialog = ({ open, onOpenChange, onSuccess }: QuickPaymentDialogProps) => {
+const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselectedTenant }: QuickPaymentDialogProps) => {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [amount, setAmount] = useState("");
@@ -41,8 +42,12 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess }: QuickPaymentDialo
   useEffect(() => {
     if (open) {
       fetchAgentAndTenants();
+      // Pre-select tenant if provided
+      if (preselectedTenant) {
+        setSelectedTenant(preselectedTenant);
+      }
     }
-  }, [open]);
+  }, [open, preselectedTenant]);
 
   const fetchAgentAndTenants = async () => {
     try {
