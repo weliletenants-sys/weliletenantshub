@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import ManagerLayout from "@/components/ManagerLayout";
@@ -74,6 +74,42 @@ const PaymentVerifications = () => {
       return data as Payment[];
     },
   });
+
+  // Real-time subscription for instant updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('payment-verifications-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'collections'
+        },
+        (payload) => {
+          console.log('Payment change detected:', payload);
+          
+          // Invalidate and refetch payment data
+          queryClient.invalidateQueries({ queryKey: ["all-payments"] });
+          
+          // Show notification for new payments
+          if (payload.eventType === 'INSERT') {
+            toast.info('New payment submission received', {
+              description: 'Payment list updated automatically',
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            toast.info('Payment status updated', {
+              description: 'Changes reflected automatically',
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // Verify payment mutation
   const verifyMutation = useMutation({
