@@ -8,7 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { Skeleton } from "@/components/ui/skeleton";
 import { clearOldCaches } from "@/lib/cacheManager";
 import SplashScreen from "@/components/SplashScreen";
-import { useInstallReminder } from "@/hooks/useInstallReminder";
+import { InstallReminderProvider } from "@/components/InstallReminderProvider";
 
 // Eagerly load critical pages
 import Index from "./pages/Index";
@@ -59,13 +59,10 @@ const queryClient = new QueryClient();
 
 const App = () => {
   const [showSplash, setShowSplash] = useState(() => {
-    // Show splash only on first load, not on subsequent navigations
+    // Skip splash on repeat visits for faster load
     const hasShownSplash = sessionStorage.getItem('splashShown');
     return !hasShownSplash;
   });
-
-  // Initialize install reminder system
-  useInstallReminder();
 
   // Initialize cache cleanup on app start
   useEffect(() => {
@@ -86,6 +83,7 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        {!showSplash && <InstallReminderProvider />}
         <BrowserRouter>
           <Suspense fallback={<PageLoader />}>
             <Routes>
