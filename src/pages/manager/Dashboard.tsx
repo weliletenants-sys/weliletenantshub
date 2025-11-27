@@ -4,7 +4,7 @@ import PullToRefresh from "react-simple-pull-to-refresh";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -30,6 +30,10 @@ const ManagerDashboard = () => {
     verifiedPayments: 0,
     rejectedPayments: 0,
     totalPortfolioValue: 0,
+    portfolioDayChange: 0,
+    portfolioDayChangePercent: 0,
+    portfolioWeekChange: 0,
+    portfolioWeekChangePercent: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [showTenantSearch, setShowTenantSearch] = useState(false);
@@ -82,6 +86,39 @@ const ManagerDashboard = () => {
           return sum + (parseFloat(agent.portfolio_value?.toString() || '0'));
         }, 0) || 0;
 
+        // Calculate portfolio growth (day-over-day and week-over-week)
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const lastWeek = new Date(today);
+        lastWeek.setDate(lastWeek.getDate() - 7);
+
+        // Fetch collections from yesterday to calculate day change
+        const { data: yesterdayCollections } = await supabase
+          .from("collections")
+          .select("amount")
+          .eq("status", "verified")
+          .gte("collection_date", yesterday.toISOString().split('T')[0])
+          .lt("collection_date", today.toISOString().split('T')[0]);
+
+        const yesterdayTotal = yesterdayCollections?.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0;
+
+        // Fetch collections from last 7 days for week change
+        const { data: weekCollections } = await supabase
+          .from("collections")
+          .select("amount, collection_date")
+          .eq("status", "verified")
+          .gte("collection_date", lastWeek.toISOString().split('T')[0]);
+
+        const thisWeekTotal = weekCollections?.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0;
+        
+        // Calculate changes
+        const portfolioDayChange = yesterdayTotal;
+        const portfolioDayChangePercent = totalPortfolioValue > 0 ? (portfolioDayChange / totalPortfolioValue) * 100 : 0;
+        
+        const portfolioWeekChange = thisWeekTotal;
+        const portfolioWeekChangePercent = totalPortfolioValue > 0 ? (portfolioWeekChange / totalPortfolioValue) * 100 : 0;
+
         // Fetch payment verification stats
         const { data: collectionsData } = await supabase
           .from("collections")
@@ -100,6 +137,10 @@ const ManagerDashboard = () => {
           verifiedPayments,
           rejectedPayments,
           totalPortfolioValue,
+          portfolioDayChange,
+          portfolioDayChangePercent,
+          portfolioWeekChange,
+          portfolioWeekChangePercent,
         });
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
@@ -137,6 +178,35 @@ const ManagerDashboard = () => {
       return sum + (parseFloat(agent.portfolio_value?.toString() || '0'));
     }, 0) || 0;
 
+    // Calculate portfolio growth
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const lastWeek = new Date(today);
+    lastWeek.setDate(lastWeek.getDate() - 7);
+
+    const { data: yesterdayCollections } = await supabase
+      .from("collections")
+      .select("amount")
+      .eq("status", "verified")
+      .gte("collection_date", yesterday.toISOString().split('T')[0])
+      .lt("collection_date", today.toISOString().split('T')[0]);
+
+    const yesterdayTotal = yesterdayCollections?.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0;
+
+    const { data: weekCollections } = await supabase
+      .from("collections")
+      .select("amount")
+      .eq("status", "verified")
+      .gte("collection_date", lastWeek.toISOString().split('T')[0]);
+
+    const thisWeekTotal = weekCollections?.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0;
+    
+    const portfolioDayChange = yesterdayTotal;
+    const portfolioDayChangePercent = totalPortfolioValue > 0 ? (portfolioDayChange / totalPortfolioValue) * 100 : 0;
+    const portfolioWeekChange = thisWeekTotal;
+    const portfolioWeekChangePercent = totalPortfolioValue > 0 ? (portfolioWeekChange / totalPortfolioValue) * 100 : 0;
+
     // Fetch payment verification stats
     const { data: collectionsData } = await supabase
       .from("collections")
@@ -155,6 +225,10 @@ const ManagerDashboard = () => {
       verifiedPayments,
       rejectedPayments,
       totalPortfolioValue,
+      portfolioDayChange,
+      portfolioDayChangePercent,
+      portfolioWeekChange,
+      portfolioWeekChangePercent,
     });
     
     toast.success("Dashboard refreshed");
@@ -550,9 +624,133 @@ const ManagerDashboard = () => {
               </div>
             )}
           </CardContent>
-        </Card>
+          </Card>
 
-        {/* Admin Access Card */}
+          {/* Portfolio Growth Tracking */}
+          <Card className="border-2 border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                Portfolio Growth Tracking
+              </CardTitle>
+              <CardDescription>
+                Monitor portfolio value changes over time
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Day-over-Day Change */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "p-2 rounded-lg",
+                        stats.portfolioDayChange >= 0 ? "bg-success/10" : "bg-destructive/10"
+                      )}>
+                        {stats.portfolioDayChange >= 0 ? (
+                          <ArrowUp className="h-5 w-5 text-success" />
+                        ) : (
+                          <ArrowDown className="h-5 w-5 text-destructive" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground font-medium">Daily Change</p>
+                        <p className="text-xs text-muted-foreground">vs. Yesterday</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className={cn(
+                      "text-3xl font-bold",
+                      stats.portfolioDayChange >= 0 ? "text-success" : "text-destructive"
+                    )}>
+                      {stats.portfolioDayChange >= 0 ? '+' : ''}UGX {Math.abs(stats.portfolioDayChange).toLocaleString()}
+                    </div>
+                    <div className={cn(
+                      "text-sm font-medium flex items-center gap-1",
+                      stats.portfolioDayChangePercent >= 0 ? "text-success" : "text-destructive"
+                    )}>
+                      {stats.portfolioDayChangePercent >= 0 ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )}
+                      {Math.abs(stats.portfolioDayChangePercent).toFixed(2)}%
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-border">
+                    <p className="text-xs text-muted-foreground">
+                      Collections verified yesterday
+                    </p>
+                  </div>
+                </div>
+
+                {/* Week-over-Week Change */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "p-2 rounded-lg",
+                        stats.portfolioWeekChange >= 0 ? "bg-success/10" : "bg-destructive/10"
+                      )}>
+                        {stats.portfolioWeekChange >= 0 ? (
+                          <ArrowUp className="h-5 w-5 text-success" />
+                        ) : (
+                          <ArrowDown className="h-5 w-5 text-destructive" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground font-medium">Weekly Change</p>
+                        <p className="text-xs text-muted-foreground">Last 7 Days</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className={cn(
+                      "text-3xl font-bold",
+                      stats.portfolioWeekChange >= 0 ? "text-success" : "text-destructive"
+                    )}>
+                      {stats.portfolioWeekChange >= 0 ? '+' : ''}UGX {Math.abs(stats.portfolioWeekChange).toLocaleString()}
+                    </div>
+                    <div className={cn(
+                      "text-sm font-medium flex items-center gap-1",
+                      stats.portfolioWeekChangePercent >= 0 ? "text-success" : "text-destructive"
+                    )}>
+                      {stats.portfolioWeekChangePercent >= 0 ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )}
+                      {Math.abs(stats.portfolioWeekChangePercent).toFixed(2)}%
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-border">
+                    <p className="text-xs text-muted-foreground">
+                      Collections verified in past 7 days
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Growth Summary */}
+              <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/10">
+                <div className="flex items-start gap-3">
+                  <TrendingUp className="h-5 w-5 text-primary mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Portfolio Performance</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {stats.portfolioWeekChange >= 0 
+                        ? `Your team's portfolio is growing! Weekly collections up by UGX ${stats.portfolioWeekChange.toLocaleString()}.`
+                        : `Weekly collections decreased. Review agent performance to identify improvement areas.`
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Admin Access Card */}
         <Card className="bg-primary/10 border-primary/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
