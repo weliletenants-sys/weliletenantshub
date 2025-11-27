@@ -11,8 +11,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus } from "lucide-react";
+import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff } from "lucide-react";
 import { format } from "date-fns";
+import { addPendingPayment, isOnline } from "@/lib/offlineSync";
 
 const AgentTenantDetail = () => {
   const { tenantId } = useParams();
@@ -112,31 +113,43 @@ const AgentTenantDetail = () => {
       const amount = parseFloat(paymentForm.amount);
       const commission = amount * 0.05; // 5% commission
 
-      // Insert collection
-      const { error: collectionError } = await supabase
-        .from("collections")
-        .insert({
-          tenant_id: tenantId,
-          agent_id: agent.id,
-          amount: amount,
-          commission: commission,
-          collection_date: paymentForm.collectionDate,
-          payment_method: paymentForm.paymentMethod,
-          status: "completed",
+      const collectionData = {
+        tenant_id: tenantId,
+        agent_id: agent.id,
+        amount: amount,
+        commission: commission,
+        collection_date: paymentForm.collectionDate,
+        payment_method: paymentForm.paymentMethod,
+        status: "completed",
+      };
+
+      if (isOnline()) {
+        // Online: Save directly to database
+        const { error: collectionError } = await supabase
+          .from("collections")
+          .insert(collectionData);
+
+        if (collectionError) throw collectionError;
+
+        // Update tenant's outstanding balance
+        const newBalance = parseFloat(tenant.outstanding_balance) - amount;
+        const { error: updateError } = await supabase
+          .from("tenants")
+          .update({ outstanding_balance: Math.max(0, newBalance) })
+          .eq("id", tenantId);
+
+        if (updateError) throw updateError;
+
+        toast.success(`Payment recorded! You earned UGX ${commission.toLocaleString()} commission`);
+      } else {
+        // Offline: Save to IndexedDB for later sync
+        await addPendingPayment(collectionData, tenantId!);
+        
+        toast.success("Payment saved offline! Will sync when back online.", {
+          icon: <CloudOff className="h-4 w-4" />,
+          duration: 5000,
         });
-
-      if (collectionError) throw collectionError;
-
-      // Update tenant's outstanding balance
-      const newBalance = parseFloat(tenant.outstanding_balance) - amount;
-      const { error: updateError } = await supabase
-        .from("tenants")
-        .update({ outstanding_balance: Math.max(0, newBalance) })
-        .eq("id", tenantId);
-
-      if (updateError) throw updateError;
-
-      toast.success(`Payment recorded! You earned UGX ${commission.toLocaleString()} commission`);
+      }
       
       // Reset form and close dialog
       setPaymentForm({
@@ -146,8 +159,10 @@ const AgentTenantDetail = () => {
       });
       setDialogOpen(false);
       
-      // Refresh data
-      fetchTenantDetails();
+      // Refresh data if online
+      if (isOnline()) {
+        fetchTenantDetails();
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to record payment");
     } finally {
@@ -191,6 +206,13 @@ const AgentTenantDetail = () => {
             <p className="text-muted-foreground">Tenant Details & Payment History</p>
           </div>
           {getStatusBadge(tenant.status)}
+          
+          {!isOnline() && (
+            <Badge variant="secondary" className="gap-2">
+              <CloudOff className="h-3 w-3" />
+              Offline Mode
+            </Badge>
+          )}
           
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
