@@ -5,9 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Phone, User, DollarSign, Calendar } from "lucide-react";
+import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus } from "lucide-react";
 import { format } from "date-fns";
 
 const AgentTenantDetail = () => {
@@ -16,6 +20,13 @@ const AgentTenantDetail = () => {
   const [tenant, setTenant] = useState<any>(null);
   const [collections, setCollections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: "",
+    paymentMethod: "cash",
+    collectionDate: format(new Date(), "yyyy-MM-dd"),
+  });
 
   useEffect(() => {
     fetchTenantDetails();
@@ -82,6 +93,68 @@ const AgentTenantDetail = () => {
     return <Badge variant={variants[status] || "secondary"}>{status}</Badge>;
   };
 
+  const handleRecordPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: agent } = await supabase
+        .from("agents")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (!agent) throw new Error("Agent profile not found");
+
+      const amount = parseFloat(paymentForm.amount);
+      const commission = amount * 0.05; // 5% commission
+
+      // Insert collection
+      const { error: collectionError } = await supabase
+        .from("collections")
+        .insert({
+          tenant_id: tenantId,
+          agent_id: agent.id,
+          amount: amount,
+          commission: commission,
+          collection_date: paymentForm.collectionDate,
+          payment_method: paymentForm.paymentMethod,
+          status: "completed",
+        });
+
+      if (collectionError) throw collectionError;
+
+      // Update tenant's outstanding balance
+      const newBalance = parseFloat(tenant.outstanding_balance) - amount;
+      const { error: updateError } = await supabase
+        .from("tenants")
+        .update({ outstanding_balance: Math.max(0, newBalance) })
+        .eq("id", tenantId);
+
+      if (updateError) throw updateError;
+
+      toast.success(`Payment recorded! You earned UGX ${commission.toLocaleString()} commission`);
+      
+      // Reset form and close dialog
+      setPaymentForm({
+        amount: "",
+        paymentMethod: "cash",
+        collectionDate: format(new Date(), "yyyy-MM-dd"),
+      });
+      setDialogOpen(false);
+      
+      // Refresh data
+      fetchTenantDetails();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to record payment");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <AgentLayout currentPage="/agent/tenants">
@@ -118,6 +191,84 @@ const AgentTenantDetail = () => {
             <p className="text-muted-foreground">Tenant Details & Payment History</p>
           </div>
           {getStatusBadge(tenant.status)}
+          
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Record Payment
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Record Payment</DialogTitle>
+                <DialogDescription>
+                  Record a new payment for {tenant.tenant_name}
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleRecordPayment} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="amount">Amount (UGX)</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    value={paymentForm.amount}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                    placeholder="Enter amount"
+                    required
+                    min="1"
+                  />
+                  {paymentForm.amount && (
+                    <p className="text-xs text-muted-foreground">
+                      Your commission: UGX {(parseFloat(paymentForm.amount) * 0.05).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="paymentMethod">Payment Method</Label>
+                  <Select
+                    value={paymentForm.paymentMethod}
+                    onValueChange={(value) => setPaymentForm({ ...paymentForm, paymentMethod: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="mobile_money">Mobile Money</SelectItem>
+                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="collectionDate">Collection Date</Label>
+                  <Input
+                    id="collectionDate"
+                    type="date"
+                    value={paymentForm.collectionDate}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, collectionDate: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={submitting}>
+                    {submitting ? "Recording..." : "Record Payment"}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
