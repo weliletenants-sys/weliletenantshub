@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import WelileLogo from "@/components/WelileLogo";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { cn } from "@/lib/utils";
+import { useRipple } from "@/hooks/useRipple";
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -34,6 +35,7 @@ const adminRoutes = [
 const AdminLayout = ({ children }: AdminLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const createRipple = useRipple();
 
   return (
     <div className="min-h-screen bg-background">
@@ -74,7 +76,10 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                     isActive && "bg-primary text-primary-foreground"
                   )}
                   size="lg"
-                  onClick={() => navigate(route.path)}
+                  onClick={(e) => {
+                    createRipple(e);
+                    navigate(route.path);
+                  }}
                 >
                   <Icon className="h-6 w-6" />
                   <div className="flex flex-col items-start">
