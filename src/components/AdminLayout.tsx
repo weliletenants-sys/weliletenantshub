@@ -54,7 +54,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       <div className="max-w-7xl mx-auto p-4 md:p-8">
         <div className="grid md:grid-cols-[250px_1fr] gap-6">
           {/* Sidebar Navigation */}
-          <aside className="space-y-2">
+          <aside className="space-y-3">
             <div className="mb-4">
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                 Admin Tools
@@ -70,14 +70,15 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                   key={route.path}
                   variant={isActive ? "default" : "ghost"}
                   className={cn(
-                    "w-full justify-start gap-3",
+                    "w-full justify-start gap-4 h-14 text-base",
                     isActive && "bg-primary text-primary-foreground"
                   )}
+                  size="lg"
                   onClick={() => navigate(route.path)}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-6 w-6" />
                   <div className="flex flex-col items-start">
-                    <span className="text-sm font-medium">{route.label}</span>
+                    <span className="text-base font-medium">{route.label}</span>
                     {!isActive && (
                       <span className="text-xs text-muted-foreground">
                         {route.description}
@@ -88,13 +89,14 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
               );
             })}
 
-            <div className="pt-4 border-t mt-4">
+            <div className="pt-6 border-t mt-6">
               <Button
                 variant="outline"
-                className="w-full justify-start gap-3"
+                className="w-full justify-start gap-4 h-14 text-base"
+                size="lg"
                 onClick={() => navigate("/")}
               >
-                <Home className="h-4 w-4" />
+                <Home className="h-6 w-6" />
                 <span>Back to Home</span>
               </Button>
             </div>
