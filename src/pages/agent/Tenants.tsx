@@ -5,16 +5,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { TenantRow } from "@/components/TenantRow";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Plus, AlertCircle } from "lucide-react";
+import { useTenantListPrefetch } from "@/hooks/useTenantPrefetch";
 
 const AgentTenants = () => {
   const [tenants, setTenants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
   const navigate = useNavigate();
+  
+  // Initialize prefetching for visible tenants
+  const { observeTenantRow } = useTenantListPrefetch(tenants);
 
   useEffect(() => {
     fetchTenants();
@@ -94,28 +99,13 @@ const AgentTenants = () => {
         </TableHeader>
         <TableBody>
           {tenantList.map((tenant) => (
-            <TableRow 
-              key={tenant.id} 
-              className="cursor-pointer hover:bg-muted/50"
-              onClick={() => navigate(`/agent/tenants/${tenant.id}`)}
-            >
-              <TableCell className="font-medium">{tenant.tenant_name}</TableCell>
-              <TableCell>{tenant.tenant_phone}</TableCell>
-              <TableCell>UGX {parseFloat(tenant.rent_amount || 0).toLocaleString()}</TableCell>
-              <TableCell>{getStatusBadge(tenant.status)}</TableCell>
-              <TableCell>
-                {activeTab === "overdue" ? (
-                  <span className="text-destructive font-semibold">
-                    {tenant.daysOverdue} day{tenant.daysOverdue !== 1 ? 's' : ''}
-                  </span>
-                ) : (
-                  `${tenant.days_remaining || 0} days`
-                )}
-              </TableCell>
-              <TableCell className="font-medium">
-                UGX {parseFloat(tenant.outstanding_balance || 0).toLocaleString()}
-              </TableCell>
-            </TableRow>
+            <TenantRow
+              key={tenant.id}
+              tenant={tenant}
+              activeTab={activeTab}
+              observeTenantRow={observeTenantRow}
+              getStatusBadge={getStatusBadge}
+            />
           ))}
         </TableBody>
       </Table>

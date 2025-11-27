@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSwipeable } from "react-swipeable";
+import { useQueryClient } from "@tanstack/react-query";
 import AgentLayout from "@/components/AgentLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,19 +19,25 @@ import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff, Receipt, 
 import { format } from "date-fns";
 import { addPendingPayment, isOnline } from "@/lib/offlineSync";
 import { haptics } from "@/utils/haptics";
+import { useTenantData, useCollectionsData, useAgentInfo } from "@/hooks/useTenantData";
 
 const AgentTenantDetail = () => {
   const { tenantId } = useParams();
   const navigate = useNavigate();
-  const [tenant, setTenant] = useState<any>(null);
-  const [collections, setCollections] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  
+  // Use React Query hooks for data fetching with caching
+  const { data: tenant, isLoading: tenantLoading, error: tenantError } = useTenantData(tenantId);
+  const { data: collections = [], isLoading: collectionsLoading } = useCollectionsData(tenantId);
+  const { data: agentInfo } = useAgentInfo();
+  
+  const loading = tenantLoading || collectionsLoading;
+  
   const [dialogOpen, setDialogOpen] = useState(false);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [lastPayment, setLastPayment] = useState<any>(null);
-  const [agentInfo, setAgentInfo] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("details");
   const [paymentForm, setPaymentForm] = useState({
     amount: "",
@@ -44,6 +51,27 @@ const AgentTenantDetail = () => {
     lc1Phone: "",
     rentAmount: "",
   });
+
+  // Update edit form when tenant data loads
+  useEffect(() => {
+    if (tenant) {
+      setEditForm({
+        landlordName: tenant.landlord_name || "",
+        landlordPhone: tenant.landlord_phone || "",
+        lc1Name: tenant.lc1_name || "",
+        lc1Phone: tenant.lc1_phone || "",
+        rentAmount: tenant.rent_amount?.toString() || "",
+      });
+    }
+  }, [tenant]);
+
+  // Handle errors
+  useEffect(() => {
+    if (tenantError) {
+      toast.error("Failed to load tenant details");
+      navigate("/agent/tenants");
+    }
+  }, [tenantError, navigate]);
 
   const tabs = ["details", "payments", "actions"];
 
@@ -64,83 +92,6 @@ const AgentTenantDetail = () => {
     trackMouse: false,
     preventScrollOnSwipe: true,
   });
-
-  useEffect(() => {
-    fetchTenantDetails();
-    fetchAgentInfo();
-  }, [tenantId]);
-
-  const fetchAgentInfo = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name, phone_number")
-        .eq("id", user.id)
-        .single();
-
-      if (profile) {
-        setAgentInfo({
-          agent_name: profile.full_name || "Agent",
-          agent_phone: profile.phone_number || "",
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching agent info:", error);
-    }
-  };
-
-  const fetchTenantDetails = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: agent } = await supabase
-        .from("agents")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!agent) return;
-
-      // Fetch tenant details
-      const { data: tenantData, error: tenantError } = await supabase
-        .from("tenants")
-        .select("*")
-        .eq("id", tenantId)
-        .eq("agent_id", agent.id)
-        .single();
-
-      if (tenantError) throw tenantError;
-      setTenant(tenantData);
-      
-      // Set edit form with current data
-      setEditForm({
-        landlordName: tenantData.landlord_name || "",
-        landlordPhone: tenantData.landlord_phone || "",
-        lc1Name: tenantData.lc1_name || "",
-        lc1Phone: tenantData.lc1_phone || "",
-        rentAmount: tenantData.rent_amount?.toString() || "",
-      });
-
-      // Fetch collections history
-      const { data: collectionsData, error: collectionsError } = await supabase
-        .from("collections")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .order("collection_date", { ascending: false });
-
-      if (collectionsError) throw collectionsError;
-      setCollections(collectionsData || []);
-    } catch (error: any) {
-      toast.error("Failed to load tenant details");
-      navigate("/agent/tenants");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -200,7 +151,7 @@ const AgentTenantDetail = () => {
         if (collectionError) throw collectionError;
 
         // Update tenant's outstanding balance
-        const newBalance = parseFloat(tenant.outstanding_balance) - amount;
+        const newBalance = parseFloat(tenant.outstanding_balance?.toString() || '0') - amount;
         const { error: updateError } = await supabase
           .from("tenants")
           .update({ outstanding_balance: Math.max(0, newBalance) })
@@ -239,7 +190,8 @@ const AgentTenantDetail = () => {
       
       // Refresh data if online
       if (isOnline()) {
-        fetchTenantDetails();
+        queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
+        queryClient.invalidateQueries({ queryKey: ['collections', tenantId] });
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to record payment");
@@ -272,7 +224,7 @@ const AgentTenantDetail = () => {
 
       toast.success("Tenant details updated successfully");
       setEditDialogOpen(false);
-      fetchTenantDetails();
+      queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
     } catch (error: any) {
       toast.error(error.message || "Failed to update tenant");
     } finally {
@@ -298,7 +250,7 @@ const AgentTenantDetail = () => {
 
   const totalCollected = collections
     .filter(c => c.status === "completed")
-    .reduce((sum, c) => sum + parseFloat(c.amount), 0);
+    .reduce((sum, c) => sum + parseFloat(c.amount?.toString() || '0'), 0);
 
   return (
     <AgentLayout currentPage="/agent/tenants">
@@ -542,7 +494,7 @@ const AgentTenantDetail = () => {
                         <DollarSign className="h-4 w-4 text-muted-foreground" />
                         <div>
                           <p className="text-sm text-muted-foreground">Monthly Rent</p>
-                          <p className="font-medium">UGX {parseFloat(tenant.rent_amount).toLocaleString()}</p>
+                          <p className="font-medium">UGX {parseFloat(tenant.rent_amount?.toString() || '0').toLocaleString()}</p>
                         </div>
                       </div>
                     )}
@@ -564,7 +516,7 @@ const AgentTenantDetail = () => {
                     <div>
                       <p className="text-sm text-muted-foreground">Outstanding Balance</p>
                       <p className="text-2xl font-bold">
-                        UGX {parseFloat(tenant.outstanding_balance).toLocaleString()}
+                        UGX {parseFloat(tenant.outstanding_balance?.toString() || '0').toLocaleString()}
                       </p>
                     </div>
                     <div>
@@ -658,10 +610,10 @@ const AgentTenantDetail = () => {
                                 {format(new Date(collection.collection_date), "MMM dd, yyyy")}
                               </TableCell>
                               <TableCell className="font-medium">
-                                UGX {parseFloat(collection.amount).toLocaleString()}
+                                UGX {parseFloat(collection.amount?.toString() || '0').toLocaleString()}
                               </TableCell>
                               <TableCell className="text-primary">
-                                UGX {parseFloat(collection.commission).toLocaleString()}
+                                UGX {parseFloat(collection.commission?.toString() || '0').toLocaleString()}
                               </TableCell>
                               <TableCell className="capitalize">{collection.payment_method}</TableCell>
                               <TableCell>{getPaymentStatusBadge(collection.status)}</TableCell>
@@ -718,7 +670,7 @@ const AgentTenantDetail = () => {
                             const lastCollection = collections[0];
                             setLastPayment({
                               ...lastCollection,
-                              tenant_outstanding_balance: parseFloat(tenant.outstanding_balance),
+                              tenant_outstanding_balance: parseFloat(tenant.outstanding_balance?.toString() || '0'),
                             });
                             setReceiptDialogOpen(true);
                           }
@@ -766,7 +718,7 @@ const AgentTenantDetail = () => {
                 tenantData={{
                   tenant_name: tenant.tenant_name,
                   tenant_phone: tenant.tenant_phone,
-                  rent_amount: parseFloat(tenant.rent_amount),
+                  rent_amount: parseFloat(tenant.rent_amount?.toString() || '0'),
                   outstanding_balance: lastPayment.tenant_outstanding_balance,
                 }}
                 agentData={agentInfo}
