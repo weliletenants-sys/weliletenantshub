@@ -164,6 +164,16 @@ const ManagerPortfolioBreakdown = () => {
     toast.success("Date filters cleared");
   };
 
+  const setPresetDateRange = (days: number, label: string) => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    setStartDate(start);
+    setEndDate(end);
+    haptics.light();
+    toast.success(`Date range set to ${label}`);
+  };
+
   const getDateRangeLabel = () => {
     if (startDate && endDate) {
       return `${format(startDate, "MMM d, yyyy")} - ${format(endDate, "MMM d, yyyy")}`;
@@ -527,6 +537,45 @@ const ManagerPortfolioBreakdown = () => {
                 <p className="text-sm text-muted-foreground">{getDateRangeLabel()}</p>
               </div>
             )}
+
+            {/* Preset Date Range Buttons */}
+            <div className="mt-6 border-t pt-4">
+              <label className="text-sm font-medium mb-3 block">Quick Filters</label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPresetDateRange(7, "Last 7 Days")}
+                  className="w-full"
+                >
+                  Last 7 Days
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPresetDateRange(30, "Last 30 Days")}
+                  className="w-full"
+                >
+                  Last 30 Days
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPresetDateRange(90, "Last Quarter")}
+                  className="w-full"
+                >
+                  Last Quarter
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPresetDateRange(365, "Last Year")}
+                  className="w-full"
+                >
+                  Last Year
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
