@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Wallet, Users, TrendingUp, Search, User, Phone, DollarSign, ChevronRight } from "lucide-react";
+import { ArrowLeft, Wallet, Users, TrendingUp, Search, User, Phone, DollarSign, ChevronRight, Download, FileDown } from "lucide-react";
+import jsPDF from "jspdf";
 import { haptics } from "@/utils/haptics";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -138,6 +139,162 @@ const ManagerPortfolioBreakdown = () => {
     });
   };
 
+  const exportPortfolioCSV = () => {
+    const csvRows = [];
+    
+    // CSV Headers
+    csvRows.push([
+      "Agent Name",
+      "Agent Phone",
+      "Total Tenants",
+      "Portfolio Value (UGX)",
+      "Tenant Name",
+      "Tenant Phone",
+      "Status",
+      "Outstanding Balance (UGX)"
+    ].join(","));
+
+    // Add data rows
+    filteredPortfolios.forEach(portfolio => {
+      if (portfolio.tenants.length === 0) {
+        // Agent with no tenants
+        csvRows.push([
+          `"${portfolio.name}"`,
+          `"${portfolio.phone}"`,
+          portfolio.activeTenants,
+          portfolio.totalPortfolioValue,
+          '""',
+          '""',
+          '""',
+          '""'
+        ].join(","));
+      } else {
+        // Agent with tenants
+        portfolio.tenants.forEach((tenant, idx) => {
+          csvRows.push([
+            idx === 0 ? `"${portfolio.name}"` : '""',
+            idx === 0 ? `"${portfolio.phone}"` : '""',
+            idx === 0 ? portfolio.activeTenants : '""',
+            idx === 0 ? portfolio.totalPortfolioValue : '""',
+            `"${tenant.tenant_name}"`,
+            `"${tenant.tenant_phone}"`,
+            `"${tenant.status}"`,
+            parseFloat(tenant.outstanding_balance?.toString() || "0")
+          ].join(","));
+        });
+      }
+    });
+
+    const csvContent = csvRows.join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `portfolio-breakdown-${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    
+    haptics.success();
+    toast.success("Portfolio breakdown exported as CSV");
+  };
+
+  const exportPortfolioPDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    let yPosition = margin;
+
+    // Title
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("Portfolio Breakdown Report", margin, yPosition);
+    yPosition += 10;
+
+    // Date and summary
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Generated: ${new Date().toLocaleString()}`, margin, yPosition);
+    yPosition += 6;
+    doc.text(`Total Portfolio Value: UGX ${totalPortfolioValue.toLocaleString()}`, margin, yPosition);
+    yPosition += 6;
+    doc.text(`Total Agents: ${filteredPortfolios.length}`, margin, yPosition);
+    yPosition += 6;
+    doc.text(`Total Tenants: ${totalTenants}`, margin, yPosition);
+    yPosition += 12;
+
+    // Agent details
+    filteredPortfolios.forEach((portfolio, agentIndex) => {
+      // Check if we need a new page
+      if (yPosition > pageHeight - 40) {
+        doc.addPage();
+        yPosition = margin;
+      }
+
+      // Agent header
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${agentIndex + 1}. ${portfolio.name}`, margin, yPosition);
+      yPosition += 6;
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Phone: ${portfolio.phone}`, margin + 5, yPosition);
+      yPosition += 5;
+      doc.text(`Portfolio Value: UGX ${portfolio.totalPortfolioValue.toLocaleString()}`, margin + 5, yPosition);
+      yPosition += 5;
+      doc.text(`Total Tenants: ${portfolio.activeTenants}`, margin + 5, yPosition);
+      yPosition += 8;
+
+      // Tenant table header
+      if (portfolio.tenants.length > 0) {
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        const col1 = margin + 10;
+        const col2 = col1 + 50;
+        const col3 = col2 + 35;
+        const col4 = col3 + 25;
+
+        doc.text("Tenant Name", col1, yPosition);
+        doc.text("Phone", col2, yPosition);
+        doc.text("Status", col3, yPosition);
+        doc.text("Balance (UGX)", col4, yPosition);
+        yPosition += 5;
+
+        // Tenant rows
+        doc.setFont("helvetica", "normal");
+        portfolio.tenants.forEach((tenant) => {
+          if (yPosition > pageHeight - 20) {
+            doc.addPage();
+            yPosition = margin;
+          }
+
+          const tenantName = tenant.tenant_name.length > 20 
+            ? tenant.tenant_name.substring(0, 20) + "..." 
+            : tenant.tenant_name;
+          
+          doc.text(tenantName, col1, yPosition);
+          doc.text(tenant.tenant_phone, col2, yPosition);
+          doc.text(tenant.status, col3, yPosition);
+          doc.text(parseFloat(tenant.outstanding_balance?.toString() || "0").toLocaleString(), col4, yPosition);
+          yPosition += 5;
+        });
+      } else {
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "italic");
+        doc.text("No tenants assigned", margin + 10, yPosition);
+        yPosition += 5;
+      }
+
+      yPosition += 8;
+    });
+
+    doc.save(`portfolio-breakdown-${new Date().toISOString().split("T")[0]}.pdf`);
+    
+    haptics.success();
+    toast.success("Portfolio breakdown exported as PDF");
+  };
+
   if (loading) {
     return (
       <ManagerLayout currentPage="/manager/dashboard">
@@ -238,16 +395,40 @@ const ManagerPortfolioBreakdown = () => {
           </Card>
         </div>
 
-        {/* Search */}
+        {/* Search and Export */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Search className="h-5 w-5" />
-              Search Agents or Tenants
-            </CardTitle>
-            <CardDescription>
-              Filter by agent name, phone, tenant name, or tenant phone
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Search className="h-5 w-5" />
+                  Search Agents or Tenants
+                </CardTitle>
+                <CardDescription>
+                  Filter by agent name, phone, tenant name, or tenant phone
+                </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportPortfolioCSV}
+                  className="gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportPortfolioPDF}
+                  className="gap-2"
+                >
+                  <FileDown className="h-4 w-4" />
+                  PDF
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <Input
