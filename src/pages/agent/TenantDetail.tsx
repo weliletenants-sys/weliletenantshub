@@ -17,10 +17,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 import PaymentReceipt from "@/components/PaymentReceipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff, Receipt, Edit, History, Zap, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff, Receipt, Edit, History, Zap, Loader2, Trash2, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { isOnline } from "@/lib/offlineSync";
 import { haptics } from "@/utils/haptics";
@@ -50,6 +53,8 @@ const AgentTenantDetail = () => {
   const [lastPayment, setLastPayment] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("details");
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
+  const [dateRangeFilter, setDateRangeFilter] = useState<string>("all");
+  const [customDateRange, setCustomDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined });
   const [paymentForm, setPaymentForm] = useState({
     amount: "",
     paymentMethod: "cash",
@@ -721,35 +726,113 @@ const AgentTenantDetail = () => {
                   </CardDescription>
                   
                   {/* Payment Method Filter */}
-                  <div className="flex flex-wrap gap-2 mt-4">
-                    <Button
-                      size="sm"
-                      variant={paymentMethodFilter === "all" ? "default" : "outline"}
-                      onClick={() => setPaymentMethodFilter("all")}
-                    >
-                      All ({collections.length})
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={paymentMethodFilter === "cash" ? "default" : "outline"}
-                      onClick={() => setPaymentMethodFilter("cash")}
-                    >
-                      Cash ({collections.filter(c => c.payment_method === "cash").length})
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={paymentMethodFilter === "mtn" ? "default" : "outline"}
-                      onClick={() => setPaymentMethodFilter("mtn")}
-                    >
-                      MTN ({collections.filter(c => c.payment_method === "mtn").length})
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={paymentMethodFilter === "airtel" ? "default" : "outline"}
-                      onClick={() => setPaymentMethodFilter("airtel")}
-                    >
-                      Airtel ({collections.filter(c => c.payment_method === "airtel").length})
-                    </Button>
+                  <div className="space-y-3 mt-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-2 block">Payment Method</Label>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant={paymentMethodFilter === "all" ? "default" : "outline"}
+                          onClick={() => setPaymentMethodFilter("all")}
+                        >
+                          All ({collections.length})
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={paymentMethodFilter === "cash" ? "default" : "outline"}
+                          onClick={() => setPaymentMethodFilter("cash")}
+                        >
+                          Cash ({collections.filter(c => c.payment_method === "cash").length})
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={paymentMethodFilter === "mtn" ? "default" : "outline"}
+                          onClick={() => setPaymentMethodFilter("mtn")}
+                        >
+                          MTN ({collections.filter(c => c.payment_method === "mtn").length})
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={paymentMethodFilter === "airtel" ? "default" : "outline"}
+                          onClick={() => setPaymentMethodFilter("airtel")}
+                        >
+                          Airtel ({collections.filter(c => c.payment_method === "airtel").length})
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Date Range Filter */}
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-2 block">Time Period</Label>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant={dateRangeFilter === "all" ? "default" : "outline"}
+                          onClick={() => {
+                            setDateRangeFilter("all");
+                            setCustomDateRange({ from: undefined, to: undefined });
+                          }}
+                        >
+                          All Time
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={dateRangeFilter === "7days" ? "default" : "outline"}
+                          onClick={() => {
+                            setDateRangeFilter("7days");
+                            setCustomDateRange({ from: undefined, to: undefined });
+                          }}
+                        >
+                          Last 7 Days
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={dateRangeFilter === "30days" ? "default" : "outline"}
+                          onClick={() => {
+                            setDateRangeFilter("30days");
+                            setCustomDateRange({ from: undefined, to: undefined });
+                          }}
+                        >
+                          Last 30 Days
+                        </Button>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant={dateRangeFilter === "custom" ? "default" : "outline"}
+                              className={cn("gap-2")}
+                            >
+                              <CalendarIcon className="h-4 w-4" />
+                              {dateRangeFilter === "custom" && customDateRange.from ? (
+                                customDateRange.to ? (
+                                  <>
+                                    {format(customDateRange.from, "MMM d")} - {format(customDateRange.to, "MMM d")}
+                                  </>
+                                ) : (
+                                  format(customDateRange.from, "MMM d, yyyy")
+                                )
+                              ) : (
+                                "Custom Range"
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <CalendarComponent
+                              mode="range"
+                              selected={{ from: customDateRange.from, to: customDateRange.to }}
+                              onSelect={(range) => {
+                                setCustomDateRange({ from: range?.from, to: range?.to });
+                                if (range?.from) {
+                                  setDateRangeFilter("custom");
+                                }
+                              }}
+                              numberOfMonths={2}
+                              className={cn("p-3 pointer-events-auto")}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -759,13 +842,44 @@ const AgentTenantDetail = () => {
                     </div>
                   ) : (
                     (() => {
-                      const filteredCollections = paymentMethodFilter === "all" 
+                      // Filter by payment method
+                      let filteredCollections = paymentMethodFilter === "all" 
                         ? collections 
                         : collections.filter(c => c.payment_method === paymentMethodFilter);
                       
+                      // Filter by date range
+                      if (dateRangeFilter !== "all") {
+                        const now = new Date();
+                        filteredCollections = filteredCollections.filter(c => {
+                          const collectionDate = new Date(c.collection_date);
+                          
+                          if (dateRangeFilter === "7days") {
+                            const sevenDaysAgo = new Date(now);
+                            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                            return collectionDate >= sevenDaysAgo;
+                          } else if (dateRangeFilter === "30days") {
+                            const thirtyDaysAgo = new Date(now);
+                            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                            return collectionDate >= thirtyDaysAgo;
+                          } else if (dateRangeFilter === "custom" && customDateRange.from) {
+                            const fromDate = new Date(customDateRange.from);
+                            fromDate.setHours(0, 0, 0, 0);
+                            
+                            if (customDateRange.to) {
+                              const toDate = new Date(customDateRange.to);
+                              toDate.setHours(23, 59, 59, 999);
+                              return collectionDate >= fromDate && collectionDate <= toDate;
+                            } else {
+                              return collectionDate >= fromDate;
+                            }
+                          }
+                          return true;
+                        });
+                      }
+                      
                       return filteredCollections.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
-                          No {paymentMethodFilter} payments found
+                          No payments found matching the selected filters
                         </div>
                       ) : (
                         <div className="overflow-x-auto">
