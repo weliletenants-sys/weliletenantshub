@@ -15,21 +15,33 @@ const ManagerDashboard = () => {
 
   useEffect(() => {
     const fetchStats = async () => {
-      const [agentsResult, tenantsResult] = await Promise.all([
-        supabase.from("agents").select("*"),
-        supabase.from("tenants").select("*"),
-      ]);
+      try {
+        const [agentsResult, tenantsResult] = await Promise.all([
+          supabase.from("agents").select("*"),
+          supabase.from("tenants").select("*"),
+        ]);
 
-      const totalAgents = agentsResult.data?.length || 0;
-      const totalTenants = tenantsResult.data?.length || 0;
-      const pendingVerifications = tenantsResult.data?.filter(t => t.status === 'pending').length || 0;
+        if (agentsResult.error) {
+          console.error("Error fetching agents:", agentsResult.error);
+        }
+        
+        if (tenantsResult.error) {
+          console.error("Error fetching tenants:", tenantsResult.error);
+        }
 
-      setStats({
-        totalAgents,
-        activeAgents: totalAgents,
-        totalTenants,
-        pendingVerifications,
-      });
+        const totalAgents = agentsResult.data?.length || 0;
+        const totalTenants = tenantsResult.data?.length || 0;
+        const pendingVerifications = tenantsResult.data?.filter(t => t.status === 'pending').length || 0;
+
+        setStats({
+          totalAgents,
+          activeAgents: totalAgents,
+          totalTenants,
+          pendingVerifications,
+        });
+      } catch (error) {
+        console.error("Error fetching dashboard stats:", error);
+      }
     };
 
     fetchStats();
