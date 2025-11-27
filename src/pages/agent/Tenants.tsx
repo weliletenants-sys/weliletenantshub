@@ -107,16 +107,16 @@ const AgentTenants = () => {
   );
 
   const renderTenantTable = (tenantList: any[]) => (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto -mx-2 sm:mx-0">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Tenant Name</TableHead>
-            <TableHead>Phone</TableHead>
-            <TableHead>Rent Amount</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>{activeTab === "overdue" ? "Days Overdue" : "Days Left"}</TableHead>
-            <TableHead>Outstanding</TableHead>
+          <TableRow className="h-12">
+            <TableHead className="font-semibold">Name</TableHead>
+            <TableHead className="font-semibold">Phone</TableHead>
+            <TableHead className="font-semibold">Rent</TableHead>
+            <TableHead className="font-semibold">Status</TableHead>
+            <TableHead className="font-semibold">{activeTab === "overdue" ? "Overdue" : "Days"}</TableHead>
+            <TableHead className="font-semibold text-right">Balance</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -139,46 +139,47 @@ const AgentTenants = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              My Tenants
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              👥 My Tenants
               <RefreshIndicator isRefreshing={isFetching && !isLoading} />
               <RealtimeSyncIndicator lastSyncTime={lastSyncTime} compact />
             </h1>
-            <p className="text-muted-foreground">Manage and track your tenant portfolio</p>
+            <p className="text-sm text-muted-foreground">Your portfolio</p>
           </div>
-          <Button onClick={() => navigate("/agent/new-tenant")}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Tenant
+          <Button onClick={() => navigate("/agent/new-tenant")} size="lg" className="h-12 shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95">
+            <Plus className="h-5 w-5 mr-1" />
+            Add
           </Button>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="all">
-              All Tenants ({tenantsWithOverdue.length})
+          <TabsList className="grid w-full grid-cols-2 h-12">
+            <TabsTrigger value="all" className="text-base">
+              All ({tenantsWithOverdue.length})
             </TabsTrigger>
-            <TabsTrigger value="overdue" className="text-destructive data-[state=active]:text-destructive">
-              <AlertCircle className="h-4 w-4 mr-2" />
+            <TabsTrigger value="overdue" className="text-base text-destructive data-[state=active]:text-destructive">
+              <AlertCircle className="h-4 w-4 mr-1" />
               Overdue ({overdueTenants.length})
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="all">
-            <Card>
-              <CardHeader>
-                <CardTitle>All Tenants</CardTitle>
-                <CardDescription>
-                  Total: {tenantsWithOverdue.length} tenant{tenantsWithOverdue.length !== 1 ? 's' : ''}
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">All Tenants</CardTitle>
+                <CardDescription className="text-xs">
+                  {tenantsWithOverdue.length} total
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
                   <TenantListSkeleton />
                 ) : tenantsWithOverdue.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground mb-4">No tenants yet</p>
-                    <Button onClick={() => navigate("/agent/new-tenant")}>
-                      Add Your First Tenant
+                  <div className="text-center py-12">
+                    <p className="text-4xl mb-3">🏠</p>
+                    <p className="text-muted-foreground mb-4 text-sm">No tenants yet</p>
+                    <Button onClick={() => navigate("/agent/new-tenant")} size="lg" className="h-12">
+                      Add Your First Tenant 🚀
                     </Button>
                   </div>
                 ) : (
@@ -189,22 +190,23 @@ const AgentTenants = () => {
           </TabsContent>
 
           <TabsContent value="overdue">
-            <Card className="border-destructive/50">
-              <CardHeader>
-                <CardTitle className="text-destructive flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5" />
-                  Overdue Tenants
+            <Card className="border-destructive/50 hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-destructive flex items-center gap-2 text-base">
+                  <AlertCircle className="h-4 w-4" />
+                  Overdue
                 </CardTitle>
-                <CardDescription>
-                  {overdueTenants.length} tenant{overdueTenants.length !== 1 ? 's have' : ' has'} missed payment deadlines
+                <CardDescription className="text-xs">
+                  {overdueTenants.length} missed deadline{overdueTenants.length !== 1 ? 's' : ''}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
                   <TenantListSkeleton />
                 ) : overdueTenants.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">No overdue tenants - great job! 🎉</p>
+                  <div className="text-center py-12">
+                    <p className="text-4xl mb-2">✨</p>
+                    <p className="text-muted-foreground text-sm">All caught up! 🎉</p>
                   </div>
                 ) : (
                   renderTenantTable(overdueTenants)

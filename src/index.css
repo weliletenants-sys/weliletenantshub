@@ -295,3 +295,23 @@ All colors MUST be HSL.
     opacity: 0;
   }
 }
+
+/* Active state for mobile interactions */
+.active\:scale-98:active {
+  transform: scale(0.98);
+}
+
+.active\:scale-95:active {
+  transform: scale(0.95);
+}
+
+/* Smooth transitions for all interactive elements */
+@layer utilities {
+  .transition-all {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .hover\:scale-105:hover {
+    transform: scale(1.05);
+  }
+}
