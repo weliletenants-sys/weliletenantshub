@@ -587,22 +587,40 @@ const ManagerAgents = () => {
                         </div>
                         
                         {/* 7-Day Trend Sparkline */}
-                        {agent.trend.length > 0 && (
-                          <div className="flex flex-col items-center">
-                            <ResponsiveContainer width={80} height={30}>
-                              <LineChart data={agent.trend}>
-                                <Line 
-                                  type="monotone" 
-                                  dataKey="value" 
-                                  stroke="hsl(var(--primary))" 
-                                  strokeWidth={2}
-                                  dot={false}
-                                />
-                              </LineChart>
-                            </ResponsiveContainer>
-                            <p className="text-xs text-muted-foreground mt-0.5">7-day trend</p>
-                          </div>
-                        )}
+                        {agent.trend.length > 0 && (() => {
+                          const firstValue = agent.trend[0]?.value || 0;
+                          const lastValue = agent.trend[agent.trend.length - 1]?.value || 0;
+                          const percentChange = firstValue !== 0 
+                            ? ((lastValue - firstValue) / firstValue) * 100 
+                            : 0;
+                          const isPositive = percentChange >= 0;
+                          
+                          return (
+                            <div className="flex flex-col items-center">
+                              <ResponsiveContainer width={80} height={30}>
+                                <LineChart data={agent.trend}>
+                                  <Line 
+                                    type="monotone" 
+                                    dataKey="value" 
+                                    stroke={isPositive ? "hsl(var(--chart-2))" : "hsl(var(--destructive))"} 
+                                    strokeWidth={2}
+                                    dot={false}
+                                  />
+                                </LineChart>
+                              </ResponsiveContainer>
+                              <div className="flex items-center gap-0.5 mt-0.5">
+                                {isPositive ? (
+                                  <ArrowUp className="h-3 w-3 text-chart-2" />
+                                ) : (
+                                  <ArrowDown className="h-3 w-3 text-destructive" />
+                                )}
+                                <p className={`text-xs font-medium ${isPositive ? 'text-chart-2' : 'text-destructive'}`}>
+                                  {isPositive ? '+' : ''}{percentChange.toFixed(1)}%
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })()}
                         
                         <div className="text-right">
                           <p className="font-bold text-lg">
