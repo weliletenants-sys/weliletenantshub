@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Skeleton } from "@/components/ui/skeleton";
+import { clearOldCaches } from "@/lib/cacheManager";
 
 // Eagerly load critical pages
 import Index from "./pages/Index";
@@ -46,97 +47,104 @@ const PageLoader = () => (
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/install" element={<Install />} />
-            <Route path="/agent/dashboard" element={
-              <ProtectedRoute requiredRole="agent">
-                <AgentDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/agent/tenants" element={
-              <ProtectedRoute requiredRole="agent">
-                <AgentTenants />
-              </ProtectedRoute>
-            } />
-            <Route path="/agent/tenants/:tenantId" element={
-              <ProtectedRoute requiredRole="agent">
-                <AgentTenantDetail />
-              </ProtectedRoute>
-            } />
-            <Route path="/agent/new-tenant" element={
-              <ProtectedRoute requiredRole="agent">
-                <AgentNewTenant />
-              </ProtectedRoute>
-            } />
-            <Route path="/agent/collections" element={
-              <ProtectedRoute requiredRole="agent">
-                <AgentCollections />
-              </ProtectedRoute>
-            } />
-            <Route path="/agent/earnings" element={
-              <ProtectedRoute requiredRole="agent">
-                <AgentEarnings />
-              </ProtectedRoute>
-            } />
-            <Route path="/agent/offline-queue" element={
-              <ProtectedRoute requiredRole="agent">
-                <AgentOfflineQueue />
-              </ProtectedRoute>
-            } />
-            <Route path="/agent/ai-assistant" element={
-              <ProtectedRoute requiredRole="agent">
-                <AgentAIAssistant />
-              </ProtectedRoute>
-            } />
-            <Route path="/agent/weekly-summary" element={
-              <ProtectedRoute requiredRole="agent">
-                <AgentWeeklySummary />
-              </ProtectedRoute>
-            } />
-            <Route path="/agent/settings" element={
-              <ProtectedRoute requiredRole="agent">
-                <AgentSettings />
-              </ProtectedRoute>
-            } />
-            <Route path="/manager/dashboard" element={
-              <ProtectedRoute requiredRole="manager">
-                <ManagerDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/manager/agents" element={
-              <ProtectedRoute requiredRole="manager">
-                <ManagerAgents />
-              </ProtectedRoute>
-            } />
-            <Route path="/manager/verifications" element={
-              <ProtectedRoute requiredRole="manager">
-                <ManagerVerifications />
-              </ProtectedRoute>
-            } />
-            <Route path="/manager/settings" element={
-              <ProtectedRoute requiredRole="manager">
-                <ManagerSettings />
-              </ProtectedRoute>
-            } />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/profile-repair" element={<AdminProfileRepair />} />
-            <Route path="/admin/roles" element={<AdminRoleManagement />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  // Initialize cache cleanup on app start
+  useEffect(() => {
+    clearOldCaches();
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/install" element={<Install />} />
+              <Route path="/agent/dashboard" element={
+                <ProtectedRoute requiredRole="agent">
+                  <AgentDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/tenants" element={
+                <ProtectedRoute requiredRole="agent">
+                  <AgentTenants />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/tenants/:tenantId" element={
+                <ProtectedRoute requiredRole="agent">
+                  <AgentTenantDetail />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/new-tenant" element={
+                <ProtectedRoute requiredRole="agent">
+                  <AgentNewTenant />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/collections" element={
+                <ProtectedRoute requiredRole="agent">
+                  <AgentCollections />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/earnings" element={
+                <ProtectedRoute requiredRole="agent">
+                  <AgentEarnings />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/offline-queue" element={
+                <ProtectedRoute requiredRole="agent">
+                  <AgentOfflineQueue />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/ai-assistant" element={
+                <ProtectedRoute requiredRole="agent">
+                  <AgentAIAssistant />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/weekly-summary" element={
+                <ProtectedRoute requiredRole="agent">
+                  <AgentWeeklySummary />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/settings" element={
+                <ProtectedRoute requiredRole="agent">
+                  <AgentSettings />
+                </ProtectedRoute>
+              } />
+              <Route path="/manager/dashboard" element={
+                <ProtectedRoute requiredRole="manager">
+                  <ManagerDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/manager/agents" element={
+                <ProtectedRoute requiredRole="manager">
+                  <ManagerAgents />
+                </ProtectedRoute>
+              } />
+              <Route path="/manager/verifications" element={
+                <ProtectedRoute requiredRole="manager">
+                  <ManagerVerifications />
+                </ProtectedRoute>
+              } />
+              <Route path="/manager/settings" element={
+                <ProtectedRoute requiredRole="manager">
+                  <ManagerSettings />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/profile-repair" element={<AdminProfileRepair />} />
+              <Route path="/admin/roles" element={<AdminRoleManagement />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

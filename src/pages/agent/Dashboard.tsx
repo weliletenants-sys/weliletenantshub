@@ -11,6 +11,8 @@ import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap } from "luc
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 import QuickPaymentDialog from "@/components/QuickPaymentDialog";
+import { clearOldCaches, getCacheSize } from "@/lib/cacheManager";
+import { useServiceWorker } from "@/hooks/useServiceWorker";
 
 const AgentDashboard = () => {
   const navigate = useNavigate();
@@ -21,9 +23,25 @@ const AgentDashboard = () => {
   const [overdueTenants, setOverdueTenants] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
+  
+  // Service worker for caching
+  useServiceWorker();
 
   useEffect(() => {
     fetchAgentData();
+    
+    // Initialize cache management
+    const initCache = async () => {
+      await clearOldCaches();
+      
+      // Log cache size for monitoring
+      const cacheSize = await getCacheSize();
+      if (cacheSize) {
+        console.log(`Cache usage: ${(cacheSize.usage / 1024 / 1024).toFixed(2)}MB / ${(cacheSize.quota / 1024 / 1024).toFixed(2)}MB (${cacheSize.percentage.toFixed(1)}%)`);
+      }
+    };
+    
+    initCache();
   }, []);
 
   // Show overdue notification on dashboard load

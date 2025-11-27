@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import WelileLogo from "./WelileLogo";
 import OfflineSyncIndicator from "./OfflineSyncIndicator";
+import { CacheIndicator } from "./CacheIndicator";
 import Breadcrumbs from "./Breadcrumbs";
 import { supabase } from "@/integrations/supabase/client";
 import { Home, Users, Plus, DollarSign, TrendingUp, LogOut, MessageSquare, BarChart3, Settings } from "lucide-react";
@@ -56,6 +57,7 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
         <WelileLogo />
         <div className="flex items-center gap-3">
           <OfflineSyncIndicator />
+          <CacheIndicator />
           <Button variant="ghost" size="sm" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" />
             Logout
