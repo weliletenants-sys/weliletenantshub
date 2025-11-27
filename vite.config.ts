@@ -72,7 +72,11 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
+          // Google Fonts - Cache first with long expiration
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: "CacheFirst",
@@ -87,15 +91,77 @@ export default defineConfig(({ mode }) => ({
               }
             }
           },
+          // Agent Dashboard Data - Stale While Revalidate for instant loads
+          {
+            urlPattern: /\/rest\/v1\/(agents|tenants|collections)\?.*/i,
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "dashboard-data-cache",
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 2 // 2 hours
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              },
+              plugins: [
+                {
+                  cacheKeyWillBeUsed: async ({ request }) => {
+                    // Cache based on URL without auth headers for better hit rate
+                    return request.url;
+                  }
+                }
+              ]
+            }
+          },
+          // Profile and User Data - Cache first with background sync
+          {
+            urlPattern: /\/rest\/v1\/profiles\?.*/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "profile-cache",
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24 // 24 hours
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // Images and Media - Cache first with long expiration
+          {
+            urlPattern: /\.(png|jpg|jpeg|svg|gif|webp)$/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "images-cache",
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // Auth endpoints - Network only (never cache auth)
+          {
+            urlPattern: /\/auth\/.*/i,
+            handler: "NetworkOnly",
+            options: {
+              cacheName: "auth-cache"
+            }
+          },
+          // All other Supabase API calls - Network first with fallback
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
             handler: "NetworkFirst",
             options: {
               cacheName: "supabase-api-cache",
-              networkTimeoutSeconds: 10,
+              networkTimeoutSeconds: 8,
               expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 5 * 60 // 5 minutes
+                maxEntries: 75,
+                maxAgeSeconds: 60 * 30 // 30 minutes
               },
               cacheableResponse: {
                 statuses: [0, 200]
