@@ -5,6 +5,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import Login from "./pages/Login";
+import AgentDashboard from "./pages/agent/Dashboard";
+import AgentTenants from "./pages/agent/Tenants";
+import AgentNewTenant from "./pages/agent/NewTenant";
+import AgentCollections from "./pages/agent/Collections";
+import AgentEarnings from "./pages/agent/Earnings";
+import ManagerDashboard from "./pages/manager/Dashboard";
+import ManagerAgents from "./pages/manager/Agents";
+import ManagerVerifications from "./pages/manager/Verifications";
 
 const queryClient = new QueryClient();
 
@@ -16,6 +25,15 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/agent/dashboard" element={<AgentDashboard />} />
+          <Route path="/agent/tenants" element={<AgentTenants />} />
+          <Route path="/agent/new-tenant" element={<AgentNewTenant />} />
+          <Route path="/agent/collections" element={<AgentCollections />} />
+          <Route path="/agent/earnings" element={<AgentEarnings />} />
+          <Route path="/manager/dashboard" element={<ManagerDashboard />} />
+          <Route path="/manager/agents" element={<ManagerAgents />} />
+          <Route path="/manager/verifications" element={<ManagerVerifications />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
