@@ -283,17 +283,98 @@ All colors MUST be HSL.
 .ripple {
   position: absolute;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.6);
   transform: scale(0);
-  animation: ripple-animation 0.6s ease-out;
+  animation: ripple-animation 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
 }
 
+/* Dark mode ripple */
+.dark .ripple {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 @keyframes ripple-animation {
-  to {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
     transform: scale(4);
     opacity: 0;
   }
+}
+
+/* Interactive card enhancements */
+.card-interactive {
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-interactive:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+.card-interactive:active {
+  transform: translateY(0) scale(0.99);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+/* Smooth focus states */
+.focus-ring {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.3);
+}
+
+/* Hover glow effect */
+.hover-glow {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
+}
+
+/* Button press effect */
+.btn-press {
+  transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-press:active {
+  transform: scale(0.97);
+}
+
+/* Smooth background transitions */
+.bg-transition {
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Icon spin on hover */
+.icon-spin-hover svg {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.icon-spin-hover:hover svg {
+  transform: rotate(90deg);
+}
+
+/* Bounce animation */
+@keyframes bounce-subtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.bounce-on-hover:hover {
+  animation: bounce-subtle 0.6s ease-in-out;
 }
 
 /* Active state for mobile interactions */
