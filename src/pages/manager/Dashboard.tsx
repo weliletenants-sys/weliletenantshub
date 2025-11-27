@@ -863,7 +863,13 @@ const ManagerDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+          <Card 
+            className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 cursor-pointer hover:border-primary/40 transition-all hover:shadow-lg"
+            onClick={() => {
+              haptics.light();
+              navigate("/manager/portfolio-breakdown");
+            }}
+          >
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2 justify-between">
                 <div className="flex items-center gap-2">
@@ -882,7 +888,9 @@ const ManagerDashboard = () => {
               <div className="text-2xl font-bold text-primary">
                 UGX {stats.totalPortfolioValue.toLocaleString()}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Combined outstanding balances</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Combined outstanding balances • Tap for breakdown
+              </p>
             </CardContent>
           </Card>
         </div>
