@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { addPendingPayment, isOnline } from '@/lib/offlineSync';
+import { addPendingPayment, addPendingTenant, isOnline } from '@/lib/offlineSync';
 import { haptics } from '@/utils/haptics';
 import type { Tables } from '@/integrations/supabase/types';
 
@@ -212,6 +212,116 @@ export const useOptimisticTenantUpdate = () => {
 
     onSettled: (result, error, { tenantId }) => {
       queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
+    },
+  });
+};
+
+interface CreateTenantData {
+  agent_id: string;
+  tenant_name: string;
+  tenant_phone: string;
+  outstanding_balance: number;
+}
+
+/**
+ * Hook for optimistic tenant creation
+ * Adds tenant to list instantly before server confirmation
+ */
+export const useOptimisticTenantCreation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: CreateTenantData) => {
+      if (!isOnline()) {
+        // Offline: queue for later sync
+        await addPendingTenant(data);
+        return { offline: true, tenant: null };
+      }
+
+      // Online: submit to server
+      const { data: tenant, error } = await supabase
+        .from('tenants')
+        .insert(data)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return { offline: false, tenant };
+    },
+
+    // Optimistic update: Add tenant to list immediately
+    onMutate: async (data) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['tenants', data.agent_id] });
+
+      // Snapshot previous value
+      const previousTenants = queryClient.getQueryData<Tenant[]>(['tenants', data.agent_id]);
+
+      // Create optimistic tenant
+      const optimisticTenant: Tenant = {
+        id: `optimistic-${Date.now()}`,
+        agent_id: data.agent_id,
+        tenant_name: data.tenant_name,
+        tenant_phone: data.tenant_phone,
+        outstanding_balance: data.outstanding_balance,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        rent_amount: null,
+        registration_fee: null,
+        days_remaining: 30,
+        last_payment_date: null,
+        next_payment_date: null,
+        landlord_name: null,
+        landlord_phone: null,
+        landlord_id_url: null,
+        lc1_name: null,
+        lc1_phone: null,
+        lc1_letter_url: null,
+        verified_at: null,
+      };
+
+      // Optimistically add to list
+      queryClient.setQueryData<Tenant[]>(['tenants', data.agent_id], (old = []) => [
+        optimisticTenant,
+        ...old,
+      ]);
+
+      // Haptic feedback
+      haptics.light();
+
+      return { previousTenants };
+    },
+
+    // On error: rollback
+    onError: (error, data, context) => {
+      if (context?.previousTenants) {
+        queryClient.setQueryData(['tenants', data.agent_id], context.previousTenants);
+      }
+
+      haptics.error?.();
+      toast.error('Failed to add tenant. Changes have been reverted.', {
+        description: error instanceof Error ? error.message : 'Please try again',
+      });
+    },
+
+    // On success: show confirmation
+    onSuccess: (result) => {
+      if (result.offline) {
+        toast.success('Tenant saved offline!', {
+          description: 'Will sync when back online',
+          duration: 5000,
+        });
+      } else {
+        haptics.success();
+        toast.success('Tenant added! UGX 5,000 credited to your wallet');
+      }
+    },
+
+    // Always refetch to ensure sync
+    onSettled: (result, error, data) => {
+      queryClient.invalidateQueries({ queryKey: ['tenants', data.agent_id] });
     },
   });
 };
