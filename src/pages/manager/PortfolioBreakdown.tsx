@@ -70,6 +70,28 @@ const ManagerPortfolioBreakdown = () => {
     }
   }, []);
 
+  // Load pagination preferences from localStorage
+  useEffect(() => {
+    const savedPageSizes = localStorage.getItem('portfolio-tenant-page-sizes');
+    const savedShowAll = localStorage.getItem('portfolio-tenant-show-all');
+    
+    if (savedPageSizes) {
+      try {
+        setTenantPageSizes(JSON.parse(savedPageSizes));
+      } catch (e) {
+        console.error('Failed to parse saved page sizes', e);
+      }
+    }
+    
+    if (savedShowAll) {
+      try {
+        setShowAllTenants(JSON.parse(savedShowAll));
+      } catch (e) {
+        console.error('Failed to parse saved show all preferences', e);
+      }
+    }
+  }, []);
+
   const fetchPortfolioBreakdown = async () => {
     try {
       setLoading(true);
@@ -248,7 +270,12 @@ const ManagerPortfolioBreakdown = () => {
   };
 
   const setTenantPageSize = (agentId: string, size: number) => {
-    setTenantPageSizes(prev => ({ ...prev, [agentId]: size }));
+    const updatedSizes = { ...tenantPageSizes, [agentId]: size };
+    setTenantPageSizes(updatedSizes);
+    
+    // Persist to localStorage
+    localStorage.setItem('portfolio-tenant-page-sizes', JSON.stringify(updatedSizes));
+    
     // Reset to page 1 when changing page size
     setTenantPage(agentId, 1);
   };
@@ -288,7 +315,12 @@ const ManagerPortfolioBreakdown = () => {
   };
 
   const toggleShowAll = (agentId: string) => {
-    setShowAllTenants(prev => ({ ...prev, [agentId]: !prev[agentId] }));
+    const updatedShowAll = { ...showAllTenants, [agentId]: !showAllTenants[agentId] };
+    setShowAllTenants(updatedShowAll);
+    
+    // Persist to localStorage
+    localStorage.setItem('portfolio-tenant-show-all', JSON.stringify(updatedShowAll));
+    
     haptics.light();
   };
 
