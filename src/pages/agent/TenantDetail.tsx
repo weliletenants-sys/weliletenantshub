@@ -149,14 +149,15 @@ const AgentTenantDetail = () => {
   });
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      pending: "secondary",
-      verified: "default",
-      paying: "default",
-      late: "destructive",
-      defaulted: "destructive",
+    const statusConfig: Record<string, { variant: "default" | "secondary" | "destructive" | "outline", emoji: string }> = {
+      pending: { variant: "secondary", emoji: "⏰" },
+      verified: { variant: "default", emoji: "✅" },
+      paying: { variant: "default", emoji: "💰" },
+      late: { variant: "destructive", emoji: "⚠️" },
+      defaulted: { variant: "destructive", emoji: "❌" },
     };
-    return <Badge variant={variants[status] || "outline"}>{status}</Badge>;
+    const config = statusConfig[status] || { variant: "outline", emoji: "📋" };
+    return <Badge variant={config.variant} className="text-base gap-1">{config.emoji} {status}</Badge>;
   };
 
   const getPaymentStatusBadge = (status: string) => {
@@ -311,13 +312,13 @@ const AgentTenantDetail = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              {tenant.tenant_name}
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              🏠 {tenant.tenant_name}
               <RealtimeSyncIndicator lastSyncTime={lastSyncTime} compact />
             </h1>
-            <p className="text-muted-foreground">Tenant Details & Payment History</p>
+            <p className="text-muted-foreground text-sm">Portfolio Details</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {getStatusBadge(tenant.status)}
             <OptimisticBadge show={paymentMutation.isPending || tenantUpdateMutation.isPending} />
           </div>
@@ -331,9 +332,8 @@ const AgentTenantDetail = () => {
           
           <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Details
+              <Button variant="outline" size="lg" className="h-12">
+                ✏️ Edit
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -475,9 +475,8 @@ const AgentTenantDetail = () => {
           
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Record Payment
+              <Button size="lg" className="h-12 shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95">
+                💰 Record
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -564,98 +563,138 @@ const AgentTenantDetail = () => {
 
         {/* Swipeable Tabs Interface */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="details">
-              <User className="h-4 w-4 mr-2" />
-              Details
+          <TabsList className="grid w-full grid-cols-3 h-14">
+            <TabsTrigger value="details" className="text-base">
+              📋
             </TabsTrigger>
-            <TabsTrigger value="payments">
-              <History className="h-4 w-4 mr-2" />
-              Payments
+            <TabsTrigger value="payments" className="text-base">
+              💵
             </TabsTrigger>
-            <TabsTrigger value="actions">
-              <Zap className="h-4 w-4 mr-2" />
-              Actions
+            <TabsTrigger value="actions" className="text-base">
+              ⚡
             </TabsTrigger>
           </TabsList>
 
           <div {...swipeHandlers} className="mt-6">
             <TabsContent value="details" className="m-0 animate-fade-in">
+              {/* Visual Payment Progress */}
+              <Card className="mb-6 bg-gradient-to-br from-primary/5 via-primary/10 to-accent/5 border-primary/20">
+                <CardContent className="pt-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">💸 Collection Progress</p>
+                      <p className="text-3xl font-bold">
+                        {(parseFloat(tenant.rent_amount?.toString() || '0') > 0 
+                          ? ((totalCollected / parseFloat(tenant.rent_amount?.toString() || '1')) * 100) 
+                          : 0
+                        ).toFixed(0)}%
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Balance</p>
+                      <p className="text-2xl font-bold text-destructive">
+                        {(parseFloat(tenant.outstanding_balance?.toString() || '0') / 1000).toFixed(0)}K
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Emoji Progress Bar */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-2xl">
+                      {Array.from({ length: 10 }).map((_, i) => {
+                        const progress = parseFloat(tenant.rent_amount?.toString() || '0') > 0 
+                          ? (totalCollected / parseFloat(tenant.rent_amount?.toString() || '1')) * 10
+                          : 0;
+                        return (
+                          <span key={i} className="transition-all duration-300">
+                            {i < progress ? '💰' : '⚪'}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>0</span>
+                      <span>{(parseFloat(tenant.rent_amount?.toString() || '0') / 1000).toFixed(0)}K</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <div className="grid gap-6 md:grid-cols-2">
                 <Card className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-highlight-pulse ring-2 ring-primary/20' : ''}`}>
-                  <CardHeader>
+                  <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <CardTitle>Tenant Information</CardTitle>
+                      <CardTitle className="text-base">👤 Info</CardTitle>
                       <OptimisticBadge show={tenantUpdateMutation.isPending} />
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Name</p>
-                        <p className="font-medium">{tenant.tenant_name}</p>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                      <span className="text-2xl">👤</span>
+                      <div className="flex-1">
+                        <p className="text-xs text-muted-foreground">Name</p>
+                        <p className="font-semibold">{tenant.tenant_name}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Phone</p>
-                        <p className="font-medium">{tenant.tenant_phone}</p>
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                      <span className="text-2xl">📱</span>
+                      <div className="flex-1">
+                        <p className="text-xs text-muted-foreground">Phone</p>
+                        <p className="font-semibold">{tenant.tenant_phone}</p>
                       </div>
                     </div>
                     {tenant.rent_amount > 0 && (
-                      <div className={`flex items-center gap-3 transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in' : ''}`}>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Monthly Rent</p>
-                          <p className="font-medium">UGX {parseFloat(tenant.rent_amount?.toString() || '0').toLocaleString()}</p>
+                      <div className={`flex items-center gap-3 p-3 rounded-lg bg-primary/10 transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in' : ''}`}>
+                        <span className="text-2xl">💵</span>
+                        <div className="flex-1">
+                          <p className="text-xs text-muted-foreground">Monthly Rent</p>
+                          <p className="font-bold">{(parseFloat(tenant.rent_amount?.toString() || '0') / 1000).toFixed(0)}K</p>
                         </div>
                       </div>
                     )}
-                    <div className="flex items-center gap-3">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">Days Remaining</p>
-                        <p className="font-medium">{tenant.days_remaining || 0} days</p>
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                      <span className="text-2xl">⏰</span>
+                      <div className="flex-1">
+                        <p className="text-xs text-muted-foreground">Days Left</p>
+                        <p className="font-semibold">{tenant.days_remaining || 0}d</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card>
-                  <CardHeader>
+                  <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <CardTitle>Payment Summary</CardTitle>
+                      <CardTitle className="text-base">📊 Stats</CardTitle>
                       <OptimisticBadge show={paymentMutation.isPending} />
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Outstanding Balance</p>
-                      <p className="text-2xl font-bold">
-                        UGX {parseFloat(tenant.outstanding_balance?.toString() || '0').toLocaleString()}
+                  <CardContent className="space-y-3">
+                    <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                      <p className="text-xs text-muted-foreground">Outstanding</p>
+                      <p className="text-2xl font-bold text-destructive">
+                        {(parseFloat(tenant.outstanding_balance?.toString() || '0') / 1000).toFixed(0)}K
                       </p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Collected</p>
-                      <p className="text-xl font-semibold text-primary">
-                        UGX {totalCollected.toLocaleString()}
+                    <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+                      <p className="text-xs text-muted-foreground">Collected</p>
+                      <p className="text-xl font-bold text-primary">
+                        {(totalCollected / 1000).toFixed(0)}K
                       </p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Payments</p>
-                      <p className="text-lg font-medium">{collections.length}</p>
+                    <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
+                      <p className="text-xs text-muted-foreground">Payments</p>
+                      <p className="text-lg font-semibold">{collections.length} 💳</p>
                     </div>
                     {tenant.daily_payment_amount && parseFloat(tenant.daily_payment_amount.toString()) > 0 && (
-                      <div className="pt-3 border-t">
-                        <p className="text-sm text-muted-foreground">Daily Payment Amount</p>
+                      <div className="p-3 rounded-lg bg-primary/20 border-2 border-primary/40">
+                        <p className="text-xs text-muted-foreground">Daily Target</p>
                         <p className="text-xl font-bold text-primary">
-                          UGX {parseFloat(tenant.daily_payment_amount.toString()).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          {(parseFloat(tenant.daily_payment_amount.toString()) / 1000).toFixed(1)}K
                         </p>
                         {tenant.start_date && tenant.due_date && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(tenant.start_date), "MMM d")} - {format(new Date(tenant.due_date), "MMM d, yyyy")}
+                            📅 {format(new Date(tenant.start_date), "MMM d")} → {format(new Date(tenant.due_date), "MMM d")}
                           </p>
                         )}
                       </div>
@@ -667,23 +706,23 @@ const AgentTenantDetail = () => {
               {(tenant.landlord_name || tenant.landlord_phone) && (
                 <Card className={`mt-6 transition-all duration-300 relative ${tenantUpdateMutation.isPending ? 'animate-highlight-pulse ring-2 ring-primary/20' : ''}`}>
                   <SyncPulse show={!!lastSyncTime && Date.now() - lastSyncTime.getTime() < 2000} />
-                  <CardHeader>
+                  <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <CardTitle>Landlord Information</CardTitle>
+                      <CardTitle className="text-base">🏠 Landlord</CardTitle>
                       <OptimisticBadge show={tenantUpdateMutation.isPending} />
                     </div>
                   </CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-2">
+                  <CardContent className="grid gap-3 md:grid-cols-2">
                     {tenant.landlord_name && (
-                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in-delay-1' : ''}`}>
-                        <p className="text-sm text-muted-foreground">Name</p>
-                        <p className="font-medium">{tenant.landlord_name}</p>
+                      <div className={`p-3 rounded-lg bg-muted/50 transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in-delay-1' : ''}`}>
+                        <p className="text-xs text-muted-foreground">Name</p>
+                        <p className="font-semibold">{tenant.landlord_name}</p>
                       </div>
                     )}
                     {tenant.landlord_phone && (
-                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in-delay-2' : ''}`}>
-                        <p className="text-sm text-muted-foreground">Phone</p>
-                        <p className="font-medium">{tenant.landlord_phone}</p>
+                      <div className={`p-3 rounded-lg bg-muted/50 transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in-delay-2' : ''}`}>
+                        <p className="text-xs text-muted-foreground">📞 Phone</p>
+                        <p className="font-semibold">{tenant.landlord_phone}</p>
                       </div>
                     )}
                   </CardContent>
@@ -693,23 +732,23 @@ const AgentTenantDetail = () => {
               {(tenant.lc1_name || tenant.lc1_phone) && (
                 <Card className={`mt-6 transition-all duration-300 relative ${tenantUpdateMutation.isPending ? 'animate-highlight-pulse ring-2 ring-primary/20' : ''}`}>
                   <SyncPulse show={!!lastSyncTime && Date.now() - lastSyncTime.getTime() < 2000} />
-                  <CardHeader>
+                  <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <CardTitle>LC1 Information</CardTitle>
+                      <CardTitle className="text-base">🎯 LC1</CardTitle>
                       <OptimisticBadge show={tenantUpdateMutation.isPending} />
                     </div>
                   </CardHeader>
-                  <CardContent className="grid gap-4 md:grid-cols-2">
+                  <CardContent className="grid gap-3 md:grid-cols-2">
                     {tenant.lc1_name && (
-                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in-delay-1' : ''}`}>
-                        <p className="text-sm text-muted-foreground">Name</p>
-                        <p className="font-medium">{tenant.lc1_name}</p>
+                      <div className={`p-3 rounded-lg bg-muted/50 transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in-delay-1' : ''}`}>
+                        <p className="text-xs text-muted-foreground">Name</p>
+                        <p className="font-semibold">{tenant.lc1_name}</p>
                       </div>
                     )}
                     {tenant.lc1_phone && (
-                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in-delay-2' : ''}`}>
-                        <p className="text-sm text-muted-foreground">Phone</p>
-                        <p className="font-medium">{tenant.lc1_phone}</p>
+                      <div className={`p-3 rounded-lg bg-muted/50 transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in-delay-2' : ''}`}>
+                        <p className="text-xs text-muted-foreground">📞 Phone</p>
+                        <p className="font-semibold">{tenant.lc1_phone}</p>
                       </div>
                     )}
                   </CardContent>
@@ -936,42 +975,46 @@ const AgentTenantDetail = () => {
 
             <TabsContent value="actions" className="m-0 animate-fade-in">
               <div className="grid gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Quick Actions</CardTitle>
-                    <CardDescription>Perform common tasks for this tenant</CardDescription>
+                <Card className="bg-gradient-to-br from-primary/5 to-accent/5">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">⚡ Quick Actions</CardTitle>
+                    <CardDescription className="text-xs">Common tasks</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <Button
-                      className="w-full justify-start"
+                      size="lg"
+                      className="w-full justify-start h-14 text-base shadow-md hover:shadow-lg transition-all hover:scale-[1.02] active:scale-98"
                       onClick={() => setDialogOpen(true)}
                     >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Record New Payment
+                      <span className="text-xl mr-3">💰</span>
+                      Record Payment
                     </Button>
                     <Button
                       variant="outline"
-                      className="w-full justify-start"
+                      size="lg"
+                      className="w-full justify-start h-14 text-base hover:scale-[1.02] active:scale-98 transition-all"
                       onClick={() => setEditDialogOpen(true)}
                     >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Tenant Details
+                      <span className="text-xl mr-3">✏️</span>
+                      Edit Details
                     </Button>
                     <Button
                       variant="outline"
-                      className="w-full justify-start"
+                      size="lg"
+                      className="w-full justify-start h-14 text-base hover:scale-[1.02] active:scale-98 transition-all"
                       onClick={() => {
                         const phone = tenant.tenant_phone.replace(/\s/g, '');
                         const message = `Hi ${tenant.tenant_name}, this is a reminder about your rent payment.`;
                         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
                       }}
                     >
-                      <Phone className="h-4 w-4 mr-2" />
-                      Send WhatsApp Reminder
+                      <span className="text-xl mr-3">💬</span>
+                      WhatsApp
                     </Button>
                       <Button
                         variant="outline"
-                        className="w-full justify-start"
+                        size="lg"
+                        className="w-full justify-start h-14 text-base hover:scale-[1.02] active:scale-98 transition-all"
                         onClick={() => {
                           if (collections.length > 0) {
                             const lastCollection = collections[0];
@@ -984,29 +1027,30 @@ const AgentTenantDetail = () => {
                         }}
                         disabled={collections.length === 0}
                       >
-                        <Receipt className="h-4 w-4 mr-2" />
-                        View Last Receipt
+                        <span className="text-xl mr-3">🧾</span>
+                        Receipt
                       </Button>
-                    <div className="pt-3 border-t">
+                    <div className="pt-2 border-t">
                       <Button
                         variant="destructive"
-                        className="w-full justify-start"
+                        size="lg"
+                        className="w-full justify-start h-14 text-base hover:scale-[1.02] active:scale-98 transition-all"
                         onClick={() => setDeleteDialogOpen(true)}
                       >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete Tenant
+                        <span className="text-xl mr-3">🗑️</span>
+                        Delete
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-muted/30">
-                  <CardHeader>
-                    <CardTitle className="text-base">Swipe Tips</CardTitle>
+                <Card className="bg-accent/5 border-accent/20">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">💡 Tip</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground">
-                      📱 Swipe left or right to navigate between tabs on mobile
+                      Swipe ← → to switch tabs faster
                     </p>
                   </CardContent>
                 </Card>
