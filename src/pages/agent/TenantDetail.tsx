@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useSwipeable } from "react-swipeable";
 import { useQueryClient } from "@tanstack/react-query";
 import AgentLayout from "@/components/AgentLayout";
+import { TenantDetailSkeleton } from "@/components/TenantDetailSkeleton";
+import { RefreshIndicator } from "@/components/RefreshIndicator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,11 +29,12 @@ const AgentTenantDetail = () => {
   const queryClient = useQueryClient();
   
   // Use React Query hooks for data fetching with caching
-  const { data: tenant, isLoading: tenantLoading, error: tenantError } = useTenantData(tenantId);
-  const { data: collections = [], isLoading: collectionsLoading } = useCollectionsData(tenantId);
+  const { data: tenant, isLoading: tenantLoading, isFetching: tenantFetching, error: tenantError } = useTenantData(tenantId);
+  const { data: collections = [], isLoading: collectionsLoading, isFetching: collectionsFetching } = useCollectionsData(tenantId);
   const { data: agentInfo } = useAgentInfo();
   
   const loading = tenantLoading || collectionsLoading;
+  const isRefreshing = (tenantFetching || collectionsFetching) && !loading;
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
@@ -235,7 +238,7 @@ const AgentTenantDetail = () => {
   if (loading) {
     return (
       <AgentLayout currentPage="/agent/tenants">
-        <div className="text-center py-8">Loading tenant details...</div>
+        <TenantDetailSkeleton />
       </AgentLayout>
     );
   }
@@ -254,6 +257,7 @@ const AgentTenantDetail = () => {
 
   return (
     <AgentLayout currentPage="/agent/tenants">
+      <RefreshIndicator isRefreshing={isRefreshing} />
       <div className="space-y-6">
         <div className="flex items-center gap-4">
           <Button

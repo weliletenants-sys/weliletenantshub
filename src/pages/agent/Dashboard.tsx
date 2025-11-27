@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PullToRefresh from "react-simple-pull-to-refresh";
 import AgentLayout from "@/components/AgentLayout";
+import { DashboardSkeleton } from "@/components/TenantDetailSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -145,59 +146,7 @@ const AgentDashboard = () => {
   if (isLoading) {
     return (
       <AgentLayout currentPage="/agent/dashboard">
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">Welcome back! Here's your overview</p>
-          </div>
-
-          {/* Motorcycle Banner Skeleton */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4">
-                <Skeleton className="h-12 w-12 rounded-full" />
-                <div className="flex-1 space-y-3">
-                  <Skeleton className="h-8 w-3/4" />
-                  <Skeleton className="h-6 w-1/2" />
-                  <Skeleton className="h-10 w-2/3" />
-                  <Skeleton className="h-3 w-full mt-4" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Metrics Skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <Card key={i}>
-                <CardHeader className="pb-2">
-                  <Skeleton className="h-4 w-24" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-8 w-32 mb-2" />
-                  <Skeleton className="h-3 w-20" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {/* Collection Rate Skeleton */}
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-48 mb-2" />
-              <Skeleton className="h-4 w-full" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-12" />
-                </div>
-                <Skeleton className="h-3 w-full" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <DashboardSkeleton />
       </AgentLayout>
     );
   }

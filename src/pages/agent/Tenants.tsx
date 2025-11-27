@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import AgentLayout from "@/components/AgentLayout";
+import { TenantListSkeleton } from "@/components/TenantDetailSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -147,7 +148,7 @@ const AgentTenants = () => {
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <div className="text-center py-8">Loading tenants...</div>
+                  <TenantListSkeleton />
                 ) : tenants.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-muted-foreground mb-4">No tenants yet</p>
@@ -175,7 +176,7 @@ const AgentTenants = () => {
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <div className="text-center py-8">Loading tenants...</div>
+                  <TenantListSkeleton />
                 ) : overdueTenants.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-muted-foreground">No overdue tenants - great job! 🎉</p>

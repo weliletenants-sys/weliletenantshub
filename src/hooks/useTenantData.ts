@@ -1,11 +1,18 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
+
+type Tenant = Tables<'tenants'>;
+type Collection = Tables<'collections'>;
 
 /**
  * Hook to fetch tenant details with React Query caching
  * This allows prefetched data to be used instantly
+ * Uses placeholderData to show stale data while fetching fresh data
  */
 export const useTenantData = (tenantId: string | undefined) => {
+  const queryClient = useQueryClient();
+  
   return useQuery({
     queryKey: ['tenant', tenantId],
     queryFn: async () => {
@@ -35,6 +42,11 @@ export const useTenantData = (tenantId: string | undefined) => {
     enabled: !!tenantId,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes (previously cacheTime)
+    placeholderData: () => {
+      // Try to get cached data to show instantly while fetching
+      const cached = queryClient.getQueryData<Tenant>(['tenant', tenantId]);
+      return cached || undefined;
+    },
   });
 };
 
@@ -42,6 +54,8 @@ export const useTenantData = (tenantId: string | undefined) => {
  * Hook to fetch collection history with React Query caching
  */
 export const useCollectionsData = (tenantId: string | undefined) => {
+  const queryClient = useQueryClient();
+  
   return useQuery({
     queryKey: ['collections', tenantId],
     queryFn: async () => {
@@ -71,6 +85,11 @@ export const useCollectionsData = (tenantId: string | undefined) => {
     enabled: !!tenantId,
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
+    placeholderData: () => {
+      // Show cached collections instantly
+      const cached = queryClient.getQueryData<Collection[]>(['collections', tenantId]);
+      return cached || [];
+    },
   });
 };
 
