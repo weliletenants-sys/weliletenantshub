@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { haptics } from '@/utils/haptics';
 
 interface SplashScreenProps {
   onComplete: () => void;
@@ -8,9 +9,14 @@ const SplashScreen = ({ onComplete }: SplashScreenProps) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
+    // Trigger haptic feedback on splash screen appearance
+    haptics.medium();
+
     // Show splash for 2 seconds, then fade out
     const timer = setTimeout(() => {
       setIsVisible(false);
+      // Light haptic on exit
+      haptics.light();
     }, 2000);
 
     // Complete after fade out animation
