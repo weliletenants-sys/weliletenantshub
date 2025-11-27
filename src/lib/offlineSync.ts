@@ -20,6 +20,16 @@ interface OfflineDB extends DBSchema {
       synced: boolean;
     };
   };
+  pendingPayments: {
+    key: string;
+    value: {
+      id: string;
+      data: any;
+      tenantId: string;
+      timestamp: number;
+      synced: boolean;
+    };
+  };
   syncStatus: {
     key: string;
     value: {
@@ -34,8 +44,8 @@ let db: IDBPDatabase<OfflineDB> | null = null;
 export const initOfflineDB = async () => {
   if (db) return db;
   
-  db = await openDB<OfflineDB>('welile-offline', 1, {
-    upgrade(db) {
+  db = await openDB<OfflineDB>('welile-offline', 2, {
+    upgrade(db, oldVersion) {
       // Store for pending tenant additions
       if (!db.objectStoreNames.contains('pendingTenants')) {
         db.createObjectStore('pendingTenants', { keyPath: 'id' });
@@ -44,6 +54,11 @@ export const initOfflineDB = async () => {
       // Store for pending collections
       if (!db.objectStoreNames.contains('pendingCollections')) {
         db.createObjectStore('pendingCollections', { keyPath: 'id' });
+      }
+      
+      // Store for pending payments (new in version 2)
+      if (!db.objectStoreNames.contains('pendingPayments')) {
+        db.createObjectStore('pendingPayments', { keyPath: 'id' });
       }
       
       // Store for sync status
@@ -86,17 +101,35 @@ export const addPendingCollection = async (collectionData: any) => {
   return id;
 };
 
+export const addPendingPayment = async (paymentData: any, tenantId: string) => {
+  const database = await initOfflineDB();
+  const id = `payment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  await database.put('pendingPayments', {
+    id,
+    data: paymentData,
+    tenantId,
+    timestamp: Date.now(),
+    synced: false,
+  });
+  
+  await updateSyncStatus();
+  return id;
+};
+
 export const getPendingCount = async () => {
   const database = await initOfflineDB();
   const tenants = await database.getAll('pendingTenants');
   const collections = await database.getAll('pendingCollections');
+  const payments = await database.getAll('pendingPayments');
   
   const unsynced = {
     tenants: tenants.filter(t => !t.synced).length,
     collections: collections.filter(c => !c.synced).length,
+    payments: payments.filter(p => !p.synced).length,
   };
   
-  return unsynced.tenants + unsynced.collections;
+  return unsynced.tenants + unsynced.collections + unsynced.payments;
 };
 
 const updateSyncStatus = async () => {
@@ -154,6 +187,48 @@ export const syncPendingData = async () => {
       }
     }
     
+    // Sync pending payments
+    const pendingPayments = await database.getAll('pendingPayments');
+    const unsyncedPayments = pendingPayments.filter(p => !p.synced);
+    
+    for (const payment of unsyncedPayments) {
+      // Insert the collection
+      const { error: collectionError } = await supabase
+        .from('collections')
+        .insert(payment.data);
+      
+      if (collectionError) {
+        console.error('Error syncing payment:', collectionError);
+        throw collectionError;
+      }
+      
+      // Update tenant balance
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('outstanding_balance')
+        .eq('id', payment.tenantId)
+        .single();
+      
+      if (tenant) {
+        const newBalance = Number(tenant.outstanding_balance) - Number(payment.data.amount);
+        const { error: updateError } = await supabase
+          .from('tenants')
+          .update({ outstanding_balance: Math.max(0, newBalance) })
+          .eq('id', payment.tenantId);
+        
+        if (updateError) {
+          console.error('Error updating tenant balance:', updateError);
+          throw updateError;
+        }
+      }
+      
+      // Mark as synced
+      await database.put('pendingPayments', {
+        ...payment,
+        synced: true,
+      });
+    }
+    
     await updateSyncStatus();
     
     // Clean up synced items older than 7 days
@@ -163,6 +238,7 @@ export const syncPendingData = async () => {
       success: true,
       syncedTenants: unsyncedTenants.length,
       syncedCollections: unsyncedCollections.length,
+      syncedPayments: unsyncedPayments.length,
     };
   } catch (error) {
     console.error('Sync failed:', error);
@@ -190,6 +266,14 @@ const cleanupSyncedData = async () => {
   for (const collection of collections) {
     if (collection.synced && collection.timestamp < sevenDaysAgo) {
       await database.delete('pendingCollections', collection.id);
+    }
+  }
+  
+  // Clean payments
+  const payments = await database.getAll('pendingPayments');
+  for (const payment of payments) {
+    if (payment.synced && payment.timestamp < sevenDaysAgo) {
+      await database.delete('pendingPayments', payment.id);
     }
   }
 };
