@@ -106,6 +106,30 @@ All colors MUST be HSL.
   }
 }
 
+/* Pull to Refresh Styling */
+.ptr {
+  position: relative;
+}
+
+.ptr__pull-down {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: hsl(var(--primary));
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px;
+  z-index: 10;
+}
+
+.ptr__children {
+  transition: transform 0.2s ease;
+}
+
 @layer base {
   * {
     @apply border-border;
