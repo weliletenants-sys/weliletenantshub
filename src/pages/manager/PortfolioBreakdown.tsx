@@ -8,10 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Wallet, Users, TrendingUp, Search, User, Phone, DollarSign, ChevronRight, Download, FileDown } from "lucide-react";
+import { ArrowLeft, Wallet, Users, TrendingUp, Search, User, Phone, DollarSign, ChevronRight, Download, FileDown, Calendar as CalendarIcon, X } from "lucide-react";
 import jsPDF from "jspdf";
 import { haptics } from "@/utils/haptics";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface TenantData {
   id: string;
@@ -39,6 +43,8 @@ const ManagerPortfolioBreakdown = () => {
   const [totalPortfolioValue, setTotalPortfolioValue] = useState(0);
   const [totalTenants, setTotalTenants] = useState(0);
   const [openAgents, setOpenAgents] = useState<Set<string>>(new Set());
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
 
   const fetchPortfolioBreakdown = async () => {
     try {
@@ -58,11 +64,23 @@ const ManagerPortfolioBreakdown = () => {
 
       if (agentsError) throw agentsError;
 
-      // Fetch all tenants
-      const { data: tenants, error: tenantsError } = await supabase
+      // Fetch all tenants with optional date filtering
+      let tenantsQuery = supabase
         .from("tenants")
         .select("*")
         .order("tenant_name");
+
+      // Apply date range filters if set
+      if (startDate) {
+        tenantsQuery = tenantsQuery.gte("created_at", startDate.toISOString());
+      }
+      if (endDate) {
+        const endOfDay = new Date(endDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        tenantsQuery = tenantsQuery.lte("created_at", endOfDay.toISOString());
+      }
+
+      const { data: tenants, error: tenantsError } = await tenantsQuery;
 
       if (tenantsError) throw tenantsError;
 
@@ -106,7 +124,7 @@ const ManagerPortfolioBreakdown = () => {
 
   useEffect(() => {
     fetchPortfolioBreakdown();
-  }, []);
+  }, [startDate, endDate]);
 
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -139,10 +157,31 @@ const ManagerPortfolioBreakdown = () => {
     });
   };
 
+  const clearDateFilters = () => {
+    setStartDate(undefined);
+    setEndDate(undefined);
+    haptics.light();
+    toast.success("Date filters cleared");
+  };
+
+  const getDateRangeLabel = () => {
+    if (startDate && endDate) {
+      return `${format(startDate, "MMM d, yyyy")} - ${format(endDate, "MMM d, yyyy")}`;
+    } else if (startDate) {
+      return `From ${format(startDate, "MMM d, yyyy")}`;
+    } else if (endDate) {
+      return `Until ${format(endDate, "MMM d, yyyy")}`;
+    }
+    return "All Time";
+  };
+
   const exportPortfolioCSV = () => {
     const csvRows = [];
     
-    // CSV Headers
+    // CSV Headers with date range
+    csvRows.push([`"Portfolio Breakdown Report - ${getDateRangeLabel()}"`]);
+    csvRows.push([`"Generated: ${new Date().toLocaleString()}"`]);
+    csvRows.push([""]);
     csvRows.push([
       "Agent Name",
       "Agent Phone",
@@ -190,7 +229,8 @@ const ManagerPortfolioBreakdown = () => {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `portfolio-breakdown-${new Date().toISOString().split("T")[0]}.csv`;
+    const dateLabel = startDate || endDate ? `-${format(startDate || new Date(), "yyyy-MM-dd")}-to-${format(endDate || new Date(), "yyyy-MM-dd")}` : "";
+    link.download = `portfolio-breakdown${dateLabel}-${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
     window.URL.revokeObjectURL(url);
     
@@ -214,6 +254,8 @@ const ManagerPortfolioBreakdown = () => {
     // Date and summary
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
+    doc.text(`Report Period: ${getDateRangeLabel()}`, margin, yPosition);
+    yPosition += 6;
     doc.text(`Generated: ${new Date().toLocaleString()}`, margin, yPosition);
     yPosition += 6;
     doc.text(`Total Portfolio Value: UGX ${totalPortfolioValue.toLocaleString()}`, margin, yPosition);
@@ -289,7 +331,8 @@ const ManagerPortfolioBreakdown = () => {
       yPosition += 8;
     });
 
-    doc.save(`portfolio-breakdown-${new Date().toISOString().split("T")[0]}.pdf`);
+    const dateLabel = startDate || endDate ? `-${format(startDate || new Date(), "yyyy-MM-dd")}-to-${format(endDate || new Date(), "yyyy-MM-dd")}` : "";
+    doc.save(`portfolio-breakdown${dateLabel}-${new Date().toISOString().split("T")[0]}.pdf`);
     
     haptics.success();
     toast.success("Portfolio breakdown exported as PDF");
@@ -394,6 +437,98 @@ const ManagerPortfolioBreakdown = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Date Range Filters */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5" />
+              Date Range Filter
+            </CardTitle>
+            <CardDescription>
+              Filter portfolio data by tenant registration date range
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-2 block">Start Date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !startDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {startDate ? format(startDate, "PPP") : <span>Pick start date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={startDate}
+                      onSelect={setStartDate}
+                      disabled={(date) => date > new Date() || (endDate ? date > endDate : false)}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-2 block">End Date</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !endDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {endDate ? format(endDate, "PPP") : <span>Pick end date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={endDate}
+                      onSelect={setEndDate}
+                      disabled={(date) => date > new Date() || (startDate ? date < startDate : false)}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {(startDate || endDate) && (
+                <div className="flex items-end">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={clearDateFilters}
+                    className="h-10 w-10"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {(startDate || endDate) && (
+              <div className="mt-4 p-3 bg-muted rounded-lg">
+                <p className="text-sm font-medium">Active Filter:</p>
+                <p className="text-sm text-muted-foreground">{getDateRangeLabel()}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Search and Export */}
         <Card>
