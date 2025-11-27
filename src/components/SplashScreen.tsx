@@ -19,8 +19,9 @@ const SplashScreen = ({ onComplete }: SplashScreenProps) => {
       haptics.light();
     }, 2000);
 
-    // Complete after fade out animation
+    // Complete after fade out animation with success haptic
     const completeTimer = setTimeout(() => {
+      haptics.success();
       onComplete();
     }, 2500);
 
