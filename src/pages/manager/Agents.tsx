@@ -8,9 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRealtimeAgents, useRealtimeAllTenants, useRealtimeProfiles, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
-import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Activity, Wallet } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Activity, Wallet, ChevronDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Progress } from "@/components/ui/progress";
 
 interface AgentWithDetails {
   id: string;
@@ -49,6 +51,14 @@ const ManagerAgents = () => {
   const [portfolioMaxFilter, setPortfolioMaxFilter] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
   const [totalPortfolioValue, setTotalPortfolioValue] = useState(0);
+  const [agentPortfolioBreakdown, setAgentPortfolioBreakdown] = useState<Array<{
+    agent_id: string;
+    agent_name: string;
+    portfolio_value: number;
+    tenant_count: number;
+    percentage: number;
+  }>>([]);
+  const [showPortfolioBreakdown, setShowPortfolioBreakdown] = useState(false);
   
   // Enable real-time updates
   useRealtimeAgents();
@@ -133,28 +143,44 @@ const ManagerAgents = () => {
 
       if (agentsError) throw agentsError;
 
-      // Fetch tenant counts for each agent
+      // Fetch tenant counts and portfolio values for each agent
       const agentIds = agentsData?.map(a => a.id) || [];
       
       if (agentIds.length > 0) {
-        const { data: tenantCounts, error: tenantsError } = await supabase
+        const { data: tenantData, error: tenantsError } = await supabase
           .from("tenants")
-          .select("agent_id")
+          .select("agent_id, outstanding_balance")
           .in("agent_id", agentIds);
 
         if (tenantsError) throw tenantsError;
 
-        // Count tenants per agent
-        const tenantCountMap = (tenantCounts || []).reduce((acc: Record<string, number>, tenant) => {
-          acc[tenant.agent_id] = (acc[tenant.agent_id] || 0) + 1;
-          return acc;
-        }, {});
+        // Count tenants and calculate portfolio value per agent
+        const tenantCountMap: Record<string, number> = {};
+        const portfolioValueMap: Record<string, number> = {};
+        
+        (tenantData || []).forEach(tenant => {
+          tenantCountMap[tenant.agent_id] = (tenantCountMap[tenant.agent_id] || 0) + 1;
+          portfolioValueMap[tenant.agent_id] = (portfolioValueMap[tenant.agent_id] || 0) + Number(tenant.outstanding_balance || 0);
+        });
 
         // Merge tenant counts with agent data
         const agentsWithCounts = (agentsData || []).map(agent => ({
           ...agent,
           tenant_count: tenantCountMap[agent.id] || 0,
         }));
+        
+        // Build portfolio breakdown data
+        const breakdown = agentsWithCounts
+          .map(agent => ({
+            agent_id: agent.id,
+            agent_name: agent.profiles?.full_name || "Unknown Agent",
+            portfolio_value: portfolioValueMap[agent.id] || 0,
+            tenant_count: tenantCountMap[agent.id] || 0,
+            percentage: totalPortfolioValue > 0 ? ((portfolioValueMap[agent.id] || 0) / totalPortfolioValue) * 100 : 0,
+          }))
+          .sort((a, b) => b.portfolio_value - a.portfolio_value);
+        
+        setAgentPortfolioBreakdown(breakdown);
 
         // Sort by tenant_count if that's the selected column
         if (sortColumn === "tenant_count") {
@@ -407,6 +433,65 @@ const ManagerAgents = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Portfolio Breakdown Card */}
+        <Collapsible open={showPortfolioBreakdown} onOpenChange={setShowPortfolioBreakdown}>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="text-left">
+                    <CardTitle className="flex items-center gap-2">
+                      <Wallet className="h-5 w-5 text-purple-600" />
+                      Portfolio Value Breakdown by Agent
+                    </CardTitle>
+                    <CardDescription>
+                      See each agent's contribution to total portfolio value
+                    </CardDescription>
+                  </div>
+                  <ChevronDown className={`h-5 w-5 transition-transform ${showPortfolioBreakdown ? 'rotate-180' : ''}`} />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            
+            <CollapsibleContent>
+              <CardContent className="space-y-4 pt-4 border-t">
+                {agentPortfolioBreakdown.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">No agents with portfolio data</p>
+                ) : (
+                  agentPortfolioBreakdown.map((agent) => (
+                    <div 
+                      key={agent.agent_id}
+                      className="space-y-2 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/manager/agents/${agent.agent_id}`)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium">{agent.agent_name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {agent.tenant_count} tenant{agent.tenant_count !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-lg">
+                            UGX {agent.portfolio_value.toLocaleString()}
+                          </p>
+                          <p className="text-sm text-purple-600 font-medium">
+                            {agent.percentage.toFixed(1)}% of total
+                          </p>
+                        </div>
+                      </div>
+                      <Progress 
+                        value={agent.percentage} 
+                        className="h-2"
+                      />
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         <div className="flex gap-3">
           <Button 
