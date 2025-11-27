@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Plus, AlertCircle } from "lucide-react";
 import { useTenantListPrefetch } from "@/hooks/useTenantPrefetch";
+import { useRealtimeTenants } from "@/hooks/useRealtimeSubscription";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Tenant = Tables<'tenants'>;
@@ -78,6 +79,9 @@ const AgentTenants = () => {
   
   // Initialize prefetching for visible tenants
   const { observeTenantRow } = useTenantListPrefetch(tenantsWithOverdue);
+  
+  // Enable real-time updates for tenants
+  useRealtimeTenants(agentId);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
