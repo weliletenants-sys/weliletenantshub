@@ -1,15 +1,24 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import WelileLogo from "@/components/WelileLogo";
-import { UserCog, Users } from "lucide-react";
+import { UserCog, Users, Download } from "lucide-react";
 
 const Index = () => {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-accent/5 flex flex-col">
-      <header className="p-6">
+      <header className="p-6 flex justify-between items-center">
         <WelileLogo />
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => navigate("/install")}
+          className="gap-2"
+        >
+          <Download className="h-4 w-4" />
+          Install App
+        </Button>
       </header>
       
       <main className="flex-1 flex flex-col items-center justify-center px-4 pb-20">
