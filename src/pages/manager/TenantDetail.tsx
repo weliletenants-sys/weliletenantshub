@@ -53,11 +53,23 @@ interface Collection {
   status: string;
 }
 
+interface TransferHistory {
+  id: string;
+  created_at: string;
+  old_data: any;
+  new_data: any;
+  manager?: {
+    full_name: string;
+    phone_number: string;
+  };
+}
+
 const ManagerTenantDetail = () => {
   const { tenantId } = useParams();
   const navigate = useNavigate();
   const [tenant, setTenant] = useState<TenantData | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [transferHistory, setTransferHistory] = useState<TransferHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -129,6 +141,42 @@ const ManagerTenantDetail = () => {
 
       if (collectionsError) throw collectionsError;
       setCollections(collectionsData || []);
+
+      // Fetch transfer history from audit logs
+      const { data: auditData, error: auditError } = await supabase
+        .from("audit_logs")
+        .select(`
+          id,
+          created_at,
+          old_data,
+          new_data,
+          user_id
+        `)
+        .eq("table_name", "tenants")
+        .eq("record_id", tenantId)
+        .eq("action", "TRANSFER")
+        .order("created_at", { ascending: false });
+
+      if (auditError) {
+        console.error("Error fetching transfer history:", auditError);
+      } else if (auditData) {
+        // Fetch manager details for each transfer
+        const transfersWithManagers = await Promise.all(
+          auditData.map(async (audit) => {
+            const { data: managerProfile } = await supabase
+              .from("profiles")
+              .select("full_name, phone_number")
+              .eq("id", audit.user_id)
+              .single();
+
+            return {
+              ...audit,
+              manager: managerProfile,
+            };
+          })
+        );
+        setTransferHistory(transfersWithManagers);
+      }
     } catch (error: any) {
       console.error("Error fetching tenant:", error);
       toast.error("Failed to load tenant details");
@@ -893,6 +941,73 @@ const ManagerTenantDetail = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Transfer History */}
+        {transferHistory.length > 0 && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ArrowRightLeft className="h-5 w-5 text-primary" />
+                Transfer History ({transferHistory.length})
+              </CardTitle>
+              <CardDescription>
+                Complete history of tenant reassignments between agents
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {transferHistory.map((transfer, index) => (
+                  <div 
+                    key={transfer.id}
+                    className="p-4 rounded-lg border bg-card space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          Transfer #{transferHistory.length - index}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {format(new Date(transfer.created_at), "MMM d, yyyy 'at' h:mm a")}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 p-3 rounded-md bg-muted/50 border">
+                        <p className="text-xs text-muted-foreground mb-1">From Agent</p>
+                        <p className="font-medium">{transfer.old_data?.agent_name || "Unknown Agent"}</p>
+                      </div>
+                      
+                      <div className="flex items-center justify-center">
+                        <ArrowRightLeft className="h-5 w-5 text-primary" />
+                      </div>
+                      
+                      <div className="flex-1 p-3 rounded-md bg-primary/10 border border-primary/20">
+                        <p className="text-xs text-muted-foreground mb-1">To Agent</p>
+                        <p className="font-medium text-primary">{transfer.new_data?.agent_name || "Unknown Agent"}</p>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-border">
+                      <div className="flex items-center gap-2 text-sm">
+                        <UserCog className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Approved by:</span>
+                        <span className="font-medium">
+                          {transfer.manager?.full_name || "Unknown Manager"}
+                        </span>
+                        {transfer.manager?.phone_number && (
+                          <span className="text-xs text-muted-foreground">
+                            ({transfer.manager.phone_number})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </ManagerLayout>
   );
