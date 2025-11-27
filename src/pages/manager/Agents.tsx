@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,6 +62,15 @@ const ManagerAgents = () => {
         <div>
           <h1 className="text-3xl font-bold">Agent Management</h1>
           <p className="text-muted-foreground">Monitor and manage all agents in your area</p>
+        </div>
+
+        <div className="flex gap-3">
+          <Button 
+            variant="outline"
+            onClick={() => navigate("/manager/agents/compare")}
+          >
+            Compare Agents
+          </Button>
         </div>
 
         <Card>
