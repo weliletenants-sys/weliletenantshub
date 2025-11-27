@@ -6,6 +6,7 @@ import Breadcrumbs from "./Breadcrumbs";
 import { supabase } from "@/integrations/supabase/client";
 import { LayoutDashboard, Users, CheckSquare, LogOut, Settings, Home } from "lucide-react";
 import { toast } from "sonner";
+import { useRipple } from "@/hooks/useRipple";
 
 interface ManagerLayoutProps {
   children: ReactNode;
@@ -15,6 +16,7 @@ interface ManagerLayoutProps {
 const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
+  const createRipple = useRipple();
 
   useEffect(() => {
     checkAuth();
@@ -64,7 +66,10 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
                 variant={currentPage === item.path ? "default" : "ghost"}
                 className="w-full justify-start h-14 text-base"
                 size="lg"
-                onClick={() => navigate(item.path)}
+                onClick={(e) => {
+                  createRipple(e);
+                  navigate(item.path);
+                }}
               >
                 <item.icon className="h-6 w-6 mr-3" />
                 {item.label}
