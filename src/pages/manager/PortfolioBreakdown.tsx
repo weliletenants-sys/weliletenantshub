@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Wallet, Users, TrendingUp, Search, User, Phone, DollarSign, ChevronRight, ChevronLeft, Download, FileDown, Calendar as CalendarIcon, X, Star, Trash2 } from "lucide-react";
+import { ArrowLeft, Wallet, Users, TrendingUp, Search, User, Phone, DollarSign, ChevronRight, ChevronLeft, Download, FileDown, Calendar as CalendarIcon, X, Star, Trash2, List } from "lucide-react";
 import jsPDF from "jspdf";
 import { haptics } from "@/utils/haptics";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -55,6 +55,7 @@ const ManagerPortfolioBreakdown = () => {
   const [tenantPages, setTenantPages] = useState<Record<string, number>>({});
   const [tenantPageSizes, setTenantPageSizes] = useState<Record<string, number>>({});
   const [jumpToPageInputs, setJumpToPageInputs] = useState<Record<string, string>>({});
+  const [showAllTenants, setShowAllTenants] = useState<Record<string, boolean>>({});
   const defaultPageSize = 10;
 
   // Load saved ranges from localStorage on mount
@@ -286,7 +287,30 @@ const ManagerPortfolioBreakdown = () => {
     setJumpToPageInputs(prev => ({ ...prev, [agentId]: sanitized }));
   };
 
+  const toggleShowAll = (agentId: string) => {
+    setShowAllTenants(prev => ({ ...prev, [agentId]: !prev[agentId] }));
+    haptics.light();
+  };
+
+  const isShowingAll = (agentId: string) => {
+    return showAllTenants[agentId] || false;
+  };
+
   const getPaginatedTenants = (tenants: TenantData[], agentId: string) => {
+    // If showing all, return all tenants
+    if (isShowingAll(agentId)) {
+      return {
+        tenants: tenants,
+        totalPages: 1,
+        currentPage: 1,
+        pageSize: tenants.length,
+        startIndex: 1,
+        endIndex: tenants.length,
+        totalTenants: tenants.length,
+        showingAll: true,
+      };
+    }
+
     const currentPage = getTenantPage(agentId);
     const pageSize = getTenantPageSize(agentId);
     const startIndex = (currentPage - 1) * pageSize;
@@ -299,6 +323,7 @@ const ManagerPortfolioBreakdown = () => {
       startIndex: startIndex + 1,
       endIndex: Math.min(endIndex, tenants.length),
       totalTenants: tenants.length,
+      showingAll: false,
     };
   };
 
@@ -897,9 +922,25 @@ const ManagerPortfolioBreakdown = () => {
                     <CardContent className="pt-0 border-t">
                       <div className="space-y-3 mt-4">
                         <div className="flex items-center justify-between mb-4">
-                          <h4 className="font-semibold text-sm text-muted-foreground">
-                            Tenant List ({portfolio.tenants.length})
-                          </h4>
+                          <div className="flex items-center gap-3">
+                            <h4 className="font-semibold text-sm text-muted-foreground">
+                              Tenant List ({portfolio.tenants.length})
+                            </h4>
+                            {portfolio.tenants.length > 5 && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleShowAll(portfolio.id);
+                                }}
+                                className="h-7 gap-2"
+                              >
+                                <List className="h-3 w-3" />
+                                {isShowingAll(portfolio.id) ? "Show Paginated" : "Show All"}
+                              </Button>
+                            )}
+                          </div>
                           <Button
                             variant="outline"
                             size="sm"
@@ -961,7 +1002,7 @@ const ManagerPortfolioBreakdown = () => {
                                   ))}
                                   
                                   {/* Pagination Controls */}
-                                  {paginationData.totalPages > 1 && (
+                                  {!paginationData.showingAll && paginationData.totalPages > 1 && (
                                     <div className="flex flex-col gap-4 pt-4 mt-4 border-t">
                                       <div className="flex items-center justify-between flex-wrap gap-4">
                                         <div className="flex items-center gap-4">
