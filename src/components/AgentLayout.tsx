@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useRipple } from "@/hooks/useRipple";
 import { useSwipeBack } from "@/hooks/useSwipeBack";
 import SwipeBackIndicator from "./SwipeBackIndicator";
+import BottomNavigation from "./BottomNavigation";
 
 interface AgentLayoutProps {
   children: ReactNode;
@@ -47,6 +48,9 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
     { icon: Plus, label: "New Tenant", path: "/agent/new-tenant" },
     { icon: DollarSign, label: "Collections", path: "/agent/collections" },
     { icon: TrendingUp, label: "Earnings", path: "/agent/earnings" },
+  ];
+
+  const moreNavItems = [
     { icon: BarChart3, label: "Weekly Report", path: "/agent/weekly-summary" },
     { icon: MessageSquare, label: "AI Assistant", path: "/agent/ai-assistant" },
     { icon: Settings, label: "Settings", path: "/agent/settings" },
@@ -73,9 +77,10 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
       </header>
 
       <div className="flex-1 flex flex-col md:flex-row">
-        <nav className="bg-card border-b md:border-b-0 md:border-r border-border p-6 md:w-72">
+        {/* Sidebar - Desktop only */}
+        <nav className="hidden md:block bg-card border-r border-border p-6 md:w-72">
           <div className="space-y-3">
-            {navItems.map((item) => (
+            {[...navItems, ...moreNavItems].map((item) => (
               <Button
                 key={item.path}
                 variant={currentPage === item.path ? "default" : "ghost"}
@@ -105,11 +110,14 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
           </div>
         </nav>
 
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto">
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto pb-20 md:pb-6">
           <Breadcrumbs />
           {children}
         </main>
       </div>
+
+      {/* Bottom Navigation - Mobile only */}
+      <BottomNavigation items={navItems} currentPage={currentPage} />
     </div>
   );
 };

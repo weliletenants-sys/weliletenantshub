@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useRipple } from "@/hooks/useRipple";
 import { useSwipeBack } from "@/hooks/useSwipeBack";
 import SwipeBackIndicator from "./SwipeBackIndicator";
+import BottomNavigation from "./BottomNavigation";
 
 interface ManagerLayoutProps {
   children: ReactNode;
@@ -63,7 +64,8 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
       </header>
 
       <div className="flex-1 flex flex-col md:flex-row">
-        <nav className="bg-card border-b md:border-b-0 md:border-r border-border p-6 md:w-72">
+        {/* Sidebar - Desktop only */}
+        <nav className="hidden md:block bg-card border-r border-border p-6 md:w-72">
           <div className="space-y-3">
             {navItems.map((item) => (
               <Button
@@ -95,11 +97,14 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
           </div>
         </nav>
 
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto">
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto pb-20 md:pb-6">
           <Breadcrumbs />
           {children}
         </main>
       </div>
+
+      {/* Bottom Navigation - Mobile only */}
+      <BottomNavigation items={navItems} currentPage={currentPage} />
     </div>
   );
 };
