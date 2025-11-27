@@ -247,30 +247,34 @@ const AgentDashboard = () => {
     <AgentLayout currentPage="/agent/dashboard">
       <PullToRefresh onRefresh={handleRefresh} pullingContent="">
         <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">Welcome back! Here's your overview</p>
+          <div className="mb-4">
+            <h1 className="text-2xl font-bold">Dashboard 📊</h1>
+            <p className="text-sm text-muted-foreground">Your stats at a glance</p>
           </div>
 
           {/* Quick Action Buttons */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <Button 
               size="lg" 
-              className="text-lg font-bold shadow-lg hover:shadow-xl transition-all"
+              className="h-24 text-base font-bold shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"
               onClick={() => navigate("/agent/new-tenant")}
             >
-              <Plus className="h-6 w-6 mr-2" />
-              Add New Tenant
+              <div className="flex flex-col items-center gap-1">
+                <Plus className="h-8 w-8" />
+                <span>Add Tenant</span>
+              </div>
             </Button>
             
             <Button 
               size="lg" 
               variant="secondary"
-              className="text-lg font-bold shadow-lg hover:shadow-xl transition-all"
+              className="h-24 text-base font-bold shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"
               onClick={() => setQuickPaymentOpen(true)}
             >
-              <Zap className="h-6 w-6 mr-2" />
-              Quick Payment
+              <div className="flex flex-col items-center gap-1">
+                <Zap className="h-8 w-8" />
+                <span>Quick Pay</span>
+              </div>
             </Button>
           </div>
 
@@ -282,46 +286,41 @@ const AgentDashboard = () => {
 
           {/* Overdue Payment Notifications */}
           {overdueTenants.length > 0 && (
-            <Card className="border-2 border-destructive bg-destructive/5">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-destructive">
-                  <AlertCircle className="h-5 w-5" />
-                  Overdue Payments ({overdueTenants.length})
+            <Card className="border-2 border-destructive bg-destructive/5 hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-destructive text-base">
+                  ⚠️ Overdue ({overdueTenants.length})
                 </CardTitle>
-                <CardDescription>
-                  These tenants have missed their payment deadline
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {overdueTenants.slice(0, 5).map((tenant) => (
+                  {overdueTenants.slice(0, 3).map((tenant) => (
                     <div
                       key={tenant.id}
-                      className="flex items-center justify-between p-4 bg-background rounded-lg border border-destructive/20 cursor-pointer hover:bg-accent/50 transition-colors"
+                      className="flex items-center justify-between p-3 bg-background rounded-xl border border-destructive/20 cursor-pointer hover:bg-accent/50 active:scale-98 transition-all"
                       onClick={() => navigate(`/agent/tenants/${tenant.id}`)}
                     >
-                      <div>
-                        <p className="font-semibold text-base">{tenant.tenant_name}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold truncate">{tenant.tenant_name}</p>
                         <p className="text-sm text-destructive font-medium">
-                          {tenant.daysOverdue} day{tenant.daysOverdue !== 1 ? 's' : ''} overdue
+                          {tenant.daysOverdue}d overdue
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-bold text-destructive text-lg">
-                          UGX {(tenant.outstanding_balance || 0).toLocaleString()}
+                      <div className="text-right ml-2">
+                        <p className="font-bold text-destructive">
+                          {((tenant.outstanding_balance || 0) / 1000).toFixed(0)}K
                         </p>
-                        <p className="text-xs text-muted-foreground">Outstanding</p>
                       </div>
                     </div>
                   ))}
-                  {overdueTenants.length > 5 && (
+                  {overdueTenants.length > 3 && (
                     <Button
                       variant="outline"
                       size="sm"
                       className="w-full mt-2 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
                       onClick={() => navigate("/agent/tenants")}
                     >
-                      View All {overdueTenants.length} Overdue Tenants
+                      See All {overdueTenants.length} ⚡
                     </Button>
                   )}
                 </div>
@@ -330,53 +329,33 @@ const AgentDashboard = () => {
           )}
 
         {/* Portfolio Value Hero Section */}
-        <Card className="bg-gradient-to-br from-primary via-primary/90 to-primary/70 text-primary-foreground overflow-hidden relative">
+        <Card className="bg-gradient-to-br from-primary via-primary/90 to-primary/70 text-primary-foreground overflow-hidden relative hover:shadow-xl transition-shadow">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32" />
           <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24" />
-          <CardContent className="p-8 relative z-10">
+          <CardContent className="p-6 relative z-10">
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-                  <TrendingUp className="h-8 w-8" />
+                <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-xl">
+                  <TrendingUp className="h-7 w-7" />
                 </div>
                 <div>
-                  <p className="text-sm opacity-90 font-medium">Your Portfolio Capacity</p>
-                  <h2 className="text-4xl font-bold tracking-tight">
-                    UGX {(agentData?.portfolio_value || 0).toLocaleString()}
+                  <p className="text-xs opacity-90">💼 Your Portfolio</p>
+                  <h2 className="text-3xl font-bold tracking-tight">
+                    {(agentData?.portfolio_value / 1000000 || 0).toFixed(1)}M
                   </h2>
                 </div>
               </div>
               
-              <div className="space-y-3 bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                <div className="flex justify-between items-end">
-                  <div>
-                    <p className="text-sm opacity-90">Target Portfolio Limit</p>
-                    <p className="text-3xl font-bold">UGX 20,000,000</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm opacity-90">Remaining Capacity</p>
-                    <p className="text-2xl font-bold">
-                      UGX {((agentData?.portfolio_limit || 20000000) - (agentData?.portfolio_value || 0)).toLocaleString()}
-                    </p>
-                  </div>
+              <div className="space-y-2 bg-white/10 backdrop-blur-sm rounded-xl p-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm opacity-90">Target: 20M</span>
+                  <span className="text-sm font-bold">{portfolioPercentage.toFixed(0)}%</span>
                 </div>
-                <Progress value={portfolioPercentage} className="h-4 bg-white/20" />
-                <div className="flex justify-between text-sm">
-                  <span className="opacity-90">{portfolioPercentage.toFixed(1)}% utilized</span>
-                  <span className="font-semibold">{(100 - portfolioPercentage).toFixed(1)}% available to grow</span>
-                </div>
-              </div>
-
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border-2 border-white/30">
-                <p className="text-lg font-semibold">
-                  💡 You can add up to{" "}
-                  <span className="text-2xl font-bold">
-                    {Math.floor(((agentData?.portfolio_limit || 20000000) - (agentData?.portfolio_value || 0)) / 100000)}
-                  </span>{" "}
-                  more tenants!
-                </p>
-                <p className="text-sm opacity-90 mt-1">
-                  Each new tenant grows your income and brings you closer to your goals
+                <Progress value={portfolioPercentage} className="h-3 bg-white/20" />
+                <p className="text-xs opacity-90">
+                  {((agentData?.portfolio_limit || 20000000) - (agentData?.portfolio_value || 0)) / 1000000 > 0 
+                    ? `${(((agentData?.portfolio_limit || 20000000) - (agentData?.portfolio_value || 0)) / 1000000).toFixed(1)}M to go! 🚀`
+                    : 'Limit reached! 🎉'}
                 </p>
               </div>
             </div>
@@ -384,69 +363,22 @@ const AgentDashboard = () => {
         </Card>
 
         {/* Motorcycle Countdown Banner */}
-        <Card className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground">
-          <CardContent className="p-6">
-            <div className="flex items-start gap-4">
-              <Bike className="h-12 w-12 flex-shrink-0" />
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold mb-2">Motorcycle Reward Program</h3>
-                <p className="text-lg mb-3">
-                  You have <span className="font-bold">{agentData?.active_tenants || 0}</span> active tenants
-                </p>
-                {tenantsToMotorcycle > 0 ? (
-                  <p className="text-xl">
-                    Only <span className="font-bold text-3xl">{tenantsToMotorcycle}</span> more tenants to qualify for your FREE motorcycle on pay-as-you-go!
+        {tenantsToMotorcycle > 0 && (
+          <Card className="bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-xl transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3">
+                <div className="text-4xl">🏍️</div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold">Bike Reward</h3>
+                  <p className="text-base">
+                    <span className="text-3xl font-black">{tenantsToMotorcycle}</span> more to go!
                   </p>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-xl font-bold">🎉 You've qualified for the motorcycle program!</p>
-                    <Button variant="secondary" size="lg" className="mt-2">
-                      Apply for Motorcycle
-                    </Button>
-                  </div>
-                )}
-                <Progress value={(agentData?.active_tenants || 0) * 2} className="mt-4 h-3" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Today's Collection Target */}
-        <Card className="border-2 border-primary/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Today's Collection Goal</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between items-end">
-              <div>
-                <p className="text-xs text-muted-foreground">Collected</p>
-                <div className="text-2xl font-bold text-success">
-                  UGX {todaysCollections.toLocaleString()}
+                  <Progress value={((agentData?.active_tenants || 0) / 50) * 100} className="mt-2 h-2 bg-white/30" />
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-muted-foreground">Target</p>
-                <div className="text-2xl font-bold">
-                  UGX {todaysTarget.toLocaleString()}
-                </div>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Progress 
-                value={todaysTarget > 0 ? (todaysCollections / todaysTarget) * 100 : 0} 
-                className="h-3"
-              />
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">
-                  {todaysTarget > 0 ? Math.round((todaysCollections / todaysTarget) * 100) : 0}% achieved
-                </span>
-                <span className="font-semibold text-primary">
-                  UGX {Math.max(0, todaysTarget - todaysCollections).toLocaleString()} remaining
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Tenants Needing Collection */}
         <Card className="border-2 border-orange-500/20">
@@ -509,35 +441,36 @@ const AgentDashboard = () => {
         </div>
 
         {/* Payment Method Breakdown Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment Method Breakdown</CardTitle>
-            <CardDescription>
-              Collections by payment type (Last 30 days vs. previous 30 days)
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">💳 Payment Types</CardTitle>
+            <CardDescription className="text-xs">
+              Last 30 days
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Chart */}
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={paymentMethodBreakdown}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
                   <XAxis 
                     dataKey="method" 
-                    tick={{ fill: 'hsl(var(--foreground))' }}
+                    tick={{ fill: 'hsl(var(--foreground))', fontSize: 12 }}
                     axisLine={{ stroke: 'hsl(var(--border))' }}
                   />
                   <YAxis 
-                    tick={{ fill: 'hsl(var(--foreground))' }}
+                    tick={{ fill: 'hsl(var(--foreground))', fontSize: 12 }}
                     axisLine={{ stroke: 'hsl(var(--border))' }}
                     tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
                   />
                   <Tooltip 
-                    formatter={(value: any) => [`UGX ${parseFloat(value).toLocaleString()}`, 'Amount']}
+                    formatter={(value: any) => [`${(parseFloat(value) / 1000).toFixed(0)}K`, 'Amount']}
                     contentStyle={{
                       backgroundColor: 'hsl(var(--popover))',
                       borderColor: 'hsl(var(--border))',
                       borderRadius: '8px',
+                      fontSize: '12px',
                     }}
                   />
                   <Bar dataKey="amount" radius={[8, 8, 0, 0]}>
@@ -549,30 +482,30 @@ const AgentDashboard = () => {
               </ResponsiveContainer>
 
               {/* Trend Indicators */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-2">
                 {paymentMethodBreakdown.map((item) => (
-                  <div key={item.method} className="text-center p-4 rounded-lg border" style={{ borderColor: item.color, backgroundColor: `${item.color}15` }}>
-                    <div className="text-xl font-bold" style={{ color: item.color }}>
-                      UGX {item.amount.toLocaleString()}
+                  <div key={item.method} className="text-center p-3 rounded-xl border hover:shadow-md transition-shadow" style={{ borderColor: item.color, backgroundColor: `${item.color}15` }}>
+                    <div className="text-lg font-bold" style={{ color: item.color }}>
+                      {(item.amount / 1000).toFixed(0)}K
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">{item.method}</p>
-                    <div className="flex items-center justify-center gap-1 mt-2">
+                    <p className="text-xs text-muted-foreground mt-0.5">{item.method}</p>
+                    <div className="flex items-center justify-center gap-0.5 mt-1.5">
                       {item.trendIcon === 'up' && (
                         <>
-                          <ArrowUp className="h-4 w-4 text-success" />
+                          <ArrowUp className="h-3 w-3 text-success" />
                           <span className="text-xs font-semibold text-success">+{item.trend.toFixed(0)}%</span>
                         </>
                       )}
                       {item.trendIcon === 'down' && (
                         <>
-                          <ArrowDown className="h-4 w-4 text-destructive" />
+                          <ArrowDown className="h-3 w-3 text-destructive" />
                           <span className="text-xs font-semibold text-destructive">{item.trend.toFixed(0)}%</span>
                         </>
                       )}
                       {item.trendIcon === 'neutral' && (
                         <>
-                          <Minus className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-xs font-semibold text-muted-foreground">{item.trend.toFixed(0)}%</span>
+                          <Minus className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs font-semibold text-muted-foreground">0%</span>
                         </>
                       )}
                     </div>
@@ -584,56 +517,48 @@ const AgentDashboard = () => {
         </Card>
 
         {/* Payment Verification Stats */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment Verification Status</CardTitle>
-            <CardDescription>
-              Track your payment submissions and approvals
-            </CardDescription>
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">✅ Payment Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
-                <div className="text-3xl font-bold text-orange-500">{pendingVerifications}</div>
-                <p className="text-sm text-muted-foreground mt-2">Pending Review</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 hover:shadow-md transition-shadow">
+                <div className="text-2xl font-bold text-orange-500">{pendingVerifications}</div>
+                <p className="text-xs text-muted-foreground mt-1">⏳ Pending</p>
               </div>
-              <div className="text-center p-4 rounded-lg bg-success/10 border border-success/20">
-                <div className="text-3xl font-bold text-success">{verifiedPayments}</div>
-                <p className="text-sm text-muted-foreground mt-2">Verified</p>
+              <div className="text-center p-3 rounded-xl bg-success/10 border border-success/20 hover:shadow-md transition-shadow">
+                <div className="text-2xl font-bold text-success">{verifiedPayments}</div>
+                <p className="text-xs text-muted-foreground mt-1">✓ Verified</p>
               </div>
-              <div className="text-center p-4 rounded-lg bg-destructive/10 border border-destructive/20">
-                <div className="text-3xl font-bold text-destructive">{rejectedPayments}</div>
-                <p className="text-sm text-muted-foreground mt-2">Rejected</p>
+              <div className="text-center p-3 rounded-xl bg-destructive/10 border border-destructive/20 hover:shadow-md transition-shadow">
+                <div className="text-2xl font-bold text-destructive">{rejectedPayments}</div>
+                <p className="text-xs text-muted-foreground mt-1">✗ Rejected</p>
               </div>
             </div>
-            {pendingVerifications > 0 && (
-              <p className="text-sm text-muted-foreground mt-4 text-center">
-                {pendingVerifications} payment{pendingVerifications !== 1 ? 's' : ''} awaiting manager verification
-              </p>
-            )}
           </CardContent>
         </Card>
 
         {/* Collection Rate */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Collection Performance</CardTitle>
-            <CardDescription>
-              Maintain 95%+ collection rate to keep your UGX 20M portfolio limit
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">📈 Collection Rate</CardTitle>
+            <CardDescription className="text-xs">
+              Keep above 95% to maintain limit
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Collection Rate</span>
-                <span className="font-bold">{agentData?.collection_rate || 0}%</span>
+              <div className="flex justify-between items-end">
+                <span className="text-xs text-muted-foreground">Current</span>
+                <span className="text-3xl font-bold">{agentData?.collection_rate || 0}%</span>
               </div>
-              <Progress value={agentData?.collection_rate || 0} className="h-3" />
+              <Progress value={agentData?.collection_rate || 0} className="h-2.5" />
               {(agentData?.collection_rate || 0) < 95 && (
-                <div className="flex items-start gap-2 p-3 bg-warning/10 rounded-lg mt-4">
-                  <AlertCircle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-warning-foreground">
-                    Your collection rate is below 95%. Focus on collecting payments to maintain your portfolio limit.
+                <div className="flex items-start gap-2 p-3 bg-warning/10 rounded-xl mt-3">
+                  <AlertCircle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-warning-foreground">
+                    Below 95% - collect payments to keep limit! 💪
                   </p>
                 </div>
               )}

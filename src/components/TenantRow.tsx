@@ -33,32 +33,32 @@ export const TenantRow = ({
     <TableRow
       ref={rowRef}
       data-tenant-id={tenant.id}
-      className="cursor-pointer hover:bg-muted/50 transition-colors"
+      className="cursor-pointer hover:bg-muted/50 active:bg-muted transition-all h-16"
       onClick={handleClick}
     >
-      <TableCell className="font-medium">{tenant.tenant_name}</TableCell>
-      <TableCell>{tenant.tenant_phone}</TableCell>
-      <TableCell>
-        UGX {tenant.rent_amount ? parseInt(tenant.rent_amount).toLocaleString() : "0"}
+      <TableCell className="font-semibold">{tenant.tenant_name}</TableCell>
+      <TableCell className="text-sm">{tenant.tenant_phone}</TableCell>
+      <TableCell className="font-medium">
+        {tenant.rent_amount ? (parseInt(tenant.rent_amount) / 1000).toFixed(0) : "0"}K
       </TableCell>
       <TableCell>{getStatusBadge(tenant.status || "pending")}</TableCell>
       <TableCell>
         {activeTab === "overdue" && tenant.isOverdue ? (
           <Badge variant="destructive" className="font-bold">
-            {tenant.daysOverdue} {tenant.daysOverdue === 1 ? "day" : "days"}
+            {tenant.daysOverdue}d
           </Badge>
         ) : (
-          <span className="text-muted-foreground">
+          <span className="text-muted-foreground text-sm">
             {tenant.days_remaining !== null && tenant.days_remaining !== undefined
-              ? `${tenant.days_remaining} days`
+              ? `${tenant.days_remaining}d`
               : "N/A"}
           </span>
         )}
       </TableCell>
-      <TableCell className="font-semibold text-right">
+      <TableCell className="font-bold text-right">
         {tenant.outstanding_balance !== null && tenant.outstanding_balance !== undefined ? (
           <span className={tenant.outstanding_balance > 0 ? "text-destructive" : "text-success"}>
-            UGX {parseInt(tenant.outstanding_balance).toLocaleString()}
+            {(parseInt(tenant.outstanding_balance) / 1000).toFixed(0)}K
           </span>
         ) : (
           "N/A"
