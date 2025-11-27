@@ -468,7 +468,7 @@ const AgentTenantDetail = () => {
           <div {...swipeHandlers} className="mt-6">
             <TabsContent value="details" className="m-0 animate-fade-in">
               <div className="grid gap-6 md:grid-cols-2">
-                <Card>
+                <Card className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-highlight-pulse ring-2 ring-primary/20' : ''}`}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Tenant Information</CardTitle>
@@ -491,7 +491,7 @@ const AgentTenantDetail = () => {
                       </div>
                     </div>
                     {tenant.rent_amount > 0 && (
-                      <div className="flex items-center gap-3">
+                      <div className={`flex items-center gap-3 transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in' : ''}`}>
                         <DollarSign className="h-4 w-4 text-muted-foreground" />
                         <div>
                           <p className="text-sm text-muted-foreground">Monthly Rent</p>
@@ -538,7 +538,7 @@ const AgentTenantDetail = () => {
               </div>
 
               {(tenant.landlord_name || tenant.landlord_phone) && (
-                <Card className="mt-6">
+                <Card className={`mt-6 transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-highlight-pulse ring-2 ring-primary/20' : ''}`}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Landlord Information</CardTitle>
@@ -547,13 +547,13 @@ const AgentTenantDetail = () => {
                   </CardHeader>
                   <CardContent className="grid gap-4 md:grid-cols-2">
                     {tenant.landlord_name && (
-                      <div>
+                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in' : ''}`}>
                         <p className="text-sm text-muted-foreground">Name</p>
                         <p className="font-medium">{tenant.landlord_name}</p>
                       </div>
                     )}
                     {tenant.landlord_phone && (
-                      <div>
+                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in' : ''}`}>
                         <p className="text-sm text-muted-foreground">Phone</p>
                         <p className="font-medium">{tenant.landlord_phone}</p>
                       </div>
@@ -563,7 +563,7 @@ const AgentTenantDetail = () => {
               )}
 
               {(tenant.lc1_name || tenant.lc1_phone) && (
-                <Card className="mt-6">
+                <Card className={`mt-6 transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-highlight-pulse ring-2 ring-primary/20' : ''}`}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>LC1 Information</CardTitle>
@@ -572,13 +572,13 @@ const AgentTenantDetail = () => {
                   </CardHeader>
                   <CardContent className="grid gap-4 md:grid-cols-2">
                     {tenant.lc1_name && (
-                      <div>
+                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in' : ''}`}>
                         <p className="text-sm text-muted-foreground">Name</p>
                         <p className="font-medium">{tenant.lc1_name}</p>
                       </div>
                     )}
                     {tenant.lc1_phone && (
-                      <div>
+                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in' : ''}`}>
                         <p className="text-sm text-muted-foreground">Phone</p>
                         <p className="font-medium">{tenant.lc1_phone}</p>
                       </div>

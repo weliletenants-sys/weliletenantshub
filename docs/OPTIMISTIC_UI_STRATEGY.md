@@ -83,6 +83,9 @@ updateMutation.mutate({
 - LC1 information updates in UI
 - Rent amount changes
 - OptimisticBadge appears in affected cards
+- **Cards pulse and highlight with animation**
+- **Updated fields fade in smoothly**
+- **Primary ring border appears during update**
 - Haptic feedback triggers
 
 **What happens in background:**
@@ -192,6 +195,22 @@ onSettled: (result, error, data) => {
 ## Visual Feedback
 
 ### Optimistic State Indicators
+
+#### Animated Cards
+When landlord or LC1 information updates:
+```tsx
+<Card className={`transition-all duration-300 ${
+  tenantUpdateMutation.isPending 
+    ? 'animate-highlight-pulse ring-2 ring-primary/20' 
+    : ''
+}`}>
+```
+
+**Animation Effects**:
+- **Highlight Pulse**: Card subtly scales and changes background color
+- **Ring Border**: Primary color ring appears around updated cards
+- **Fade-In**: Individual field values fade in smoothly
+- **Duration**: 600ms for complete animation cycle
 
 #### Quick Payment Dialog
 ```tsx
@@ -315,6 +334,28 @@ if (!isOnline()) {
 
 ## Best Practices
 
+### Visual Animation Guidelines
+
+1. **Pulse animations for card updates**
+   ```tsx
+   className={`transition-all duration-300 ${
+     isPending ? 'animate-highlight-pulse ring-2 ring-primary/20' : ''
+   }`}
+   ```
+
+2. **Fade-in for individual field changes**
+   ```tsx
+   className={`transition-all duration-300 ${
+     isPending ? 'animate-fade-in' : ''
+   }`}
+   ```
+
+3. **Combine visual indicators**
+   - Animation (pulse/fade)
+   - Ring border (primary color)
+   - OptimisticBadge (status indicator)
+   - Haptic feedback (tactile)
+
 ### For Developers
 
 1. **Always snapshot previous state**
@@ -434,6 +475,7 @@ Payment Recording:
 ## Future Enhancements
 
 - [x] Optimistic tenant creation
+- [x] Animated transitions for landlord/LC1 updates
 - [ ] Optimistic deletion with undo
 - [ ] Optimistic image uploads
 - [ ] Batch optimistic updates
