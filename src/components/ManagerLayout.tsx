@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { LayoutDashboard, Users, CheckSquare, LogOut, Settings, Home } from "lucide-react";
 import { toast } from "sonner";
 import { useRipple } from "@/hooks/useRipple";
+import { useSwipeBack } from "@/hooks/useSwipeBack";
+import SwipeBackIndicator from "./SwipeBackIndicator";
 
 interface ManagerLayoutProps {
   children: ReactNode;
@@ -17,6 +19,7 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const createRipple = useRipple();
+  const { swipeProgress } = useSwipeBack();
 
   useEffect(() => {
     checkAuth();
@@ -49,6 +52,8 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <SwipeBackIndicator progress={swipeProgress} />
+      
       <header className="bg-card border-b border-border p-6 flex justify-between items-center">
         <WelileLogo />
         <Button variant="ghost" size="default" onClick={handleLogout}>

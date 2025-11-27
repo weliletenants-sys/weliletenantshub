@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Home, Users, Plus, DollarSign, TrendingUp, LogOut, MessageSquare, BarChart3, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { useRipple } from "@/hooks/useRipple";
+import { useSwipeBack } from "@/hooks/useSwipeBack";
+import SwipeBackIndicator from "./SwipeBackIndicator";
 
 interface AgentLayoutProps {
   children: ReactNode;
@@ -19,6 +21,7 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const createRipple = useRipple();
+  const { swipeProgress } = useSwipeBack();
 
   useEffect(() => {
     checkAuth();
@@ -55,6 +58,8 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <SwipeBackIndicator progress={swipeProgress} />
+      
       <header className="bg-card border-b border-border p-6 flex justify-between items-center">
         <WelileLogo />
         <div className="flex items-center gap-4">
