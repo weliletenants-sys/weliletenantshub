@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, User, Phone, DollarSign, Calendar, Edit, Save, Trash2, Home, MapPin, FileText, CalendarDays, History, TrendingDown } from "lucide-react";
+import { ArrowLeft, User, Phone, DollarSign, Calendar, Edit, Save, Trash2, Home, MapPin, FileText, CalendarDays, History, TrendingDown, UserCog, ArrowRightLeft } from "lucide-react";
 import { format } from "date-fns";
 import { haptics } from "@/utils/haptics";
 
@@ -62,6 +62,10 @@ const ManagerTenantDetail = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [availableAgents, setAvailableAgents] = useState<any[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("");
+  const [isTransferring, setIsTransferring] = useState(false);
   const [editForm, setEditForm] = useState({
     tenantName: "",
     tenantPhone: "",
@@ -135,7 +139,28 @@ const ManagerTenantDetail = () => {
 
   useEffect(() => {
     fetchTenantData();
+    fetchAvailableAgents();
   }, [tenantId]);
+
+  const fetchAvailableAgents = async () => {
+    try {
+      const { data: agentsData, error } = await supabase
+        .from("agents")
+        .select(`
+          id,
+          profiles:user_id (
+            full_name,
+            phone_number
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setAvailableAgents(agentsData || []);
+    } catch (error: any) {
+      console.error("Error fetching agents:", error);
+    }
+  };
 
   const handleSave = async () => {
     if (!tenant) return;
@@ -216,6 +241,88 @@ const ManagerTenantDetail = () => {
     }
   };
 
+  const handleTransferTenant = async () => {
+    if (!tenant || !selectedAgentId) return;
+
+    try {
+      setIsTransferring(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Not authenticated");
+        return;
+      }
+
+      // Get the new agent's profile info for the audit log
+      const { data: newAgent } = await supabase
+        .from("agents")
+        .select(`
+          id,
+          profiles:user_id (
+            full_name
+          )
+        `)
+        .eq("id", selectedAgentId)
+        .single();
+
+      // Get the old agent's profile info for the audit log
+      const { data: oldAgent } = await supabase
+        .from("agents")
+        .select(`
+          id,
+          profiles:user_id (
+            full_name
+          )
+        `)
+        .eq("id", tenant.agent_id)
+        .single();
+
+      // Update the tenant's agent_id
+      const { error: updateError } = await supabase
+        .from("tenants")
+        .update({ agent_id: selectedAgentId })
+        .eq("id", tenantId);
+
+      if (updateError) throw updateError;
+
+      // Create audit log entry for the transfer
+      const { error: auditError } = await supabase
+        .from("audit_logs")
+        .insert({
+          user_id: user.id,
+          action: "TRANSFER",
+          table_name: "tenants",
+          record_id: tenantId!,
+          old_data: {
+            agent_id: tenant.agent_id,
+            agent_name: oldAgent?.profiles?.full_name || "Unknown",
+          },
+          new_data: {
+            agent_id: selectedAgentId,
+            agent_name: newAgent?.profiles?.full_name || "Unknown",
+          },
+          changed_fields: ["agent_id"],
+        });
+
+      if (auditError) {
+        console.error("Error creating audit log:", auditError);
+        // Don't fail the transfer if audit log fails, just log it
+      }
+
+      haptics.success();
+      toast.success(`Tenant transferred to ${newAgent?.profiles?.full_name || "new agent"} successfully`);
+      setTransferDialogOpen(false);
+      setSelectedAgentId("");
+      await fetchTenantData();
+    } catch (error: any) {
+      console.error("Error transferring tenant:", error);
+      haptics.error();
+      toast.error("Failed to transfer tenant");
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
   const calculateDailyPayment = () => {
     const rent = parseFloat(editForm.rentAmount) || 0;
     const start = editForm.startDate ? new Date(editForm.startDate) : null;
@@ -271,6 +378,72 @@ const ManagerTenantDetail = () => {
           <div className="flex gap-2">
             {!isEditing ? (
               <>
+                <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="lg">
+                      <ArrowRightLeft className="h-4 w-4 mr-2" />
+                      Transfer Tenant
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Transfer Tenant to Another Agent</DialogTitle>
+                      <DialogDescription>
+                        Select an agent to transfer {tenant.tenant_name} to. This action will be recorded in the audit log.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div>
+                        <Label htmlFor="agent">Select Agent</Label>
+                        <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choose an agent" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableAgents
+                              .filter(agent => agent.id !== tenant.agent_id)
+                              .map((agent) => (
+                                <SelectItem key={agent.id} value={agent.id}>
+                                  <div className="flex items-center gap-2">
+                                    <UserCog className="h-4 w-4" />
+                                    <span>{agent.profiles?.full_name || "Unknown Agent"}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      ({agent.profiles?.phone_number})
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="p-4 bg-muted rounded-lg border">
+                        <p className="text-sm text-muted-foreground">
+                          <strong>Current Agent:</strong> {tenant.agents?.profiles?.full_name || "Unknown"}
+                        </p>
+                        {selectedAgentId && (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            <strong>New Agent:</strong>{" "}
+                            {availableAgents.find(a => a.id === selectedAgentId)?.profiles?.full_name || "Unknown"}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="outline" onClick={() => {
+                        setTransferDialogOpen(false);
+                        setSelectedAgentId("");
+                      }}>
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleTransferTenant}
+                        disabled={!selectedAgentId || isTransferring}
+                      >
+                        {isTransferring ? "Transferring..." : "Transfer Tenant"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
                 <Button onClick={() => setIsEditing(true)} size="lg">
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Details
