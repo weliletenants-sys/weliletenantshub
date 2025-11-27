@@ -7,6 +7,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import Install from "./pages/Install";
 import AgentDashboard from "./pages/agent/Dashboard";
 import AgentTenants from "./pages/agent/Tenants";
 import AgentNewTenant from "./pages/agent/NewTenant";
@@ -27,6 +28,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/install" element={<Install />} />
           <Route path="/agent/dashboard" element={
             <ProtectedRoute requiredRole="agent">
               <AgentDashboard />
