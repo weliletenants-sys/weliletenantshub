@@ -4,7 +4,7 @@ import PullToRefresh from "react-simple-pull-to-refresh";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -26,6 +26,9 @@ const ManagerDashboard = () => {
     activeAgents: 0,
     totalTenants: 0,
     pendingVerifications: 0,
+    pendingPayments: 0,
+    verifiedPayments: 0,
+    rejectedPayments: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [showTenantSearch, setShowTenantSearch] = useState(false);
@@ -73,11 +76,23 @@ const ManagerDashboard = () => {
         const totalTenants = tenantsResult.data?.length || 0;
         const pendingVerifications = tenantsResult.data?.filter(t => t.status === 'pending').length || 0;
 
+        // Fetch payment verification stats
+        const { data: collectionsData } = await supabase
+          .from("collections")
+          .select("status");
+
+        const pendingPayments = collectionsData?.filter(c => c.status === 'pending').length || 0;
+        const verifiedPayments = collectionsData?.filter(c => c.status === 'verified').length || 0;
+        const rejectedPayments = collectionsData?.filter(c => c.status === 'rejected').length || 0;
+
         setStats({
           totalAgents,
           activeAgents: totalAgents,
           totalTenants,
           pendingVerifications,
+          pendingPayments,
+          verifiedPayments,
+          rejectedPayments,
         });
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
@@ -110,11 +125,23 @@ const ManagerDashboard = () => {
     const totalTenants = tenantsResult.data?.length || 0;
     const pendingVerifications = tenantsResult.data?.filter(t => t.status === 'pending').length || 0;
 
+    // Fetch payment verification stats
+    const { data: collectionsData } = await supabase
+      .from("collections")
+      .select("status");
+
+    const pendingPayments = collectionsData?.filter(c => c.status === 'pending').length || 0;
+    const verifiedPayments = collectionsData?.filter(c => c.status === 'verified').length || 0;
+    const rejectedPayments = collectionsData?.filter(c => c.status === 'rejected').length || 0;
+
     setStats({
       totalAgents,
       activeAgents: totalAgents,
       totalTenants,
       pendingVerifications,
+      pendingPayments,
+      verifiedPayments,
+      rejectedPayments,
     });
     
     toast.success("Dashboard refreshed");
@@ -463,6 +490,52 @@ const ManagerDashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Payment Verification Stats */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Verification Overview</CardTitle>
+            <CardDescription>
+              Track all payment submissions and approvals across your team
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div 
+                className="text-center p-6 rounded-lg bg-orange-500/10 border-2 border-orange-500/20 cursor-pointer hover:border-orange-500/40 transition-colors"
+                onClick={() => navigate("/manager/payment-verifications")}
+              >
+                <Clock className="h-8 w-8 text-orange-500 mx-auto mb-2" />
+                <div className="text-4xl font-bold text-orange-500">{stats.pendingPayments}</div>
+                <p className="text-sm text-muted-foreground mt-2 font-medium">Pending Review</p>
+              </div>
+              <div 
+                className="text-center p-6 rounded-lg bg-success/10 border-2 border-success/20 cursor-pointer hover:border-success/40 transition-colors"
+                onClick={() => navigate("/manager/payment-verifications")}
+              >
+                <CheckCircle2 className="h-8 w-8 text-success mx-auto mb-2" />
+                <div className="text-4xl font-bold text-success">{stats.verifiedPayments}</div>
+                <p className="text-sm text-muted-foreground mt-2 font-medium">Verified</p>
+              </div>
+              <div 
+                className="text-center p-6 rounded-lg bg-destructive/10 border-2 border-destructive/20 cursor-pointer hover:border-destructive/40 transition-colors"
+                onClick={() => navigate("/manager/payment-verifications")}
+              >
+                <XCircle className="h-8 w-8 text-destructive mx-auto mb-2" />
+                <div className="text-4xl font-bold text-destructive">{stats.rejectedPayments}</div>
+                <p className="text-sm text-muted-foreground mt-2 font-medium">Rejected</p>
+              </div>
+            </div>
+            {stats.pendingPayments > 0 && (
+              <div className="mt-4 p-4 bg-orange-500/5 rounded-lg border border-orange-500/20">
+                <p className="text-sm text-center">
+                  <AlertCircle className="h-4 w-4 inline mr-1 text-orange-500" />
+                  <span className="font-medium">{stats.pendingPayments} payment{stats.pendingPayments !== 1 ? 's' : ''}</span> awaiting your verification
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Admin Access Card */}
         <Card className="bg-primary/10 border-primary/20">
