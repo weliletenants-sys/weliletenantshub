@@ -19,9 +19,28 @@ export async function ensureProfileExists(user: User): Promise<boolean> {
       return false;
     }
 
-    // If profile exists, ensure agent/manager record exists
+    // If profile exists, ensure user_roles and agent/manager record exists
     if (existingProfile) {
       const role = existingProfile.role;
+      
+      // Ensure user_roles entry exists
+      const { data: userRoleExists } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', role)
+        .maybeSingle();
+
+      if (!userRoleExists) {
+        console.log('Creating missing user_role for user:', user.id, 'role:', role);
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({ user_id: user.id, role });
+
+        if (roleError) {
+          console.error('Error creating user_role:', roleError);
+        }
+      }
       
       if (role === 'agent') {
         const { data: agentExists } = await supabase
@@ -82,6 +101,16 @@ export async function ensureProfileExists(user: User): Promise<boolean> {
     if (profileError) {
       console.error('Error creating profile:', profileError);
       return false;
+    }
+
+    // Create user_roles entry
+    const { error: roleError } = await supabase
+      .from('user_roles')
+      .insert({ user_id: user.id, role });
+
+    if (roleError) {
+      console.error('Error creating user_role:', roleError);
+      // Continue even if role creation fails
     }
 
     // Create corresponding agent or manager record
