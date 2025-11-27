@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Wallet, Users, TrendingUp, Search, User, Phone, DollarSign, ChevronRight, Download, FileDown, Calendar as CalendarIcon, X } from "lucide-react";
+import { ArrowLeft, Wallet, Users, TrendingUp, Search, User, Phone, DollarSign, ChevronRight, Download, FileDown, Calendar as CalendarIcon, X, Star, Trash2 } from "lucide-react";
 import jsPDF from "jspdf";
 import { haptics } from "@/utils/haptics";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -16,6 +16,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 interface TenantData {
   id: string;
@@ -45,6 +47,21 @@ const ManagerPortfolioBreakdown = () => {
   const [openAgents, setOpenAgents] = useState<Set<string>>(new Set());
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [savedRanges, setSavedRanges] = useState<Array<{ name: string; startDate: string; endDate: string }>>([]);
+  const [rangeName, setRangeName] = useState("");
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+
+  // Load saved ranges from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('portfolio-saved-date-ranges');
+    if (saved) {
+      try {
+        setSavedRanges(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse saved date ranges', e);
+      }
+    }
+  }, []);
 
   const fetchPortfolioBreakdown = async () => {
     try {
@@ -172,6 +189,43 @@ const ManagerPortfolioBreakdown = () => {
     setEndDate(end);
     haptics.light();
     toast.success(`Date range set to ${label}`);
+  };
+
+  const saveCurrentRange = () => {
+    if (!startDate || !endDate || !rangeName.trim()) {
+      toast.error("Please select dates and enter a name");
+      return;
+    }
+
+    const newRange = {
+      name: rangeName.trim(),
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString()
+    };
+
+    const updatedRanges = [...savedRanges, newRange];
+    setSavedRanges(updatedRanges);
+    localStorage.setItem('portfolio-saved-date-ranges', JSON.stringify(updatedRanges));
+    
+    setRangeName("");
+    setSaveDialogOpen(false);
+    haptics.light();
+    toast.success(`Saved date range: ${newRange.name}`);
+  };
+
+  const loadSavedRange = (range: { name: string; startDate: string; endDate: string }) => {
+    setStartDate(new Date(range.startDate));
+    setEndDate(new Date(range.endDate));
+    haptics.light();
+    toast.success(`Loaded date range: ${range.name}`);
+  };
+
+  const deleteSavedRange = (index: number) => {
+    const updatedRanges = savedRanges.filter((_, i) => i !== index);
+    setSavedRanges(updatedRanges);
+    localStorage.setItem('portfolio-saved-date-ranges', JSON.stringify(updatedRanges));
+    haptics.light();
+    toast.success("Date range deleted");
   };
 
   const getDateRangeLabel = () => {
@@ -576,6 +630,88 @@ const ManagerPortfolioBreakdown = () => {
                 </Button>
               </div>
             </div>
+
+            {/* Save Current Range */}
+            {startDate && endDate && (
+              <div className="mt-4 border-t pt-4">
+                <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-full">
+                      <Star className="w-4 h-4 mr-2" />
+                      Save Current Range as Favorite
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Save Date Range</DialogTitle>
+                      <DialogDescription>
+                        Give this date range a name to quickly access it later.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="range-name">Range Name</Label>
+                        <Input
+                          id="range-name"
+                          placeholder="e.g., Q1 2024, Summer Period"
+                          value={rangeName}
+                          onChange={(e) => setRangeName(e.target.value)}
+                        />
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        <p>From: {format(startDate, "PPP")}</p>
+                        <p>To: {format(endDate, "PPP")}</p>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={saveCurrentRange}>
+                        Save
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            )}
+
+            {/* Saved Ranges */}
+            {savedRanges.length > 0 && (
+              <div className="mt-4 border-t pt-4">
+                <label className="text-sm font-medium mb-3 block">Saved Favorites</label>
+                <div className="space-y-2">
+                  {savedRanges.map((range, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between gap-2 p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                    >
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => loadSavedRange(range)}
+                        className="flex-1 justify-start text-left h-auto py-2"
+                      >
+                        <div className="flex flex-col gap-1">
+                          <span className="font-medium">{range.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(range.startDate), "PP")} - {format(new Date(range.endDate), "PP")}
+                          </span>
+                        </div>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => deleteSavedRange(index)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
