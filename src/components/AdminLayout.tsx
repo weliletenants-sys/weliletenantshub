@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Shield, Wrench, UserCog, Home } from "lucide-react";
+import { Shield, Wrench, UserCog, Home, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WelileLogo from "@/components/WelileLogo";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,12 @@ interface AdminLayoutProps {
 }
 
 const adminRoutes = [
+  {
+    path: "/admin",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    description: "Overview and statistics"
+  },
   {
     path: "/admin/roles",
     label: "Role Management",

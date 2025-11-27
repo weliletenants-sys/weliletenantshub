@@ -24,6 +24,7 @@ import ManagerVerifications from "./pages/manager/Verifications";
 import ManagerSettings from "./pages/manager/Settings";
 import AdminProfileRepair from "./pages/admin/ProfileRepair";
 import AdminRoleManagement from "./pages/admin/RoleManagement";
+import AdminDashboard from "./pages/admin/Dashboard";
 
 const queryClient = new QueryClient();
 
@@ -106,6 +107,9 @@ const App = () => (
             <ProtectedRoute requiredRole="manager">
               <ManagerSettings />
             </ProtectedRoute>
+          } />
+          <Route path="/admin" element={
+            <AdminDashboard />
           } />
           <Route path="/admin/profile-repair" element={
             <AdminProfileRepair />
