@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import PullToRefresh from "react-simple-pull-to-refresh";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 
 const ManagerDashboard = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalAgents: 0,
     activeAgents: 0,
@@ -224,6 +226,27 @@ const ManagerDashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Admin Access Card */}
+        <Card className="bg-primary/10 border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              Admin Access
+            </CardTitle>
+            <CardDescription>
+              As a manager, you have admin privileges to manage users and system settings
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button 
+              onClick={() => navigate('/admin')}
+              className="w-full md:w-auto"
+            >
+              Open Admin Dashboard
+            </Button>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

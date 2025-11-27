@@ -41,6 +41,27 @@ export async function ensureProfileExists(user: User): Promise<boolean> {
           console.error('Error creating user_role:', roleError);
         }
       }
+
+      // Managers automatically get admin role
+      if (role === 'manager') {
+        const { data: adminRoleExists } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+
+        if (!adminRoleExists) {
+          console.log('Granting admin role to manager:', user.id);
+          const { error: adminRoleError } = await supabase
+            .from('user_roles')
+            .insert({ user_id: user.id, role: 'admin' });
+
+          if (adminRoleError) {
+            console.error('Error creating admin role for manager:', adminRoleError);
+          }
+        }
+      }
       
       if (role === 'agent') {
         const { data: agentExists } = await supabase
@@ -111,6 +132,17 @@ export async function ensureProfileExists(user: User): Promise<boolean> {
     if (roleError) {
       console.error('Error creating user_role:', roleError);
       // Continue even if role creation fails
+    }
+
+    // Managers automatically get admin role
+    if (role === 'manager') {
+      const { error: adminRoleError } = await supabase
+        .from('user_roles')
+        .insert({ user_id: user.id, role: 'admin' });
+
+      if (adminRoleError) {
+        console.error('Error creating admin role for manager:', adminRoleError);
+      }
     }
 
     // Create corresponding agent or manager record
