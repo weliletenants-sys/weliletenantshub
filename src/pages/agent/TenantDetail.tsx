@@ -6,6 +6,7 @@ import AgentLayout from "@/components/AgentLayout";
 import { TenantDetailSkeleton } from "@/components/TenantDetailSkeleton";
 import { RefreshIndicator } from "@/components/RefreshIndicator";
 import { OptimisticBadge } from "@/components/OptimisticBadge";
+import { RealtimeSyncIndicator, SyncPulse } from "@/components/RealtimeSyncIndicator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,7 @@ import { haptics } from "@/utils/haptics";
 import { useTenantData, useCollectionsData, useAgentInfo } from "@/hooks/useTenantData";
 import { useOptimisticPayment, useOptimisticTenantUpdate } from "@/hooks/useOptimisticPayment";
 import { useRealtimeCollections } from "@/hooks/useRealtimeSubscription";
+import { useRealtimeSyncStatus } from "@/hooks/useRealtimeSyncStatus";
 
 const AgentTenantDetail = () => {
   const { tenantId } = useParams();
@@ -63,6 +65,9 @@ const AgentTenantDetail = () => {
   
   // Enable real-time updates for collections
   useRealtimeCollections(tenantId);
+  
+  // Track sync status for visual indicators
+  const { lastSyncTime } = useRealtimeSyncStatus('collections');
 
   // Update edit form when tenant data loads
   useEffect(() => {
@@ -238,7 +243,10 @@ const AgentTenantDetail = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold">{tenant.tenant_name}</h1>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              {tenant.tenant_name}
+              <RealtimeSyncIndicator lastSyncTime={lastSyncTime} compact />
+            </h1>
             <p className="text-muted-foreground">Tenant Details & Payment History</p>
           </div>
           <div className="flex items-center gap-2">
@@ -542,7 +550,8 @@ const AgentTenantDetail = () => {
               </div>
 
               {(tenant.landlord_name || tenant.landlord_phone) && (
-                <Card className={`mt-6 transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-highlight-pulse ring-2 ring-primary/20' : ''}`}>
+                <Card className={`mt-6 transition-all duration-300 relative ${tenantUpdateMutation.isPending ? 'animate-highlight-pulse ring-2 ring-primary/20' : ''}`}>
+                  <SyncPulse show={!!lastSyncTime && Date.now() - lastSyncTime.getTime() < 2000} />
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Landlord Information</CardTitle>
@@ -567,7 +576,8 @@ const AgentTenantDetail = () => {
               )}
 
               {(tenant.lc1_name || tenant.lc1_phone) && (
-                <Card className={`mt-6 transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-highlight-pulse ring-2 ring-primary/20' : ''}`}>
+                <Card className={`mt-6 transition-all duration-300 relative ${tenantUpdateMutation.isPending ? 'animate-highlight-pulse ring-2 ring-primary/20' : ''}`}>
+                  <SyncPulse show={!!lastSyncTime && Date.now() - lastSyncTime.getTime() < 2000} />
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>LC1 Information</CardTitle>
