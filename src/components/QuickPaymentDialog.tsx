@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search, Zap } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useOptimisticPayment } from "@/hooks/useOptimisticPayment";
 
 interface Tenant {
   id: string;
@@ -30,9 +32,11 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess }: QuickPaymentDialo
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [loading, setLoading] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [agentId, setAgentId] = useState<string>("");
+  
+  // Optimistic mutation hook
+  const paymentMutation = useOptimisticPayment();
 
   useEffect(() => {
     if (open) {
@@ -75,60 +79,33 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess }: QuickPaymentDialo
     e.preventDefault();
     if (!selectedTenant || !amount || !agentId) return;
 
-    setLoading(true);
-
-    try {
-      const paymentAmount = parseFloat(amount);
-      if (isNaN(paymentAmount) || paymentAmount <= 0) {
-        toast.error("Please enter a valid amount");
-        return;
-      }
-
-      // Calculate commission (10%)
-      const commission = paymentAmount * 0.1;
-
-      // Record collection
-      const { error: collectionError } = await supabase
-        .from('collections')
-        .insert({
-          agent_id: agentId,
-          tenant_id: selectedTenant.id,
-          amount: paymentAmount,
-          commission: commission,
-          payment_method: paymentMethod,
-          status: 'completed',
-          collection_date: new Date().toISOString().split('T')[0],
-        });
-
-      if (collectionError) throw collectionError;
-
-      // Update tenant balance
-      const newBalance = (selectedTenant.outstanding_balance || 0) - paymentAmount;
-      const { error: updateError } = await supabase
-        .from('tenants')
-        .update({
-          outstanding_balance: newBalance,
-          last_payment_date: new Date().toISOString(),
-        })
-        .eq('id', selectedTenant.id);
-
-      if (updateError) throw updateError;
-
-      toast.success(`Payment of UGX ${paymentAmount.toLocaleString()} recorded successfully!`);
-      
-      // Reset form
-      setSelectedTenant(null);
-      setAmount("");
-      setPaymentMethod("cash");
-      
-      onOpenChange(false);
-      onSuccess?.();
-    } catch (error: any) {
-      console.error('Error recording payment:', error);
-      toast.error(error.message || "Failed to record payment");
-    } finally {
-      setLoading(false);
+    const paymentAmount = parseFloat(amount);
+    if (isNaN(paymentAmount) || paymentAmount <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
     }
+
+    // Calculate commission (10%)
+    const commission = paymentAmount * 0.1;
+
+    // Use optimistic mutation - UI updates instantly
+    paymentMutation.mutate({
+      tenantId: selectedTenant.id,
+      amount: paymentAmount,
+      paymentMethod,
+      collectionDate: new Date().toISOString().split('T')[0],
+      agentId,
+      commission,
+    }, {
+      onSuccess: () => {
+        // Reset form on success
+        setSelectedTenant(null);
+        setAmount("");
+        setPaymentMethod("cash");
+        onOpenChange(false);
+        onSuccess?.();
+      }
+    });
   };
 
   return (
@@ -235,13 +212,19 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess }: QuickPaymentDialo
 
           {/* Commission Preview */}
           {amount && parseFloat(amount) > 0 && (
-            <div className="bg-primary/10 p-3 rounded-lg">
+            <div className="bg-primary/10 p-3 rounded-lg space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Your Commission (10%):</span>
                 <span className="font-semibold text-primary">
                   UGX {(parseFloat(amount) * 0.1).toLocaleString()}
                 </span>
               </div>
+              {paymentMutation.isPending && (
+                <div className="flex items-center gap-2 text-xs text-primary">
+                  <Zap className="h-3 w-3 animate-pulse" />
+                  <span>Update will process instantly...</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -252,22 +235,25 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess }: QuickPaymentDialo
               variant="outline"
               className="flex-1"
               onClick={() => onOpenChange(false)}
-              disabled={loading}
+              disabled={paymentMutation.isPending}
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="flex-1"
-              disabled={loading || !selectedTenant || !amount}
+              className="flex-1 gap-2"
+              disabled={paymentMutation.isPending || !selectedTenant || !amount}
             >
-              {loading ? (
+              {paymentMutation.isPending ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Recording...
                 </>
               ) : (
-                "Record Payment"
+                <>
+                  <Zap className="h-4 w-4" />
+                  Record Payment
+                </>
               )}
             </Button>
           </div>

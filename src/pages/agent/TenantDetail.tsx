@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import AgentLayout from "@/components/AgentLayout";
 import { TenantDetailSkeleton } from "@/components/TenantDetailSkeleton";
 import { RefreshIndicator } from "@/components/RefreshIndicator";
+import { OptimisticBadge } from "@/components/OptimisticBadge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,11 +18,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import PaymentReceipt from "@/components/PaymentReceipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff, Receipt, Edit, History, Zap } from "lucide-react";
+import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff, Receipt, Edit, History, Zap, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { addPendingPayment, isOnline } from "@/lib/offlineSync";
+import { isOnline } from "@/lib/offlineSync";
 import { haptics } from "@/utils/haptics";
 import { useTenantData, useCollectionsData, useAgentInfo } from "@/hooks/useTenantData";
+import { useOptimisticPayment, useOptimisticTenantUpdate } from "@/hooks/useOptimisticPayment";
 
 const AgentTenantDetail = () => {
   const { tenantId } = useParams();
@@ -39,7 +41,6 @@ const AgentTenantDetail = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [lastPayment, setLastPayment] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("details");
   const [paymentForm, setPaymentForm] = useState({
@@ -54,6 +55,10 @@ const AgentTenantDetail = () => {
     lc1Phone: "",
     rentAmount: "",
   });
+  
+  // Optimistic mutations
+  const paymentMutation = useOptimisticPayment();
+  const tenantUpdateMutation = useOptimisticTenantUpdate();
 
   // Update edit form when tenant data loads
   useEffect(() => {
@@ -118,121 +123,82 @@ const AgentTenantDetail = () => {
 
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
+    if (!tenant) return;
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const { data: agent } = await supabase
-        .from("agents")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!agent) throw new Error("Agent profile not found");
-
-      const amount = parseFloat(paymentForm.amount);
-      const commission = amount * 0.05; // 5% commission
-
-      const collectionData = {
-        tenant_id: tenantId,
-        agent_id: agent.id,
-        amount: amount,
-        commission: commission,
-        collection_date: paymentForm.collectionDate,
-        payment_method: paymentForm.paymentMethod,
-        status: "completed",
-      };
-
-      if (isOnline()) {
-        // Online: Save directly to database
-        const { error: collectionError } = await supabase
-          .from("collections")
-          .insert(collectionData);
-
-        if (collectionError) throw collectionError;
-
-        // Update tenant's outstanding balance
-        const newBalance = parseFloat(tenant.outstanding_balance?.toString() || '0') - amount;
-        const { error: updateError } = await supabase
-          .from("tenants")
-          .update({ outstanding_balance: Math.max(0, newBalance) })
-          .eq("id", tenantId);
-
-        if (updateError) throw updateError;
-
-        // Store payment details for receipt
-        setLastPayment({
-          ...collectionData,
-          tenant_outstanding_balance: Math.max(0, newBalance),
-        });
-
-        haptics.success();
-        toast.success(`Payment recorded! You earned UGX ${commission.toLocaleString()} commission`);
-        
-        // Show receipt dialog
-        setReceiptDialogOpen(true);
-      } else {
-        // Offline: Save to IndexedDB for later sync
-        await addPendingPayment(collectionData, tenantId!);
-        
-        toast.success("Payment saved offline! Will sync when back online.", {
-          icon: <CloudOff className="h-4 w-4" />,
-          duration: 5000,
-        });
-      }
-      
-      // Reset form and close dialog
-      setPaymentForm({
-        amount: "",
-        paymentMethod: "cash",
-        collectionDate: format(new Date(), "yyyy-MM-dd"),
-      });
-      setDialogOpen(false);
-      
-      // Refresh data if online
-      if (isOnline()) {
-        queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
-        queryClient.invalidateQueries({ queryKey: ['collections', tenantId] });
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to record payment");
-    } finally {
-      setSubmitting(false);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Not authenticated");
+      return;
     }
+
+    const { data: agent } = await supabase
+      .from("agents")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!agent) {
+      toast.error("Agent profile not found");
+      return;
+    }
+
+    const amount = parseFloat(paymentForm.amount);
+    const commission = amount * 0.05; // 5% commission
+
+    // Use optimistic mutation
+    paymentMutation.mutate({
+      tenantId: tenantId!,
+      amount,
+      paymentMethod: paymentForm.paymentMethod,
+      collectionDate: paymentForm.collectionDate,
+      agentId: agent.id,
+      commission,
+    }, {
+      onSuccess: (result) => {
+        if (!result.offline) {
+          // Show receipt for online payments
+          setLastPayment({
+            amount,
+            commission,
+            payment_method: paymentForm.paymentMethod,
+            collection_date: paymentForm.collectionDate,
+            tenant_outstanding_balance: Math.max(0, parseFloat(tenant.outstanding_balance?.toString() || '0') - amount),
+          });
+          setReceiptDialogOpen(true);
+        }
+        
+        // Reset form
+        setPaymentForm({
+          amount: "",
+          paymentMethod: "cash",
+          collectionDate: format(new Date(), "yyyy-MM-dd"),
+        });
+        setDialogOpen(false);
+      }
+    });
   };
 
   const handleEditTenant = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
+    
+    const rentAmount = editForm.rentAmount ? parseFloat(editForm.rentAmount) : 0;
+    const registrationFee = rentAmount >= 200000 ? 20000 : 10000;
 
-    try {
-      const rentAmount = editForm.rentAmount ? parseFloat(editForm.rentAmount) : 0;
-      const registrationFee = rentAmount >= 200000 ? 20000 : 10000;
-
-      const { error } = await supabase
-        .from("tenants")
-        .update({
-          landlord_name: editForm.landlordName || "",
-          landlord_phone: editForm.landlordPhone || "",
-          lc1_name: editForm.lc1Name || "",
-          lc1_phone: editForm.lc1Phone || "",
-          rent_amount: rentAmount,
-          registration_fee: registrationFee,
-        })
-        .eq("id", tenantId);
-
-      if (error) throw error;
-
-      toast.success("Tenant details updated successfully");
-      setEditDialogOpen(false);
-      queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update tenant");
-    } finally {
-      setSubmitting(false);
-    }
+    tenantUpdateMutation.mutate({
+      tenantId: tenantId!,
+      updates: {
+        landlord_name: editForm.landlordName || "",
+        landlord_phone: editForm.landlordPhone || "",
+        lc1_name: editForm.lc1Name || "",
+        lc1_phone: editForm.lc1Phone || "",
+        rent_amount: rentAmount,
+        registration_fee: registrationFee,
+      }
+    }, {
+      onSuccess: () => {
+        setEditDialogOpen(false);
+      }
+    });
   };
 
   if (loading) {
@@ -271,7 +237,10 @@ const AgentTenantDetail = () => {
             <h1 className="text-3xl font-bold">{tenant.tenant_name}</h1>
             <p className="text-muted-foreground">Tenant Details & Payment History</p>
           </div>
-          {getStatusBadge(tenant.status)}
+          <div className="flex items-center gap-2">
+            {getStatusBadge(tenant.status)}
+            <OptimisticBadge show={paymentMutation.isPending || tenantUpdateMutation.isPending} />
+          </div>
           
           {!isOnline() && (
             <Badge variant="secondary" className="gap-2">
@@ -367,8 +336,18 @@ const AgentTenantDetail = () => {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={submitting}>
-                    {submitting ? "Saving..." : "Save Changes"}
+                  <Button type="submit" className="flex-1 gap-2" disabled={tenantUpdateMutation.isPending}>
+                    {tenantUpdateMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-4 w-4" />
+                        Save Changes
+                      </>
+                    )}
                   </Button>
                 </div>
               </form>
@@ -445,8 +424,18 @@ const AgentTenantDetail = () => {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={submitting}>
-                    {submitting ? "Recording..." : "Record Payment"}
+                  <Button type="submit" className="flex-1 gap-2" disabled={paymentMutation.isPending}>
+                    {paymentMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Recording...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-4 w-4" />
+                        Record Payment
+                      </>
+                    )}
                   </Button>
                 </div>
               </form>
@@ -514,7 +503,10 @@ const AgentTenantDetail = () => {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Payment Summary</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Payment Summary</CardTitle>
+                      <OptimisticBadge show={paymentMutation.isPending} />
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
@@ -608,21 +600,36 @@ const AgentTenantDetail = () => {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {collections.map((collection) => (
-                            <TableRow key={collection.id}>
-                              <TableCell>
-                                {format(new Date(collection.collection_date), "MMM dd, yyyy")}
-                              </TableCell>
-                              <TableCell className="font-medium">
-                                UGX {parseFloat(collection.amount?.toString() || '0').toLocaleString()}
-                              </TableCell>
-                              <TableCell className="text-primary">
-                                UGX {parseFloat(collection.commission?.toString() || '0').toLocaleString()}
-                              </TableCell>
-                              <TableCell className="capitalize">{collection.payment_method}</TableCell>
-                              <TableCell>{getPaymentStatusBadge(collection.status)}</TableCell>
-                            </TableRow>
-                          ))}
+                          {collections.map((collection) => {
+                            const isOptimistic = collection.id.startsWith('optimistic-');
+                            return (
+                              <TableRow 
+                                key={collection.id}
+                                className={isOptimistic ? "bg-primary/5" : ""}
+                              >
+                                <TableCell>
+                                  {format(new Date(collection.collection_date), "MMM dd, yyyy")}
+                                </TableCell>
+                                <TableCell className="font-medium">
+                                  UGX {parseFloat(collection.amount?.toString() || '0').toLocaleString()}
+                                </TableCell>
+                                <TableCell className="text-primary">
+                                  UGX {parseFloat(collection.commission?.toString() || '0').toLocaleString()}
+                                </TableCell>
+                                <TableCell className="capitalize">{collection.payment_method}</TableCell>
+                                <TableCell>
+                                  {isOptimistic ? (
+                                    <Badge variant="secondary" className="gap-1">
+                                      <Zap className="h-3 w-3 animate-pulse" />
+                                      Processing
+                                    </Badge>
+                                  ) : (
+                                    getPaymentStatusBadge(collection.status)
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </div>
