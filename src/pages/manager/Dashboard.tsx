@@ -58,8 +58,11 @@ const ManagerDashboard = () => {
   const [maxTenantsFilter, setMaxTenantsFilter] = useState<string>("");
   const [agentGrowthComparison, setAgentGrowthComparison] = useState<any[]>([]);
 
-  // Track previous portfolio value for change detection
+  // Track previous values for change detection
   const [prevPortfolioValue, setPrevPortfolioValue] = useState<number | null>(null);
+  const [prevTotalTenants, setPrevTotalTenants] = useState<number | null>(null);
+  const [prevPendingVerifications, setPrevPendingVerifications] = useState<number | null>(null);
+  const [prevPendingPayments, setPrevPendingPayments] = useState<number | null>(null);
 
   // Subscribe to real-time updates for all agent activity
   useRealtimeAllTenants();
@@ -87,6 +90,69 @@ const ManagerDashboard = () => {
     
     setPrevPortfolioValue(stats.totalPortfolioValue);
   }, [stats.totalPortfolioValue]);
+
+  // Show toast notification when total tenants changes
+  useEffect(() => {
+    if (prevTotalTenants !== null && stats.totalTenants !== prevTotalTenants) {
+      const difference = stats.totalTenants - prevTotalTenants;
+      const isIncrease = difference > 0;
+      
+      if (isIncrease) {
+        toast.success(
+          `New Tenant${difference > 1 ? 's' : ''} Added`,
+          {
+            description: `${difference} new tenant${difference > 1 ? 's' : ''} registered`,
+            duration: 4000,
+          }
+        );
+        haptics.success();
+      }
+    }
+    
+    setPrevTotalTenants(stats.totalTenants);
+  }, [stats.totalTenants]);
+
+  // Show toast notification when pending verifications change
+  useEffect(() => {
+    if (prevPendingVerifications !== null && stats.pendingVerifications !== prevPendingVerifications) {
+      const difference = stats.pendingVerifications - prevPendingVerifications;
+      const isIncrease = difference > 0;
+      
+      if (isIncrease) {
+        toast.info(
+          `New Verification${Math.abs(difference) > 1 ? 's' : ''} Pending`,
+          {
+            description: `${Math.abs(difference)} tenant${Math.abs(difference) > 1 ? 's' : ''} awaiting verification`,
+            duration: 4000,
+          }
+        );
+        haptics.light();
+      }
+    }
+    
+    setPrevPendingVerifications(stats.pendingVerifications);
+  }, [stats.pendingVerifications]);
+
+  // Show toast notification when pending payments change
+  useEffect(() => {
+    if (prevPendingPayments !== null && stats.pendingPayments !== prevPendingPayments) {
+      const difference = stats.pendingPayments - prevPendingPayments;
+      const isIncrease = difference > 0;
+      
+      if (isIncrease) {
+        toast.info(
+          `New Payment${Math.abs(difference) > 1 ? 's' : ''} to Review`,
+          {
+            description: `${Math.abs(difference)} payment${Math.abs(difference) > 1 ? 's' : ''} awaiting verification`,
+            duration: 4000,
+          }
+        );
+        haptics.light();
+      }
+    }
+    
+    setPrevPendingPayments(stats.pendingPayments);
+  }, [stats.pendingPayments]);
 
   useEffect(() => {
     const fetchStats = async () => {
