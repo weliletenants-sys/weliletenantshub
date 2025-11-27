@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import WelileLogo from "./WelileLogo";
 import Breadcrumbs from "./Breadcrumbs";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Users, CheckSquare, LogOut, Settings, Home, TrendingUp, FileText } from "lucide-react";
+import { LayoutDashboard, Users, CheckSquare, LogOut, Settings, Home, TrendingUp, FileText, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { useRipple } from "@/hooks/useRipple";
 import { useSwipeBack } from "@/hooks/useSwipeBack";
@@ -43,9 +43,10 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/manager/dashboard" },
     { icon: Users, label: "Agents", path: "/manager/agents" },
+    { icon: DollarSign, label: "Payment Verifications", path: "/manager/payment-verifications" },
     { icon: TrendingUp, label: "Weekly Report", path: "/manager/weekly-report" },
     { icon: FileText, label: "Audit Log", path: "/manager/audit-log" },
-    { icon: CheckSquare, label: "Verifications", path: "/manager/verifications" },
+    { icon: CheckSquare, label: "Tenant Verifications", path: "/manager/verifications" },
     { icon: Settings, label: "Settings", path: "/manager/settings" },
   ];
 

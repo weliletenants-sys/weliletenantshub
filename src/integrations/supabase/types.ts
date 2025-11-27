@@ -176,8 +176,11 @@ export type Database = {
           created_at: string
           id: string
           payment_method: string | null
+          rejection_reason: string | null
           status: string | null
           tenant_id: string
+          verified_at: string | null
+          verified_by: string | null
         }
         Insert: {
           agent_id: string
@@ -187,8 +190,11 @@ export type Database = {
           created_at?: string
           id?: string
           payment_method?: string | null
+          rejection_reason?: string | null
           status?: string | null
           tenant_id: string
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Update: {
           agent_id?: string
@@ -198,8 +204,11 @@ export type Database = {
           created_at?: string
           id?: string
           payment_method?: string | null
+          rejection_reason?: string | null
           status?: string | null
           tenant_id?: string
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Relationships: [
           {

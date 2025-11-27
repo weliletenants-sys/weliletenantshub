@@ -107,6 +107,9 @@ export const useOptimisticPayment = () => {
         collection_date: data.collectionDate,
         status: 'pending',
         created_at: new Date().toISOString(),
+        verified_by: null,
+        verified_at: null,
+        rejection_reason: null,
       };
 
       queryClient.setQueryData<Collection[]>(['collections', data.tenantId], (old = []) => [
