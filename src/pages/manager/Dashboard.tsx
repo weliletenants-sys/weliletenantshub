@@ -82,9 +82,9 @@ const ManagerDashboard = () => {
         const totalTenants = tenantsResult.data?.length || 0;
         const pendingVerifications = tenantsResult.data?.filter(t => t.status === 'pending').length || 0;
 
-        // Calculate total portfolio value
-        const totalPortfolioValue = agentsResult.data?.reduce((sum, agent) => {
-          return sum + (parseFloat(agent.portfolio_value?.toString() || '0'));
+        // Calculate total portfolio value from outstanding balances
+        const totalPortfolioValue = tenantsResult.data?.reduce((sum, tenant) => {
+          return sum + (parseFloat(tenant.outstanding_balance?.toString() || '0'));
         }, 0) || 0;
 
         // Calculate portfolio growth (day-over-day and week-over-week)
@@ -177,9 +177,9 @@ const ManagerDashboard = () => {
     const totalTenants = tenantsResult.data?.length || 0;
     const pendingVerifications = tenantsResult.data?.filter(t => t.status === 'pending').length || 0;
 
-    // Calculate total portfolio value
-    const totalPortfolioValue = agentsResult.data?.reduce((sum, agent) => {
-      return sum + (parseFloat(agent.portfolio_value?.toString() || '0'));
+    // Calculate total portfolio value from outstanding balances
+    const totalPortfolioValue = tenantsResult.data?.reduce((sum, tenant) => {
+      return sum + (parseFloat(tenant.outstanding_balance?.toString() || '0'));
     }, 0) || 0;
 
     // Calculate portfolio growth
