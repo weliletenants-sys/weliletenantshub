@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import WelileLogo from "./WelileLogo";
 import OfflineSyncIndicator from "./OfflineSyncIndicator";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Users, Plus, DollarSign, TrendingUp, LogOut, MessageSquare } from "lucide-react";
+import { Home, Users, Plus, DollarSign, TrendingUp, LogOut, MessageSquare, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 
 interface AgentLayoutProps {
@@ -40,6 +40,7 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
     { icon: Plus, label: "New Tenant", path: "/agent/new-tenant" },
     { icon: DollarSign, label: "Collections", path: "/agent/collections" },
     { icon: TrendingUp, label: "Earnings", path: "/agent/earnings" },
+    { icon: BarChart3, label: "Weekly Report", path: "/agent/weekly-summary" },
     { icon: MessageSquare, label: "AI Assistant", path: "/agent/ai-assistant" },
   ];
 
