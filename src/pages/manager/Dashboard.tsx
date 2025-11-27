@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Users, UserCheck, AlertCircle, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,10 +13,12 @@ const ManagerDashboard = () => {
     totalTenants: 0,
     pendingVerifications: 0,
   });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
+        setIsLoading(true);
         const [agentsResult, tenantsResult] = await Promise.all([
           supabase.from("agents").select("*"),
           supabase.from("tenants").select("*"),
@@ -41,6 +44,8 @@ const ManagerDashboard = () => {
         });
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -66,6 +71,68 @@ const ManagerDashboard = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  if (isLoading) {
+    return (
+      <ManagerLayout currentPage="/manager/dashboard">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">Manager Dashboard</h1>
+            <p className="text-muted-foreground">Service Centre Overview</p>
+          </div>
+
+          {/* Stats Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i}>
+                <CardHeader className="pb-2">
+                  <Skeleton className="h-4 w-24" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-32 mb-2" />
+                  <Skeleton className="h-3 w-20" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Recent Activity Skeleton */}
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-32 mb-2" />
+              <Skeleton className="h-4 w-48" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-4 w-full" />
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-32" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-48" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-4 w-full mb-4" />
+                <Skeleton className="h-10 w-40" />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </ManagerLayout>
+    );
+  }
 
   return (
     <ManagerLayout currentPage="/manager/dashboard">
