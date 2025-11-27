@@ -36,6 +36,7 @@ const ManagerWeeklyReport = lazy(() => import("./pages/manager/WeeklyReport"));
 const ManagerAuditLog = lazy(() => import("./pages/manager/AuditLog"));
 const ManagerVerifications = lazy(() => import("./pages/manager/Verifications"));
 const ManagerPaymentVerifications = lazy(() => import("./pages/manager/PaymentVerifications"));
+const ManagerVerificationHistory = lazy(() => import("./pages/manager/VerificationHistory"));
 const ManagerSettings = lazy(() => import("./pages/manager/Settings"));
 const AdminProfileRepair = lazy(() => import("./pages/admin/ProfileRepair"));
 const AdminRoleManagement = lazy(() => import("./pages/admin/RoleManagement"));
@@ -185,6 +186,11 @@ const App = () => {
               <Route path="/manager/payment-verifications" element={
                 <ProtectedRoute requiredRole="manager">
                   <ManagerPaymentVerifications />
+                </ProtectedRoute>
+              } />
+              <Route path="/manager/verification-history" element={
+                <ProtectedRoute requiredRole="manager">
+                  <ManagerVerificationHistory />
                 </ProtectedRoute>
               } />
               <Route path="/manager/settings" element={
