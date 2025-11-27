@@ -1,0 +1,268 @@
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import AgentLayout from "@/components/AgentLayout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { ArrowLeft, Phone, User, DollarSign, Calendar } from "lucide-react";
+import { format } from "date-fns";
+
+const AgentTenantDetail = () => {
+  const { tenantId } = useParams();
+  const navigate = useNavigate();
+  const [tenant, setTenant] = useState<any>(null);
+  const [collections, setCollections] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTenantDetails();
+  }, [tenantId]);
+
+  const fetchTenantDetails = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: agent } = await supabase
+        .from("agents")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (!agent) return;
+
+      // Fetch tenant details
+      const { data: tenantData, error: tenantError } = await supabase
+        .from("tenants")
+        .select("*")
+        .eq("id", tenantId)
+        .eq("agent_id", agent.id)
+        .single();
+
+      if (tenantError) throw tenantError;
+      setTenant(tenantData);
+
+      // Fetch collections history
+      const { data: collectionsData, error: collectionsError } = await supabase
+        .from("collections")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .order("collection_date", { ascending: false });
+
+      if (collectionsError) throw collectionsError;
+      setCollections(collectionsData || []);
+    } catch (error: any) {
+      toast.error("Failed to load tenant details");
+      navigate("/agent/tenants");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      pending: "secondary",
+      verified: "default",
+      paying: "default",
+      late: "destructive",
+      defaulted: "destructive",
+    };
+    return <Badge variant={variants[status] || "outline"}>{status}</Badge>;
+  };
+
+  const getPaymentStatusBadge = (status: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive"> = {
+      completed: "default",
+      pending: "secondary",
+      failed: "destructive",
+    };
+    return <Badge variant={variants[status] || "secondary"}>{status}</Badge>;
+  };
+
+  if (loading) {
+    return (
+      <AgentLayout currentPage="/agent/tenants">
+        <div className="text-center py-8">Loading tenant details...</div>
+      </AgentLayout>
+    );
+  }
+
+  if (!tenant) {
+    return (
+      <AgentLayout currentPage="/agent/tenants">
+        <div className="text-center py-8">Tenant not found</div>
+      </AgentLayout>
+    );
+  }
+
+  const totalCollected = collections
+    .filter(c => c.status === "completed")
+    .reduce((sum, c) => sum + parseFloat(c.amount), 0);
+
+  return (
+    <AgentLayout currentPage="/agent/tenants">
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/agent/tenants")}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold">{tenant.tenant_name}</h1>
+            <p className="text-muted-foreground">Tenant Details & Payment History</p>
+          </div>
+          {getStatusBadge(tenant.status)}
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Tenant Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Name</p>
+                  <p className="font-medium">{tenant.tenant_name}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Phone</p>
+                  <p className="font-medium">{tenant.tenant_phone}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Monthly Rent</p>
+                  <p className="font-medium">UGX {parseFloat(tenant.rent_amount).toLocaleString()}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Days Remaining</p>
+                  <p className="font-medium">{tenant.days_remaining || 0} days</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Outstanding Balance</p>
+                <p className="text-2xl font-bold">
+                  UGX {parseFloat(tenant.outstanding_balance).toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Collected</p>
+                <p className="text-xl font-semibold text-primary">
+                  UGX {totalCollected.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Payments</p>
+                <p className="text-lg font-medium">{collections.length}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Landlord Information</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="text-sm text-muted-foreground">Name</p>
+              <p className="font-medium">{tenant.landlord_name}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Phone</p>
+              <p className="font-medium">{tenant.landlord_phone}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>LC1 Information</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="text-sm text-muted-foreground">Name</p>
+              <p className="font-medium">{tenant.lc1_name}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Phone</p>
+              <p className="font-medium">{tenant.lc1_phone}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment History</CardTitle>
+            <CardDescription>
+              {collections.length} payment{collections.length !== 1 ? 's' : ''} recorded
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {collections.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No payments recorded yet
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Commission</TableHead>
+                      <TableHead>Method</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {collections.map((collection) => (
+                      <TableRow key={collection.id}>
+                        <TableCell>
+                          {format(new Date(collection.collection_date), "MMM dd, yyyy")}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          UGX {parseFloat(collection.amount).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-primary">
+                          UGX {parseFloat(collection.commission).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="capitalize">{collection.payment_method}</TableCell>
+                        <TableCell>{getPaymentStatusBadge(collection.status)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </AgentLayout>
+  );
+};
+
+export default AgentTenantDetail;

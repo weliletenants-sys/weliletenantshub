@@ -11,6 +11,7 @@ import Install from "./pages/Install";
 import AgentDashboard from "./pages/agent/Dashboard";
 import AgentTenants from "./pages/agent/Tenants";
 import AgentNewTenant from "./pages/agent/NewTenant";
+import AgentTenantDetail from "./pages/agent/TenantDetail";
 import AgentCollections from "./pages/agent/Collections";
 import AgentEarnings from "./pages/agent/Earnings";
 import AgentOfflineQueue from "./pages/agent/OfflineQueue";
@@ -38,6 +39,11 @@ const App = () => (
           <Route path="/agent/tenants" element={
             <ProtectedRoute requiredRole="agent">
               <AgentTenants />
+            </ProtectedRoute>
+          } />
+          <Route path="/agent/tenants/:tenantId" element={
+            <ProtectedRoute requiredRole="agent">
+              <AgentTenantDetail />
             </ProtectedRoute>
           } />
           <Route path="/agent/new-tenant" element={
