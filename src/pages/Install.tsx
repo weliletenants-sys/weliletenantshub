@@ -151,6 +151,14 @@ const Install = () => {
             )}
           </CardContent>
         </Card>
+
+        <Button
+          variant="ghost"
+          className="w-full"
+          onClick={() => navigate("/")}
+        >
+          Back to Home
+        </Button>
       </div>
     </div>
   );
