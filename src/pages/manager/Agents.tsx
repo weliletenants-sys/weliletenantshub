@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRealtimeAgents, useRealtimeAllTenants, useRealtimeProfiles, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
-import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
@@ -43,6 +43,11 @@ const ManagerAgents = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortColumn, setSortColumn] = useState<string>("created_at");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [motorcycleFilter, setMotorcycleFilter] = useState<string>("all");
+  const [portfolioMinFilter, setPortfolioMinFilter] = useState<string>("");
+  const [portfolioMaxFilter, setPortfolioMaxFilter] = useState<string>("");
+  const [showFilters, setShowFilters] = useState(false);
   
   // Enable real-time updates
   useRealtimeAgents();
@@ -144,9 +149,43 @@ const ManagerAgents = () => {
           });
         }
 
-        setAgents(agentsWithCounts);
+        // Apply client-side filters
+        let filteredAgents = agentsWithCounts;
+
+        // Status filter (active/inactive based on tenant count)
+        if (statusFilter === "active") {
+          filteredAgents = filteredAgents.filter(a => a.tenant_count > 0);
+        } else if (statusFilter === "inactive") {
+          filteredAgents = filteredAgents.filter(a => a.tenant_count === 0);
+        }
+
+        // Motorcycle eligibility filter
+        if (motorcycleFilter === "eligible") {
+          filteredAgents = filteredAgents.filter(a => a.motorcycle_eligible === true);
+        } else if (motorcycleFilter === "applied") {
+          filteredAgents = filteredAgents.filter(a => a.motorcycle_applied === true);
+        } else if (motorcycleFilter === "not_eligible") {
+          filteredAgents = filteredAgents.filter(a => !a.motorcycle_eligible);
+        }
+
+        // Portfolio value range filter
+        const minPortfolio = portfolioMinFilter ? parseFloat(portfolioMinFilter) : null;
+        const maxPortfolio = portfolioMaxFilter ? parseFloat(portfolioMaxFilter) : null;
+        
+        if (minPortfolio !== null || maxPortfolio !== null) {
+          filteredAgents = filteredAgents.filter(a => {
+            const portfolioValue = Number(a.portfolio_value || 0);
+            if (minPortfolio !== null && portfolioValue < minPortfolio) return false;
+            if (maxPortfolio !== null && portfolioValue > maxPortfolio) return false;
+            return true;
+          });
+        }
+
+        setAgents(filteredAgents);
+        setTotalAgents(filteredAgents.length);
       } else {
         setAgents([]);
+        setTotalAgents(0);
       }
     } catch (error: any) {
       toast.error("Failed to load agents");
@@ -159,7 +198,7 @@ const ManagerAgents = () => {
   useEffect(() => {
     setLoading(true);
     fetchAgents();
-  }, [currentPage, pageSize, searchQuery, sortColumn, sortDirection]);
+  }, [currentPage, pageSize, searchQuery, sortColumn, sortDirection, statusFilter, motorcycleFilter, portfolioMinFilter, portfolioMaxFilter]);
 
   useEffect(() => {
     // Listen for real-time updates and refetch
@@ -219,6 +258,16 @@ const ManagerAgents = () => {
     );
   };
 
+  const clearFilters = () => {
+    setStatusFilter("all");
+    setMotorcycleFilter("all");
+    setPortfolioMinFilter("");
+    setPortfolioMaxFilter("");
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = statusFilter !== "all" || motorcycleFilter !== "all" || portfolioMinFilter || portfolioMaxFilter;
+
   return (
     <ManagerLayout currentPage="/manager/agents">
       <div className="space-y-6">
@@ -234,7 +283,94 @@ const ManagerAgents = () => {
           >
             Compare Agents
           </Button>
+          <Button 
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+            {hasActiveFilters && (
+              <span className="ml-2 bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs">
+                Active
+              </span>
+            )}
+          </Button>
+          {hasActiveFilters && (
+            <Button 
+              variant="ghost"
+              onClick={clearFilters}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Clear Filters
+            </Button>
+          )}
         </div>
+
+        {/* Filters Panel */}
+        {showFilters && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Filter Agents</CardTitle>
+              <CardDescription>Refine your agent list by status, motorcycle eligibility, or portfolio value</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Status Filter */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Status</label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Agents</SelectItem>
+                      <SelectItem value="active">Active Only</SelectItem>
+                      <SelectItem value="inactive">Inactive Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Motorcycle Eligibility Filter */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Motorcycle Status</label>
+                  <Select value={motorcycleFilter} onValueChange={setMotorcycleFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="eligible">Eligible</SelectItem>
+                      <SelectItem value="applied">Applied</SelectItem>
+                      <SelectItem value="not_eligible">Not Eligible</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Portfolio Min Filter */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Min Portfolio (UGX)</label>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 1000000"
+                    value={portfolioMinFilter}
+                    onChange={(e) => setPortfolioMinFilter(e.target.value)}
+                  />
+                </div>
+
+                {/* Portfolio Max Filter */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Max Portfolio (UGX)</label>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 20000000"
+                    value={portfolioMaxFilter}
+                    onChange={(e) => setPortfolioMaxFilter(e.target.value)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
