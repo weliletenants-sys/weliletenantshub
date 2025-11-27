@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import PullToRefresh from "react-simple-pull-to-refresh";
 import AgentLayout from "@/components/AgentLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,11 +7,12 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
-import { Bike, TrendingUp, Users, DollarSign, AlertCircle } from "lucide-react";
+import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 
 const AgentDashboard = () => {
+  const navigate = useNavigate();
   const [agentData, setAgentData] = useState<any>(null);
   const [todaysCollections, setTodaysCollections] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -137,6 +139,16 @@ const AgentDashboard = () => {
             <h1 className="text-3xl font-bold">Dashboard</h1>
             <p className="text-muted-foreground">Welcome back! Here's your overview</p>
           </div>
+
+          {/* Prominent Add New Tenant Button */}
+          <Button 
+            size="lg" 
+            className="w-full md:w-auto text-lg font-bold shadow-lg hover:shadow-xl transition-all"
+            onClick={() => navigate("/agent/new-tenant")}
+          >
+            <Plus className="h-6 w-6 mr-2" />
+            Add New Tenant
+          </Button>
 
         {/* Portfolio Value Hero Section */}
         <Card className="bg-gradient-to-br from-primary via-primary/90 to-primary/70 text-primary-foreground overflow-hidden relative">
