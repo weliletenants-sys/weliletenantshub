@@ -10,20 +10,18 @@ const SplashScreen = ({ onComplete }: SplashScreenProps) => {
 
   useEffect(() => {
     // Trigger haptic feedback on splash screen appearance
-    haptics.medium();
+    haptics.light();
 
-    // Show splash for 2 seconds, then fade out
+    // Reduced splash duration for faster load
     const timer = setTimeout(() => {
       setIsVisible(false);
-      // Light haptic on exit
-      haptics.light();
-    }, 2000);
+    }, 1200);
 
-    // Complete after fade out animation with success haptic
+    // Complete after fade out animation
     const completeTimer = setTimeout(() => {
       haptics.success();
       onComplete();
-    }, 2500);
+    }, 1500);
 
     return () => {
       clearTimeout(timer);
