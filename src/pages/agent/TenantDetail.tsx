@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import PaymentReceipt from "@/components/PaymentReceipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff } from "lucide-react";
+import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff, Receipt } from "lucide-react";
 import { format } from "date-fns";
 import { addPendingPayment, isOnline } from "@/lib/offlineSync";
 
@@ -22,7 +23,10 @@ const AgentTenantDetail = () => {
   const [collections, setCollections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [lastPayment, setLastPayment] = useState<any>(null);
+  const [agentInfo, setAgentInfo] = useState<any>(null);
   const [paymentForm, setPaymentForm] = useState({
     amount: "",
     paymentMethod: "cash",
@@ -31,7 +35,30 @@ const AgentTenantDetail = () => {
 
   useEffect(() => {
     fetchTenantDetails();
+    fetchAgentInfo();
   }, [tenantId]);
+
+  const fetchAgentInfo = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, phone_number")
+        .eq("id", user.id)
+        .single();
+
+      if (profile) {
+        setAgentInfo({
+          agent_name: profile.full_name || "Agent",
+          agent_phone: profile.phone_number || "",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching agent info:", error);
+    }
+  };
 
   const fetchTenantDetails = async () => {
     try {
@@ -140,7 +167,16 @@ const AgentTenantDetail = () => {
 
         if (updateError) throw updateError;
 
+        // Store payment details for receipt
+        setLastPayment({
+          ...collectionData,
+          tenant_outstanding_balance: Math.max(0, newBalance),
+        });
+
         toast.success(`Payment recorded! You earned UGX ${commission.toLocaleString()} commission`);
+        
+        // Show receipt dialog
+        setReceiptDialogOpen(true);
       } else {
         // Offline: Save to IndexedDB for later sync
         await addPendingPayment(collectionData, tenantId!);
@@ -433,6 +469,36 @@ const AgentTenantDetail = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Receipt Dialog */}
+        <Dialog open={receiptDialogOpen} onOpenChange={setReceiptDialogOpen}>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Payment Receipt</DialogTitle>
+              <DialogDescription>
+                Share this receipt with the tenant
+              </DialogDescription>
+            </DialogHeader>
+            {lastPayment && agentInfo && (
+              <PaymentReceipt
+                paymentData={{
+                  amount: lastPayment.amount,
+                  commission: lastPayment.commission,
+                  collectionDate: lastPayment.collection_date,
+                  paymentMethod: lastPayment.payment_method,
+                }}
+                tenantData={{
+                  tenant_name: tenant.tenant_name,
+                  tenant_phone: tenant.tenant_phone,
+                  rent_amount: parseFloat(tenant.rent_amount),
+                  outstanding_balance: lastPayment.tenant_outstanding_balance,
+                }}
+                agentData={agentInfo}
+                receiptNumber={`WLH${Date.now().toString().slice(-8)}`}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </AgentLayout>
   );
