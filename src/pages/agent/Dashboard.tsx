@@ -24,6 +24,9 @@ const AgentDashboard = () => {
   const [overdueTenants, setOverdueTenants] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
+  const [pendingVerifications, setPendingVerifications] = useState(0);
+  const [verifiedPayments, setVerifiedPayments] = useState(0);
+  const [rejectedPayments, setRejectedPayments] = useState(0);
   
   // Service worker for caching
   useServiceWorker();
@@ -127,6 +130,29 @@ const AgentDashboard = () => {
         });
         setOverdueTenants(overdueWithDays);
       }
+
+      // Fetch payment verification stats
+      const { data: pendingData } = await supabase
+        .from("collections")
+        .select("id")
+        .eq("agent_id", agent.id)
+        .eq("status", "pending");
+      
+      const { data: verifiedData } = await supabase
+        .from("collections")
+        .select("id")
+        .eq("agent_id", agent.id)
+        .eq("status", "verified");
+      
+      const { data: rejectedData } = await supabase
+        .from("collections")
+        .select("id")
+        .eq("agent_id", agent.id)
+        .eq("status", "rejected");
+
+      setPendingVerifications(pendingData?.length || 0);
+      setVerifiedPayments(verifiedData?.length || 0);
+      setRejectedPayments(rejectedData?.length || 0);
     } catch (error: any) {
       toast.error("Failed to load dashboard data");
     } finally {
@@ -415,6 +441,37 @@ const AgentDashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Payment Verification Stats */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Verification Status</CardTitle>
+            <CardDescription>
+              Track your payment submissions and approvals
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                <div className="text-3xl font-bold text-orange-500">{pendingVerifications}</div>
+                <p className="text-sm text-muted-foreground mt-2">Pending Review</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-success/10 border border-success/20">
+                <div className="text-3xl font-bold text-success">{verifiedPayments}</div>
+                <p className="text-sm text-muted-foreground mt-2">Verified</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+                <div className="text-3xl font-bold text-destructive">{rejectedPayments}</div>
+                <p className="text-sm text-muted-foreground mt-2">Rejected</p>
+              </div>
+            </div>
+            {pendingVerifications > 0 && (
+              <p className="text-sm text-muted-foreground mt-4 text-center">
+                {pendingVerifications} payment{pendingVerifications !== 1 ? 's' : ''} awaiting manager verification
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Collection Rate */}
         <Card>
