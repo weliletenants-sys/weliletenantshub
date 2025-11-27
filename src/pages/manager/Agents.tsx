@@ -60,6 +60,7 @@ const ManagerAgents = () => {
   }>>([]);
   const [showPortfolioBreakdown, setShowPortfolioBreakdown] = useState(false);
   const [portfolioSortBy, setPortfolioSortBy] = useState<"portfolio_value" | "percentage" | "tenant_count" | "agent_name">("portfolio_value");
+  const [portfolioSortDirection, setPortfolioSortDirection] = useState<"asc" | "desc">("desc");
   
   // Enable real-time updates
   useRealtimeAgents();
@@ -312,18 +313,27 @@ const ManagerAgents = () => {
 
   // Sort portfolio breakdown based on selected option
   const sortedPortfolioBreakdown = [...agentPortfolioBreakdown].sort((a, b) => {
+    let comparison = 0;
+    
     switch (portfolioSortBy) {
       case "portfolio_value":
-        return b.portfolio_value - a.portfolio_value;
+        comparison = b.portfolio_value - a.portfolio_value;
+        break;
       case "percentage":
-        return b.percentage - a.percentage;
+        comparison = b.percentage - a.percentage;
+        break;
       case "tenant_count":
-        return b.tenant_count - a.tenant_count;
+        comparison = b.tenant_count - a.tenant_count;
+        break;
       case "agent_name":
-        return a.agent_name.localeCompare(b.agent_name);
+        comparison = a.agent_name.localeCompare(b.agent_name);
+        break;
       default:
-        return 0;
+        comparison = 0;
     }
+    
+    // Apply sort direction
+    return portfolioSortDirection === "asc" ? -comparison : comparison;
   });
 
   // Calculate statistics from filtered agents
@@ -474,19 +484,38 @@ const ManagerAgents = () => {
             <CollapsibleContent>
               <CardContent className="space-y-4 pt-4 border-t">
                 {/* Sort Options */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <label className="text-sm font-medium">Sort by:</label>
                   <Select value={portfolioSortBy} onValueChange={(value: any) => setPortfolioSortBy(value)}>
                     <SelectTrigger className="w-[200px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="portfolio_value">Portfolio Value (High to Low)</SelectItem>
-                      <SelectItem value="percentage">Percentage (High to Low)</SelectItem>
-                      <SelectItem value="tenant_count">Tenant Count (High to Low)</SelectItem>
-                      <SelectItem value="agent_name">Agent Name (A-Z)</SelectItem>
+                      <SelectItem value="portfolio_value">Portfolio Value</SelectItem>
+                      <SelectItem value="percentage">Percentage</SelectItem>
+                      <SelectItem value="tenant_count">Tenant Count</SelectItem>
+                      <SelectItem value="agent_name">Agent Name</SelectItem>
                     </SelectContent>
                   </Select>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPortfolioSortDirection(portfolioSortDirection === "asc" ? "desc" : "asc")}
+                    className="gap-2"
+                  >
+                    {portfolioSortDirection === "desc" ? (
+                      <>
+                        <ArrowDown className="h-4 w-4" />
+                        Descending
+                      </>
+                    ) : (
+                      <>
+                        <ArrowUp className="h-4 w-4" />
+                        Ascending
+                      </>
+                    )}
+                  </Button>
                 </div>
 
                 {agentPortfolioBreakdown.length === 0 ? (
