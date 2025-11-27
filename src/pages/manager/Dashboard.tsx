@@ -58,6 +58,9 @@ const ManagerDashboard = () => {
   const [maxTenantsFilter, setMaxTenantsFilter] = useState<string>("");
   const [agentGrowthComparison, setAgentGrowthComparison] = useState<any[]>([]);
 
+  // Track previous portfolio value for change detection
+  const [prevPortfolioValue, setPrevPortfolioValue] = useState<number | null>(null);
+
   // Subscribe to real-time updates for all agent activity
   useRealtimeAllTenants();
   useRealtimeAllCollections();
@@ -65,6 +68,25 @@ const ManagerDashboard = () => {
 
   // Track sync status for tenants table (for portfolio value updates)
   const { lastSyncTime } = useRealtimeSyncStatus('tenants');
+
+  // Show toast notification when portfolio value changes
+  useEffect(() => {
+    if (prevPortfolioValue !== null && stats.totalPortfolioValue !== prevPortfolioValue) {
+      const difference = stats.totalPortfolioValue - prevPortfolioValue;
+      const isIncrease = difference > 0;
+      
+      toast.success(
+        `Portfolio ${isIncrease ? 'Increased' : 'Decreased'}`,
+        {
+          description: `${isIncrease ? '+' : ''}UGX ${Math.abs(difference).toLocaleString()}`,
+          duration: 4000,
+        }
+      );
+      haptics.success();
+    }
+    
+    setPrevPortfolioValue(stats.totalPortfolioValue);
+  }, [stats.totalPortfolioValue]);
 
   useEffect(() => {
     const fetchStats = async () => {
