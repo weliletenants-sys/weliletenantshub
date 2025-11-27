@@ -61,7 +61,7 @@ paymentMutation.mutate({
 - Fresh data fetched
 
 #### 2. `useOptimisticTenantUpdate`
-Handles tenant information updates:
+Handles tenant information updates including landlord and LC1 details:
 
 ```typescript
 const updateMutation = useOptimisticTenantUpdate();
@@ -69,11 +69,26 @@ const updateMutation = useOptimisticTenantUpdate();
 updateMutation.mutate({
   tenantId,
   updates: {
-    landlord_name: "New Name",
+    landlord_name: "New Landlord",
+    landlord_phone: "0700123456",
+    lc1_name: "John LC1",
+    lc1_phone: "0700654321",
     rent_amount: 150000,
   }
 });
 ```
+
+**What happens instantly:**
+- Landlord information updates in UI
+- LC1 information updates in UI
+- Rent amount changes
+- OptimisticBadge appears in affected cards
+- Haptic feedback triggers
+
+**What happens in background:**
+- Server updates tenant record
+- Database persists changes
+- Fresh data fetched for confirmation
 
 #### 3. `useOptimisticTenantCreation`
 Handles tenant creation with instant list updates:

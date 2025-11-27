@@ -258,10 +258,15 @@ const AgentTenantDetail = () => {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Edit Tenant Details</DialogTitle>
-                <DialogDescription>
-                  Update landlord, LC1, and rent information
-                </DialogDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <DialogTitle>Edit Tenant Details</DialogTitle>
+                    <DialogDescription>
+                      Update landlord, LC1, and rent information
+                    </DialogDescription>
+                  </div>
+                  <OptimisticBadge show={tenantUpdateMutation.isPending} />
+                </div>
               </DialogHeader>
               <form onSubmit={handleEditTenant} className="space-y-4">
                 <div className="space-y-4">
@@ -465,7 +470,10 @@ const AgentTenantDetail = () => {
               <div className="grid gap-6 md:grid-cols-2">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Tenant Information</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Tenant Information</CardTitle>
+                      <OptimisticBadge show={tenantUpdateMutation.isPending} />
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center gap-3">
@@ -532,7 +540,10 @@ const AgentTenantDetail = () => {
               {(tenant.landlord_name || tenant.landlord_phone) && (
                 <Card className="mt-6">
                   <CardHeader>
-                    <CardTitle>Landlord Information</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Landlord Information</CardTitle>
+                      <OptimisticBadge show={tenantUpdateMutation.isPending} />
+                    </div>
                   </CardHeader>
                   <CardContent className="grid gap-4 md:grid-cols-2">
                     {tenant.landlord_name && (
@@ -554,7 +565,10 @@ const AgentTenantDetail = () => {
               {(tenant.lc1_name || tenant.lc1_phone) && (
                 <Card className="mt-6">
                   <CardHeader>
-                    <CardTitle>LC1 Information</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>LC1 Information</CardTitle>
+                      <OptimisticBadge show={tenantUpdateMutation.isPending} />
+                    </div>
                   </CardHeader>
                   <CardContent className="grid gap-4 md:grid-cols-2">
                     {tenant.lc1_name && (
