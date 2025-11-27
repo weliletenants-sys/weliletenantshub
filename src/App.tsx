@@ -16,6 +16,7 @@ import AgentCollections from "./pages/agent/Collections";
 import AgentEarnings from "./pages/agent/Earnings";
 import AgentOfflineQueue from "./pages/agent/OfflineQueue";
 import AgentAIAssistant from "./pages/agent/AIAssistant";
+import AgentWeeklySummary from "./pages/agent/WeeklySummary";
 import ManagerDashboard from "./pages/manager/Dashboard";
 import ManagerAgents from "./pages/manager/Agents";
 import ManagerVerifications from "./pages/manager/Verifications";
@@ -70,6 +71,11 @@ const App = () => (
           <Route path="/agent/ai-assistant" element={
             <ProtectedRoute requiredRole="agent">
               <AgentAIAssistant />
+            </ProtectedRoute>
+          } />
+          <Route path="/agent/weekly-summary" element={
+            <ProtectedRoute requiredRole="agent">
+              <AgentWeeklySummary />
             </ProtectedRoute>
           } />
           <Route path="/manager/dashboard" element={
