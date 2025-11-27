@@ -4,7 +4,7 @@ import PullToRefresh from "react-simple-pull-to-refresh";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -54,6 +54,7 @@ const ManagerDashboard = () => {
   const [agentStatusFilter, setAgentStatusFilter] = useState<string>("all");
   const [minTenantsFilter, setMinTenantsFilter] = useState<string>("");
   const [maxTenantsFilter, setMaxTenantsFilter] = useState<string>("");
+  const [agentGrowthComparison, setAgentGrowthComparison] = useState<any[]>([]);
 
   // Subscribe to real-time updates for all agent activity
   useRealtimeAllTenants();
@@ -142,6 +143,9 @@ const ManagerDashboard = () => {
           portfolioWeekChange,
           portfolioWeekChangePercent,
         });
+
+        // Calculate agent growth comparison
+        await calculateAgentGrowthComparison(agentsResult.data || []);
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
       } finally {
@@ -230,6 +234,8 @@ const ManagerDashboard = () => {
       portfolioWeekChange,
       portfolioWeekChangePercent,
     });
+    
+    await calculateAgentGrowthComparison(agentsResult.data || []);
     
     toast.success("Dashboard refreshed");
   };
@@ -388,6 +394,63 @@ const ManagerDashboard = () => {
     setAgentStatusFilter("all");
     setMinTenantsFilter("");
     setMaxTenantsFilter("");
+  };
+
+  const calculateAgentGrowthComparison = async (agents: any[]) => {
+    if (!agents || agents.length === 0) {
+      setAgentGrowthComparison([]);
+      return;
+    }
+
+    try {
+      const today = new Date();
+      const lastWeek = new Date(today);
+      lastWeek.setDate(lastWeek.getDate() - 7);
+
+      // Fetch collections for all agents in the last week
+      const { data: weekCollections } = await supabase
+        .from("collections")
+        .select("agent_id, amount")
+        .eq("status", "verified")
+        .gte("collection_date", lastWeek.toISOString().split('T')[0]);
+
+      // Calculate growth for each agent
+      const agentGrowthData = await Promise.all(
+        agents.map(async (agent) => {
+          // Get agent profile
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name, phone_number")
+            .eq("id", agent.user_id)
+            .single();
+
+          // Calculate weekly collections for this agent
+          const agentWeekCollections = weekCollections?.filter(c => c.agent_id === agent.id) || [];
+          const weeklyGrowth = agentWeekCollections.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
+          
+          // Calculate growth percentage relative to portfolio
+          const portfolioValue = parseFloat(agent.portfolio_value?.toString() || '0');
+          const growthPercent = portfolioValue > 0 ? (weeklyGrowth / portfolioValue) * 100 : 0;
+
+          return {
+            id: agent.id,
+            name: profile?.full_name || 'Unknown Agent',
+            portfolioValue,
+            weeklyGrowth,
+            growthPercent,
+            tenantCount: agent.total_tenants || 0,
+          };
+        })
+      );
+
+      // Sort by growth percentage (highest first)
+      agentGrowthData.sort((a, b) => b.growthPercent - a.growthPercent);
+
+      setAgentGrowthComparison(agentGrowthData);
+    } catch (error) {
+      console.error("Error calculating agent growth comparison:", error);
+      setAgentGrowthComparison([]);
+    }
   };
 
   if (isLoading) {
@@ -747,6 +810,127 @@ const ManagerDashboard = () => {
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Agent Growth Comparison */}
+          <Card className="border-2 border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="h-5 w-5 text-primary" />
+                Agent Performance Comparison
+              </CardTitle>
+              <CardDescription>
+                Weekly growth rates ranked by performance
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {agentGrowthComparison.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Target className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>Loading agent comparison data...</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Top Performers */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Award className="h-4 w-4 text-success" />
+                      <h4 className="font-semibold text-sm">Top Performers</h4>
+                    </div>
+                    <div className="space-y-2">
+                      {agentGrowthComparison.slice(0, 3).map((agent, index) => (
+                        <div
+                          key={agent.id}
+                          className="p-4 rounded-lg border bg-success/5 border-success/20 cursor-pointer hover:bg-success/10 transition-colors"
+                          onClick={() => navigate(`/manager/agents/${agent.id}`)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-success/20 text-success font-bold text-sm">
+                                #{index + 1}
+                              </div>
+                              <div>
+                                <p className="font-semibold">{agent.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {agent.tenantCount} tenant{agent.tenantCount !== 1 ? 's' : ''} • Portfolio: UGX {agent.portfolioValue.toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="flex items-center gap-1 text-success font-bold">
+                                <ArrowUp className="h-4 w-4" />
+                                {agent.growthPercent.toFixed(2)}%
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                +UGX {agent.weeklyGrowth.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Bottom Performers */}
+                  {agentGrowthComparison.length > 3 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Target className="h-4 w-4 text-orange-500" />
+                        <h4 className="font-semibold text-sm">Needs Support</h4>
+                      </div>
+                      <div className="space-y-2">
+                        {agentGrowthComparison.slice(-3).reverse().map((agent, index) => (
+                          <div
+                            key={agent.id}
+                            className="p-4 rounded-lg border bg-orange-500/5 border-orange-500/20 cursor-pointer hover:bg-orange-500/10 transition-colors"
+                            onClick={() => navigate(`/manager/agents/${agent.id}`)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-orange-500/20 text-orange-500 font-bold text-sm">
+                                  #{agentGrowthComparison.length - index}
+                                </div>
+                                <div>
+                                  <p className="font-semibold">{agent.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {agent.tenantCount} tenant{agent.tenantCount !== 1 ? 's' : ''} • Portfolio: UGX {agent.portfolioValue.toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className={cn(
+                                  "flex items-center gap-1 font-bold",
+                                  agent.growthPercent >= 0 ? "text-success" : "text-destructive"
+                                )}>
+                                  {agent.growthPercent >= 0 ? (
+                                    <ArrowUp className="h-4 w-4" />
+                                  ) : (
+                                    <ArrowDown className="h-4 w-4" />
+                                  )}
+                                  {agent.growthPercent >= 0 ? '+' : ''}{agent.growthPercent.toFixed(2)}%
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {agent.weeklyGrowth >= 0 ? '+' : ''}UGX {agent.weeklyGrowth.toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* View All Button */}
+                  <Button
+                    variant="outline"
+                    className="w-full mt-4"
+                    onClick={() => navigate("/manager/agent-comparison")}
+                  >
+                    View Detailed Comparison
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
