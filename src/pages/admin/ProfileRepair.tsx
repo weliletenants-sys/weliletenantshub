@@ -4,10 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, AlertCircle, CheckCircle, Wrench, RefreshCw } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import WelileLogo from "@/components/WelileLogo";
+import AdminLayout from "@/components/AdminLayout";
 
 interface UserIssue {
   userId: string;
@@ -187,42 +187,34 @@ const ProfileRepair = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
     );
   }
 
   if (isAdmin === false) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <WelileLogo />
-        <Alert variant="destructive" className="max-w-md mt-6">
+      <AdminLayout>
+        <Alert variant="destructive" className="max-w-md mx-auto mt-8">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Access Denied</AlertTitle>
           <AlertDescription>
             You need administrator privileges to access this tool.
           </AlertDescription>
         </Alert>
-        <Button variant="ghost" className="mt-4" onClick={() => navigate('/')}>
-          Go Home
-        </Button>
-      </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Wrench className="h-8 w-8" />
-              Profile Repair Tool
-            </h1>
-            <p className="text-muted-foreground">Admin tool to detect and fix profile data issues</p>
-          </div>
-          <WelileLogo />
+    <AdminLayout>
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold">Profile Repair Tool</h2>
+          <p className="text-muted-foreground">Admin tool to detect and fix profile data issues</p>
         </div>
 
         <Alert>
@@ -329,14 +321,8 @@ const ProfileRepair = () => {
             </CardContent>
           </Card>
         )}
-
-        <div className="flex justify-center">
-          <Button variant="ghost" onClick={() => navigate(-1)}>
-            Back
-          </Button>
-        </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 
