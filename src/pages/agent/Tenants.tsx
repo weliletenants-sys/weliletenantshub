@@ -1,33 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import AgentLayout from "@/components/AgentLayout";
 import { TenantListSkeleton } from "@/components/TenantDetailSkeleton";
+import { RefreshIndicator } from "@/components/RefreshIndicator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TenantRow } from "@/components/TenantRow";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Plus, AlertCircle } from "lucide-react";
 import { useTenantListPrefetch } from "@/hooks/useTenantPrefetch";
+import type { Tables } from "@/integrations/supabase/types";
+
+type Tenant = Tables<'tenants'>;
 
 const AgentTenants = () => {
-  const [tenants, setTenants] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
+  const [agentId, setAgentId] = useState<string | null>(null);
   const navigate = useNavigate();
-  
-  // Initialize prefetching for visible tenants
-  const { observeTenantRow } = useTenantListPrefetch(tenants);
 
+  // Fetch agent ID
   useEffect(() => {
-    fetchTenants();
-  }, []);
-
-  const fetchTenants = async () => {
-    try {
+    const fetchAgentId = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -37,38 +34,50 @@ const AgentTenants = () => {
         .eq("user_id", user.id)
         .single();
 
-      if (!agent) return;
+      if (agent) setAgentId(agent.id);
+    };
+
+    fetchAgentId();
+  }, []);
+
+  // Fetch tenants with React Query (supports optimistic updates)
+  const { data: tenants = [], isLoading, isFetching } = useQuery({
+    queryKey: ['tenants', agentId],
+    queryFn: async () => {
+      if (!agentId) return [];
 
       const { data, error } = await supabase
         .from("tenants")
         .select("*")
-        .eq("agent_id", agent.id)
+        .eq("agent_id", agentId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      
-      // Calculate days overdue for each tenant
-      const today = new Date();
-      const tenantsWithOverdue = (data || []).map(tenant => {
-        if (tenant.next_payment_date) {
-          const nextPayment = new Date(tenant.next_payment_date);
-          const daysOverdue = Math.floor((today.getTime() - nextPayment.getTime()) / (1000 * 60 * 60 * 24));
-          return {
-            ...tenant,
-            daysOverdue: daysOverdue > 0 ? daysOverdue : 0,
-            isOverdue: daysOverdue > 0
-          };
-        }
-        return { ...tenant, daysOverdue: 0, isOverdue: false };
-      });
-      
-      setTenants(tenantsWithOverdue);
-    } catch (error: any) {
-      toast.error("Failed to load tenants");
-    } finally {
-      setLoading(false);
-    }
-  };
+      return data || [];
+    },
+    enabled: !!agentId,
+    placeholderData: (previousData) => previousData, // Show cached data while refetching
+  });
+
+  // Calculate days overdue with useMemo
+  const tenantsWithOverdue = useMemo(() => {
+    const today = new Date();
+    return tenants.map(tenant => {
+      if (tenant.next_payment_date) {
+        const nextPayment = new Date(tenant.next_payment_date);
+        const daysOverdue = Math.floor((today.getTime() - nextPayment.getTime()) / (1000 * 60 * 60 * 24));
+        return {
+          ...tenant,
+          daysOverdue: daysOverdue > 0 ? daysOverdue : 0,
+          isOverdue: daysOverdue > 0
+        };
+      }
+      return { ...tenant, daysOverdue: 0, isOverdue: false };
+    });
+  }, [tenants]);
+  
+  // Initialize prefetching for visible tenants
+  const { observeTenantRow } = useTenantListPrefetch(tenantsWithOverdue);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -81,9 +90,12 @@ const AgentTenants = () => {
     return <Badge variant={variants[status] || "outline"}>{status}</Badge>;
   };
 
-  const overdueTenants = tenants
-    .filter(t => t.isOverdue)
-    .sort((a, b) => b.daysOverdue - a.daysOverdue);
+  const overdueTenants = useMemo(() => 
+    tenantsWithOverdue
+      .filter(t => t.isOverdue)
+      .sort((a, b) => b.daysOverdue - a.daysOverdue),
+    [tenantsWithOverdue]
+  );
 
   const renderTenantTable = (tenantList: any[]) => (
     <div className="overflow-x-auto">
@@ -118,7 +130,10 @@ const AgentTenants = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">My Tenants</h1>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              My Tenants
+              <RefreshIndicator isRefreshing={isFetching && !isLoading} />
+            </h1>
             <p className="text-muted-foreground">Manage and track your tenant portfolio</p>
           </div>
           <Button onClick={() => navigate("/agent/new-tenant")}>
@@ -130,7 +145,7 @@ const AgentTenants = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="all">
-              All Tenants ({tenants.length})
+              All Tenants ({tenantsWithOverdue.length})
             </TabsTrigger>
             <TabsTrigger value="overdue" className="text-destructive data-[state=active]:text-destructive">
               <AlertCircle className="h-4 w-4 mr-2" />
@@ -143,13 +158,13 @@ const AgentTenants = () => {
               <CardHeader>
                 <CardTitle>All Tenants</CardTitle>
                 <CardDescription>
-                  Total: {tenants.length} tenant{tenants.length !== 1 ? 's' : ''}
+                  Total: {tenantsWithOverdue.length} tenant{tenantsWithOverdue.length !== 1 ? 's' : ''}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {loading ? (
+                {isLoading ? (
                   <TenantListSkeleton />
-                ) : tenants.length === 0 ? (
+                ) : tenantsWithOverdue.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-muted-foreground mb-4">No tenants yet</p>
                     <Button onClick={() => navigate("/agent/new-tenant")}>
@@ -157,7 +172,7 @@ const AgentTenants = () => {
                     </Button>
                   </div>
                 ) : (
-                  renderTenantTable(tenants)
+                  renderTenantTable(tenantsWithOverdue)
                 )}
               </CardContent>
             </Card>
@@ -175,7 +190,7 @@ const AgentTenants = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {loading ? (
+                {isLoading ? (
                   <TenantListSkeleton />
                 ) : overdueTenants.length === 0 ? (
                   <div className="text-center py-8">

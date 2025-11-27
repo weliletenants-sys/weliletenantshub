@@ -1,31 +1,31 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AgentLayout from "@/components/AgentLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { addPendingTenant, isOnline } from "@/lib/offlineSync";
+import { isOnline } from "@/lib/offlineSync";
 import { CloudOff } from "lucide-react";
+import { useOptimisticTenantCreation } from "@/hooks/useOptimisticPayment";
 
 const AgentNewTenant = () => {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
+  const [agentId, setAgentId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     tenantName: "",
     tenantPhone: "",
     currentBalance: "",
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  const createTenantMutation = useOptimisticTenantCreation();
 
-    try {
+  // Fetch agent ID on mount
+  useEffect(() => {
+    const fetchAgentId = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      if (!user) return;
 
       const { data: agent } = await supabase
         .from("agents")
@@ -33,37 +33,31 @@ const AgentNewTenant = () => {
         .eq("user_id", user.id)
         .single();
 
-      if (!agent) throw new Error("Agent profile not found");
+      if (agent) setAgentId(agent.id);
+    };
 
-      const currentBalance = parseFloat(formData.currentBalance) || 0;
+    fetchAgentId();
+  }, []);
 
-      const tenantData = {
-        agent_id: agent.id,
-        tenant_name: formData.tenantName,
-        tenant_phone: formData.tenantPhone,
-        outstanding_balance: currentBalance,
-      };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-      if (isOnline()) {
-        // Online: Save directly to database
-        const { error } = await supabase.from("tenants").insert(tenantData);
-        if (error) throw error;
-        toast.success("Tenant added! UGX 5,000 credited to your wallet");
-      } else {
-        // Offline: Save to IndexedDB for later sync
-        await addPendingTenant(tenantData);
-        toast.success("Tenant saved offline! Will sync when back online.", {
-          icon: <CloudOff className="h-4 w-4" />,
-          duration: 5000,
-        });
-      }
-
-      navigate("/agent/tenants");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to add tenant");
-    } finally {
-      setIsLoading(false);
+    if (!agentId) {
+      return;
     }
+
+    const tenantData = {
+      agent_id: agentId,
+      tenant_name: formData.tenantName,
+      tenant_phone: formData.tenantPhone,
+      outstanding_balance: parseFloat(formData.currentBalance) || 0,
+    };
+
+    createTenantMutation.mutate(tenantData, {
+      onSuccess: () => {
+        navigate("/agent/tenants");
+      },
+    });
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,8 +152,8 @@ const AgentNewTenant = () => {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1" disabled={isLoading}>
-                  {isLoading ? "Adding..." : "Add Tenant"}
+                <Button type="submit" className="flex-1" disabled={createTenantMutation.isPending || !agentId}>
+                  {createTenantMutation.isPending ? "Adding..." : "Add Tenant"}
                 </Button>
               </div>
             </form>

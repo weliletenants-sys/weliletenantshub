@@ -75,6 +75,32 @@ updateMutation.mutate({
 });
 ```
 
+#### 3. `useOptimisticTenantCreation`
+Handles tenant creation with instant list updates:
+
+```typescript
+const createMutation = useOptimisticTenantCreation();
+
+createMutation.mutate({
+  agent_id: agentId,
+  tenant_name: "John Doe",
+  tenant_phone: "0700123456",
+  outstanding_balance: 500000,
+});
+```
+
+**What happens instantly:**
+- Tenant appears at top of list
+- Shows "pending" status
+- Navigate back to tenant list
+- Haptic feedback triggers
+
+**What happens in background:**
+- Server creates tenant
+- Database assigns real ID
+- Status changes to "verified"
+- Fresh data fetched
+
 ## Mutation Lifecycle
 
 ### 1. onMutate (Before Server Call)
@@ -392,7 +418,7 @@ Payment Recording:
 
 ## Future Enhancements
 
-- [ ] Optimistic tenant creation
+- [x] Optimistic tenant creation
 - [ ] Optimistic deletion with undo
 - [ ] Optimistic image uploads
 - [ ] Batch optimistic updates
