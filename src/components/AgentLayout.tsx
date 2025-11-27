@@ -76,6 +76,17 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
                 {item.label}
               </Button>
             ))}
+            
+            <div className="pt-4 mt-4 border-t border-border">
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => navigate("/")}
+              >
+                <Home className="h-4 w-4 mr-2" />
+                Back to Home
+              </Button>
+            </div>
           </div>
         </nav>
 
