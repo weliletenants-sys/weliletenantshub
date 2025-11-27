@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRealtimeAgents, useRealtimeAllTenants, useRealtimeProfiles, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
-import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
@@ -41,6 +41,8 @@ const ManagerAgents = () => {
   const [pageSize, setPageSize] = useState(10);
   const [totalAgents, setTotalAgents] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortColumn, setSortColumn] = useState<string>("created_at");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   
   // Enable real-time updates
   useRealtimeAgents();
@@ -86,8 +88,15 @@ const ManagerAgents = () => {
             phone_number,
             role
           )
-        `, { count: "exact" })
-        .order("created_at", { ascending: false });
+        `, { count: "exact" });
+
+      // Apply sorting based on selected column
+      if (sortColumn === "tenant_count") {
+        // For tenant count, we'll sort in memory after fetching
+        agentsQuery = agentsQuery.order("created_at", { ascending: sortDirection === "asc" });
+      } else {
+        agentsQuery = agentsQuery.order(sortColumn, { ascending: sortDirection === "asc" });
+      }
 
       // Filter by matching user IDs if search is active
       if (searchQuery.trim() && matchingUserIds.length > 0) {
@@ -127,6 +136,14 @@ const ManagerAgents = () => {
           tenant_count: tenantCountMap[agent.id] || 0,
         }));
 
+        // Sort by tenant_count if that's the selected column
+        if (sortColumn === "tenant_count") {
+          agentsWithCounts.sort((a, b) => {
+            const diff = a.tenant_count - b.tenant_count;
+            return sortDirection === "asc" ? diff : -diff;
+          });
+        }
+
         setAgents(agentsWithCounts);
       } else {
         setAgents([]);
@@ -142,7 +159,7 @@ const ManagerAgents = () => {
   useEffect(() => {
     setLoading(true);
     fetchAgents();
-  }, [currentPage, pageSize, searchQuery]);
+  }, [currentPage, pageSize, searchQuery, sortColumn, sortDirection]);
 
   useEffect(() => {
     // Listen for real-time updates and refetch
@@ -177,6 +194,29 @@ const ManagerAgents = () => {
   const handleSearch = (value: string) => {
     setSearchQuery(value);
     setCurrentPage(1); // Reset to first page when searching
+  };
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking the same column
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // Set new column and default to descending
+      setSortColumn(column);
+      setSortDirection("desc");
+    }
+    setCurrentPage(1); // Reset to first page when sorting
+  };
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 inline opacity-50" />;
+    }
+    return sortDirection === "asc" ? (
+      <ArrowUp className="h-4 w-4 ml-1 inline" />
+    ) : (
+      <ArrowDown className="h-4 w-4 ml-1 inline" />
+    );
   };
 
   return (
@@ -223,10 +263,38 @@ const ManagerAgents = () => {
                   <TableRow>
                     <TableHead>Agent Name</TableHead>
                     <TableHead>Phone</TableHead>
-                    <TableHead><Users className="h-4 w-4 inline mr-1" />Tenants</TableHead>
-                    <TableHead><TrendingUp className="h-4 w-4 inline mr-1" />Collection Rate</TableHead>
-                    <TableHead><DollarSign className="h-4 w-4 inline mr-1" />Monthly Earnings</TableHead>
-                    <TableHead><DollarSign className="h-4 w-4 inline mr-1" />Portfolio Value</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleSort("tenant_count")}
+                    >
+                      <Users className="h-4 w-4 inline mr-1" />
+                      Tenants
+                      <SortIcon column="tenant_count" />
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleSort("collection_rate")}
+                    >
+                      <TrendingUp className="h-4 w-4 inline mr-1" />
+                      Collection Rate
+                      <SortIcon column="collection_rate" />
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleSort("monthly_earnings")}
+                    >
+                      <DollarSign className="h-4 w-4 inline mr-1" />
+                      Monthly Earnings
+                      <SortIcon column="monthly_earnings" />
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleSort("portfolio_value")}
+                    >
+                      <DollarSign className="h-4 w-4 inline mr-1" />
+                      Portfolio Value
+                      <SortIcon column="portfolio_value" />
+                    </TableHead>
                     <TableHead><Bike className="h-4 w-4 inline mr-1" />Motorcycle</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
