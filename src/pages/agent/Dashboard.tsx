@@ -17,6 +17,7 @@ const AgentDashboard = () => {
   const [todaysCollections, setTodaysCollections] = useState(0);
   const [todaysTarget, setTodaysTarget] = useState(0);
   const [tenantsDueToday, setTenantsDueToday] = useState(0);
+  const [overdueTenants, setOverdueTenants] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -73,6 +74,25 @@ const AgentDashboard = () => {
       
       setTenantsDueToday(dueCount);
       setTodaysTarget(target);
+
+      // Fetch overdue tenants
+      const { data: overdueData } = await supabase
+        .from("tenants")
+        .select("id, tenant_name, next_payment_date, outstanding_balance")
+        .eq("agent_id", agent.id)
+        .lt("next_payment_date", today)
+        .in("status", ["verified", "active"])
+        .order("next_payment_date", { ascending: true });
+
+      if (overdueData) {
+        const overdueWithDays = overdueData.map(tenant => {
+          const daysOverdue = Math.floor(
+            (new Date().getTime() - new Date(tenant.next_payment_date).getTime()) / (1000 * 60 * 60 * 24)
+          );
+          return { ...tenant, daysOverdue };
+        });
+        setOverdueTenants(overdueWithDays);
+      }
     } catch (error: any) {
       toast.error("Failed to load dashboard data");
     } finally {
@@ -167,6 +187,55 @@ const AgentDashboard = () => {
             <Plus className="h-6 w-6 mr-2" />
             Add New Tenant
           </Button>
+
+          {/* Overdue Payment Notifications */}
+          {overdueTenants.length > 0 && (
+            <Card className="border-2 border-destructive bg-destructive/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-destructive">
+                  <AlertCircle className="h-5 w-5" />
+                  Overdue Payments ({overdueTenants.length})
+                </CardTitle>
+                <CardDescription>
+                  These tenants have missed their payment deadline
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {overdueTenants.slice(0, 5).map((tenant) => (
+                    <div
+                      key={tenant.id}
+                      className="flex items-center justify-between p-4 bg-background rounded-lg border border-destructive/20 cursor-pointer hover:bg-accent/50 transition-colors"
+                      onClick={() => navigate(`/agent/tenants/${tenant.id}`)}
+                    >
+                      <div>
+                        <p className="font-semibold text-base">{tenant.tenant_name}</p>
+                        <p className="text-sm text-destructive font-medium">
+                          {tenant.daysOverdue} day{tenant.daysOverdue !== 1 ? 's' : ''} overdue
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-destructive text-lg">
+                          UGX {(tenant.outstanding_balance || 0).toLocaleString()}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Outstanding</p>
+                      </div>
+                    </div>
+                  ))}
+                  {overdueTenants.length > 5 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                      onClick={() => navigate("/agent/tenants")}
+                    >
+                      View All {overdueTenants.length} Overdue Tenants
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
         {/* Portfolio Value Hero Section */}
         <Card className="bg-gradient-to-br from-primary via-primary/90 to-primary/70 text-primary-foreground overflow-hidden relative">
