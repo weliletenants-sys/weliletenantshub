@@ -56,27 +56,29 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
       </header>
 
       <div className="flex-1 flex flex-col md:flex-row">
-        <nav className="bg-card border-b md:border-b-0 md:border-r border-border p-4 md:w-64">
-          <div className="space-y-2">
+        <nav className="bg-card border-b md:border-b-0 md:border-r border-border p-6 md:w-72">
+          <div className="space-y-3">
             {navItems.map((item) => (
               <Button
                 key={item.path}
                 variant={currentPage === item.path ? "default" : "ghost"}
-                className="w-full justify-start"
+                className="w-full justify-start h-14 text-base"
+                size="lg"
                 onClick={() => navigate(item.path)}
               >
-                <item.icon className="h-4 w-4 mr-2" />
+                <item.icon className="h-6 w-6 mr-3" />
                 {item.label}
               </Button>
             ))}
             
-            <div className="pt-4 mt-4 border-t border-border">
+            <div className="pt-6 mt-6 border-t border-border">
               <Button
                 variant="outline"
-                className="w-full justify-start"
+                className="w-full justify-start h-14 text-base"
+                size="lg"
                 onClick={() => navigate("/")}
               >
-                <Home className="h-4 w-4 mr-2" />
+                <Home className="h-6 w-6 mr-3" />
                 Back to Home
               </Button>
             </div>
