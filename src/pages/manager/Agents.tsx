@@ -48,6 +48,7 @@ const ManagerAgents = () => {
   const [portfolioMinFilter, setPortfolioMinFilter] = useState<string>("");
   const [portfolioMaxFilter, setPortfolioMaxFilter] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
+  const [totalPortfolioValue, setTotalPortfolioValue] = useState(0);
   
   // Enable real-time updates
   useRealtimeAgents();
@@ -56,6 +57,20 @@ const ManagerAgents = () => {
 
   const fetchAgents = async () => {
     try {
+      // Fetch all tenants to calculate total portfolio value
+      const { data: allTenants, error: tenantsError } = await supabase
+        .from("tenants")
+        .select("outstanding_balance");
+      
+      if (tenantsError) throw tenantsError;
+      
+      // Calculate total portfolio value from tenant outstanding balances
+      const calculatedPortfolioValue = (allTenants || []).reduce(
+        (sum, tenant) => sum + Number(tenant.outstanding_balance || 0),
+        0
+      );
+      setTotalPortfolioValue(calculatedPortfolioValue);
+      
       // Build the query for profiles search
       let profilesQuery = supabase
         .from("profiles")
@@ -273,7 +288,6 @@ const ManagerAgents = () => {
   const averageCollectionRate = agents.length > 0
     ? agents.reduce((sum, agent) => sum + Number(agent.collection_rate || 0), 0) / agents.length
     : 0;
-  const totalPortfolioValue = agents.reduce((sum, agent) => sum + Number(agent.portfolio_value || 0), 0);
   const totalEarnings = agents.reduce((sum, agent) => sum + Number(agent.monthly_earnings || 0), 0);
 
   return (
