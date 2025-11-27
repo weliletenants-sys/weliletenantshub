@@ -7,10 +7,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Search, CheckCircle, XCircle, Clock, Filter, X, ChevronLeft, ChevronRight, Calendar, User, History } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Search, CheckCircle, XCircle, Clock, Filter, X, ChevronLeft, ChevronRight, CalendarIcon, User, History } from "lucide-react";
 import { useRealtimeAllCollections } from "@/hooks/useRealtimeSubscription";
 
 interface VerificationRecord {
@@ -46,6 +49,8 @@ const VerificationHistory = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);
@@ -84,6 +89,17 @@ const VerificationHistory = () => {
 
       if (paymentMethodFilter !== "all") {
         query = query.eq("payment_method", paymentMethodFilter);
+      }
+
+      // Apply date range filter
+      if (startDate) {
+        query = query.gte("verified_at", format(startDate, "yyyy-MM-dd"));
+      }
+
+      if (endDate) {
+        const endOfDay = new Date(endDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        query = query.lte("verified_at", endOfDay.toISOString());
       }
 
       if (searchQuery.trim()) {
@@ -138,16 +154,18 @@ const VerificationHistory = () => {
 
   useEffect(() => {
     fetchVerifications();
-  }, [currentPage, statusFilter, paymentMethodFilter, searchQuery]);
+  }, [currentPage, statusFilter, paymentMethodFilter, searchQuery, startDate, endDate]);
 
   const clearFilters = () => {
     setStatusFilter("all");
     setPaymentMethodFilter("all");
     setSearchQuery("");
+    setStartDate(undefined);
+    setEndDate(undefined);
     setCurrentPage(1);
   };
 
-  const hasActiveFilters = statusFilter !== "all" || paymentMethodFilter !== "all" || searchQuery.trim() !== "";
+  const hasActiveFilters = statusFilter !== "all" || paymentMethodFilter !== "all" || searchQuery.trim() !== "" || startDate !== undefined || endDate !== undefined;
 
   const totalPages = Math.ceil(totalRecords / pageSize);
   const startRecord = (currentPage - 1) * pageSize + 1;
@@ -252,7 +270,7 @@ const VerificationHistory = () => {
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Total Records
                 </CardTitle>
-                <Calendar className="h-4 w-4 text-primary" />
+                <CalendarIcon className="h-4 w-4 text-primary" />
               </div>
             </CardHeader>
             <CardContent>
@@ -265,7 +283,7 @@ const VerificationHistory = () => {
         </div>
 
         {/* Filters Section */}
-        <div className="flex gap-3 flex-wrap">
+        <div className="flex gap-3 flex-wrap items-center">
           <Button
             variant="outline"
             onClick={() => setShowFilters(!showFilters)}
@@ -285,6 +303,20 @@ const VerificationHistory = () => {
               Clear Filters
             </Button>
           )}
+          
+          {/* Active Date Range Indicator */}
+          {(startDate || endDate) && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted px-3 py-1.5 rounded-md">
+              <CalendarIcon className="h-4 w-4" />
+              <span>
+                {startDate && endDate
+                  ? `${format(startDate, "MMM dd, yyyy")} - ${format(endDate, "MMM dd, yyyy")}`
+                  : startDate
+                  ? `From ${format(startDate, "MMM dd, yyyy")}`
+                  : `Until ${format(endDate!, "MMM dd, yyyy")}`}
+              </span>
+            </div>
+          )}
         </div>
 
         {showFilters && (
@@ -293,7 +325,7 @@ const VerificationHistory = () => {
               <CardTitle className="text-lg">Filter Options</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Status Filter */}
                 <div>
                   <label className="text-sm font-medium mb-2 block">Status</label>
@@ -323,6 +355,64 @@ const VerificationHistory = () => {
                       <SelectItem value="airtel">Airtel</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* Start Date Filter */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Start Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !startDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {startDate ? format(startDate, "MMM dd, yyyy") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate}
+                        onSelect={setStartDate}
+                        disabled={(date) => (endDate ? date > endDate : false)}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* End Date Filter */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">End Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !endDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {endDate ? format(endDate, "MMM dd, yyyy") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDate}
+                        onSelect={setEndDate}
+                        disabled={(date) => (startDate ? date < startDate : false)}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             </CardContent>
