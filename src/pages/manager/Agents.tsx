@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,6 +9,7 @@ import { toast } from "sonner";
 import { useRealtimeAgents, useRealtimeAllTenants, useRealtimeProfiles, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
 
 const ManagerAgents = () => {
+  const navigate = useNavigate();
   const [agents, setAgents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -96,7 +98,11 @@ const ManagerAgents = () => {
                     </TableRow>
                   ) : (
                     agents.map((agent) => (
-                      <TableRow key={agent.id} className="cursor-pointer hover:bg-muted/50">
+                      <TableRow 
+                        key={agent.id} 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => navigate(`/manager/agents/${agent.id}`)}
+                      >
                         <TableCell className="font-medium">
                           {agent.profiles?.full_name || 'Unknown Agent'}
                         </TableCell>
