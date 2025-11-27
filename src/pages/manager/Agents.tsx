@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRealtimeAgents, useRealtimeAllTenants, useRealtimeProfiles, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
-import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Activity, Wallet } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
@@ -268,12 +268,130 @@ const ManagerAgents = () => {
 
   const hasActiveFilters = statusFilter !== "all" || motorcycleFilter !== "all" || portfolioMinFilter || portfolioMaxFilter;
 
+  // Calculate statistics from filtered agents
+  const activeAgents = agents.filter(a => a.tenant_count > 0).length;
+  const averageCollectionRate = agents.length > 0
+    ? agents.reduce((sum, agent) => sum + Number(agent.collection_rate || 0), 0) / agents.length
+    : 0;
+  const totalPortfolioValue = agents.reduce((sum, agent) => sum + Number(agent.portfolio_value || 0), 0);
+  const totalEarnings = agents.reduce((sum, agent) => sum + Number(agent.monthly_earnings || 0), 0);
+
   return (
     <ManagerLayout currentPage="/manager/agents">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Agent Management</h1>
           <p className="text-muted-foreground">Monitor and manage all agents in your area</p>
+        </div>
+
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Agents</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{totalAgents}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {activeAgents} active • {totalAgents - activeAgents} inactive
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Active Agents</CardTitle>
+                <Activity className="h-4 w-4 text-green-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-green-600">{activeAgents}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {totalAgents > 0 ? ((activeAgents / totalAgents) * 100).toFixed(1) : 0}% of total
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Avg Collection Rate</CardTitle>
+                <TrendingUp className="h-4 w-4 text-blue-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-3xl font-bold ${averageCollectionRate >= 95 ? 'text-green-600' : averageCollectionRate >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>
+                {averageCollectionRate.toFixed(1)}%
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {averageCollectionRate >= 95 ? 'Excellent' : averageCollectionRate >= 80 ? 'Good' : 'Needs improvement'}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Portfolio Value</CardTitle>
+                <Wallet className="h-4 w-4 text-purple-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-purple-600">
+                {(totalPortfolioValue / 1000000).toFixed(1)}M
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                UGX {totalPortfolioValue.toLocaleString()}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Additional Statistics Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Monthly Earnings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">UGX {totalEarnings.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Combined agent commissions
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Motorcycle Eligible</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                {agents.filter(a => a.motorcycle_eligible).length}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {agents.filter(a => a.motorcycle_applied).length} already applied
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Tenants</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {agents.reduce((sum, agent) => sum + agent.tenant_count, 0)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Across all agents
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="flex gap-3">
