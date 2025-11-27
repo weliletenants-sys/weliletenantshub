@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, User, Phone, DollarSign, Calendar, Edit, Save, Trash2, Home, MapPin, FileText, CalendarDays, History, TrendingDown, UserCog, ArrowRightLeft } from "lucide-react";
+import { ArrowLeft, User, Phone, DollarSign, Calendar, Edit, Save, Trash2, Home, MapPin, FileText, CalendarDays, History, TrendingDown, UserCog, ArrowRightLeft, Download, FileDown } from "lucide-react";
+import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { haptics } from "@/utils/haptics";
 
@@ -381,6 +382,124 @@ const ManagerTenantDetail = () => {
       return (rent / daysDiff).toFixed(0);
     }
     return "0";
+  };
+
+  const exportTransferHistoryCSV = () => {
+    if (!tenant || transferHistory.length === 0) return;
+
+    const headers = ["Transfer #", "Date", "Time", "From Agent", "To Agent", "Approved By", "Manager Phone"];
+    const rows = transferHistory.map((transfer, index) => [
+      `#${transferHistory.length - index}`,
+      format(new Date(transfer.created_at), "MMM d, yyyy"),
+      format(new Date(transfer.created_at), "h:mm a"),
+      transfer.old_data?.agent_name || "Unknown",
+      transfer.new_data?.agent_name || "Unknown",
+      transfer.manager?.full_name || "Unknown",
+      transfer.manager?.phone_number || "N/A",
+    ]);
+
+    const csvContent = [
+      `Transfer History for ${tenant.tenant_name}`,
+      `Generated on ${format(new Date(), "MMM d, yyyy 'at' h:mm a")}`,
+      "",
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(",")),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `transfer-history-${tenant.tenant_name.replace(/\s+/g, "-")}-${format(new Date(), "yyyy-MM-dd")}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    haptics.success();
+    toast.success("Transfer history exported as CSV");
+  };
+
+  const exportTransferHistoryPDF = () => {
+    if (!tenant || transferHistory.length === 0) return;
+
+    const doc = new jsPDF();
+    
+    // Title
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("Transfer History Report", 14, 20);
+    
+    // Tenant info
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Tenant: ${tenant.tenant_name}`, 14, 30);
+    doc.text(`Phone: ${tenant.tenant_phone}`, 14, 37);
+    doc.text(`Generated: ${format(new Date(), "MMM d, yyyy 'at' h:mm a")}`, 14, 44);
+    
+    // Line separator
+    doc.setLineWidth(0.5);
+    doc.line(14, 48, 196, 48);
+    
+    // Table headers
+    let yPosition = 58;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("#", 14, yPosition);
+    doc.text("Date & Time", 25, yPosition);
+    doc.text("From Agent", 70, yPosition);
+    doc.text("To Agent", 115, yPosition);
+    doc.text("Approved By", 160, yPosition);
+    
+    // Table rows
+    doc.setFont("helvetica", "normal");
+    transferHistory.forEach((transfer, index) => {
+      yPosition += 10;
+      
+      // Check if we need a new page
+      if (yPosition > 280) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      
+      const transferNum = `${transferHistory.length - index}`;
+      const dateTime = format(new Date(transfer.created_at), "MMM d, yyyy h:mm a");
+      const fromAgent = transfer.old_data?.agent_name || "Unknown";
+      const toAgent = transfer.new_data?.agent_name || "Unknown";
+      const approvedBy = transfer.manager?.full_name || "Unknown";
+      
+      doc.text(transferNum, 14, yPosition);
+      doc.text(dateTime, 25, yPosition);
+      doc.text(fromAgent.substring(0, 20), 70, yPosition);
+      doc.text(toAgent.substring(0, 20), 115, yPosition);
+      doc.text(approvedBy.substring(0, 18), 160, yPosition);
+      
+      // Add manager phone if available
+      if (transfer.manager?.phone_number) {
+        yPosition += 5;
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text(transfer.manager.phone_number, 160, yPosition);
+        doc.setFontSize(10);
+        doc.setTextColor(0);
+        yPosition += 2;
+      }
+    });
+    
+    // Footer
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(`Page ${i} of ${pageCount}`, 14, 290);
+      doc.text("Welile Rent Management System", 105, 290, { align: "center" });
+    }
+    
+    doc.save(`transfer-history-${tenant.tenant_name.replace(/\s+/g, "-")}-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+    
+    haptics.success();
+    toast.success("Transfer history exported as PDF");
   };
 
   if (loading) {
@@ -946,13 +1065,37 @@ const ManagerTenantDetail = () => {
         {transferHistory.length > 0 && (
           <Card className="border-primary/20 bg-primary/5">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ArrowRightLeft className="h-5 w-5 text-primary" />
-                Transfer History ({transferHistory.length})
-              </CardTitle>
-              <CardDescription>
-                Complete history of tenant reassignments between agents
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <ArrowRightLeft className="h-5 w-5 text-primary" />
+                    Transfer History ({transferHistory.length})
+                  </CardTitle>
+                  <CardDescription>
+                    Complete history of tenant reassignments between agents
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportTransferHistoryCSV}
+                    className="gap-2"
+                  >
+                    <FileDown className="h-4 w-4" />
+                    Export CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportTransferHistoryPDF}
+                    className="gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export PDF
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
