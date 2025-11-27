@@ -24,6 +24,7 @@ import { isOnline } from "@/lib/offlineSync";
 import { haptics } from "@/utils/haptics";
 import { useTenantData, useCollectionsData, useAgentInfo } from "@/hooks/useTenantData";
 import { useOptimisticPayment, useOptimisticTenantUpdate } from "@/hooks/useOptimisticPayment";
+import { useRealtimeCollections } from "@/hooks/useRealtimeSubscription";
 
 const AgentTenantDetail = () => {
   const { tenantId } = useParams();
@@ -59,6 +60,9 @@ const AgentTenantDetail = () => {
   // Optimistic mutations
   const paymentMutation = useOptimisticPayment();
   const tenantUpdateMutation = useOptimisticTenantUpdate();
+  
+  // Enable real-time updates for collections
+  useRealtimeCollections(tenantId);
 
   // Update edit form when tenant data loads
   useEffect(() => {

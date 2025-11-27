@@ -1,42 +1,38 @@
+import { useEffect, useState } from "react";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useRealtimeAgents, useRealtimeAllTenants } from "@/hooks/useRealtimeSubscription";
 
 const ManagerAgents = () => {
-  // Mock data - would be fetched from database
-  const agents = [
-    { 
-      id: 1, 
-      name: "John Agent", 
-      phone: "0700123456", 
-      tenants: 28, 
-      activeTenants: 26,
-      collectionRate: 96, 
-      earnings: 1250000,
-      status: "active" 
-    },
-    { 
-      id: 2, 
-      name: "Sarah Agent", 
-      phone: "0700234567", 
-      tenants: 24, 
-      activeTenants: 23,
-      collectionRate: 94, 
-      earnings: 980000,
-      status: "active" 
-    },
-    { 
-      id: 3, 
-      name: "Mike Agent", 
-      phone: "0700345678", 
-      tenants: 22, 
-      activeTenants: 20,
-      collectionRate: 91, 
-      earnings: 890000,
-      status: "warning" 
-    },
-  ];
+  const [agents, setAgents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Enable real-time updates
+  useRealtimeAgents();
+  useRealtimeAllTenants();
+
+  useEffect(() => {
+    fetchAgents();
+  }, []);
+
+  const fetchAgents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("agents")
+        .select("*");
+
+      if (error) throw error;
+      setAgents(data || []);
+    } catch (error: any) {
+      toast.error("Failed to load agents");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <ManagerLayout currentPage="/manager/agents">
@@ -67,26 +63,40 @@ const ManagerAgents = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {agents.map((agent) => (
-                    <TableRow key={agent.id} className="cursor-pointer hover:bg-muted/50">
-                      <TableCell className="font-medium">{agent.name}</TableCell>
-                      <TableCell>{agent.phone}</TableCell>
-                      <TableCell>
-                        {agent.activeTenants} / {agent.tenants}
-                      </TableCell>
-                      <TableCell>
-                        <span className={agent.collectionRate >= 95 ? "text-success" : "text-warning"}>
-                          {agent.collectionRate}%
-                        </span>
-                      </TableCell>
-                      <TableCell>UGX {agent.earnings.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Badge variant={agent.status === "active" ? "default" : "secondary"}>
-                          {agent.status}
-                        </Badge>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        Loading agents...
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : agents.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No agents found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    agents.map((agent) => (
+                      <TableRow key={agent.id} className="cursor-pointer hover:bg-muted/50">
+                        <TableCell className="font-medium">{agent.user_id}</TableCell>
+                        <TableCell>-</TableCell>
+                        <TableCell>
+                          {agent.active_tenants} / {agent.total_tenants}
+                        </TableCell>
+                        <TableCell>
+                          <span className={parseFloat(agent.collection_rate || '0') >= 95 ? "text-success" : "text-warning"}>
+                            {parseFloat(agent.collection_rate || '0').toFixed(0)}%
+                          </span>
+                        </TableCell>
+                        <TableCell>UGX {parseFloat(agent.monthly_earnings || '0').toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Badge variant={agent.active_tenants > 0 ? "default" : "secondary"}>
+                            {agent.active_tenants > 0 ? "active" : "inactive"}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
