@@ -611,6 +611,19 @@ const AgentTenantDetail = () => {
                       <p className="text-sm text-muted-foreground">Total Payments</p>
                       <p className="text-lg font-medium">{collections.length}</p>
                     </div>
+                    {tenant.daily_payment_amount && parseFloat(tenant.daily_payment_amount.toString()) > 0 && (
+                      <div className="pt-3 border-t">
+                        <p className="text-sm text-muted-foreground">Daily Payment Amount</p>
+                        <p className="text-xl font-bold text-primary">
+                          UGX {parseFloat(tenant.daily_payment_amount.toString()).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </p>
+                        {tenant.start_date && tenant.due_date && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {format(new Date(tenant.start_date), "MMM d")} - {format(new Date(tenant.due_date), "MMM d, yyyy")}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
