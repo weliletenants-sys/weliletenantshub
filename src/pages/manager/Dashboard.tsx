@@ -4,7 +4,7 @@ import PullToRefresh from "react-simple-pull-to-refresh";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -20,6 +20,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -57,6 +59,7 @@ const ManagerDashboard = () => {
   const [minTenantsFilter, setMinTenantsFilter] = useState<string>("");
   const [maxTenantsFilter, setMaxTenantsFilter] = useState<string>("");
   const [agentGrowthComparison, setAgentGrowthComparison] = useState<any[]>([]);
+  const [paymentMethodData, setPaymentMethodData] = useState<any[]>([]);
 
   // Track previous values for change detection
   const [prevPortfolioValue, setPrevPortfolioValue] = useState<number | null>(null);
@@ -239,6 +242,9 @@ const ManagerDashboard = () => {
 
         // Calculate agent growth comparison
         await calculateAgentGrowthComparison(agentsResult.data || []);
+        
+        // Fetch payment method breakdown
+        await fetchPaymentMethodBreakdown();
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
       } finally {
@@ -329,8 +335,74 @@ const ManagerDashboard = () => {
     });
     
     await calculateAgentGrowthComparison(agentsResult.data || []);
+    await fetchPaymentMethodBreakdown();
     
     toast.success("Dashboard refreshed");
+  };
+
+  const fetchPaymentMethodBreakdown = async () => {
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+      // Fetch current period (last 30 days)
+      const { data: currentPeriod } = await supabase
+        .from("collections")
+        .select("amount, payment_method")
+        .eq("status", "verified")
+        .gte("collection_date", thirtyDaysAgo.toISOString().split('T')[0]);
+
+      // Fetch previous period (30-60 days ago)
+      const { data: previousPeriod } = await supabase
+        .from("collections")
+        .select("amount, payment_method")
+        .eq("status", "verified")
+        .gte("collection_date", sixtyDaysAgo.toISOString().split('T')[0])
+        .lt("collection_date", thirtyDaysAgo.toISOString().split('T')[0]);
+
+      // Calculate totals by method
+      const calculateTotals = (data: any[]) => {
+        return {
+          cash: data?.filter(c => c.payment_method === "cash").reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0,
+          mtn: data?.filter(c => c.payment_method === "mtn").reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0,
+          airtel: data?.filter(c => c.payment_method === "airtel").reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0,
+        };
+      };
+
+      const current = calculateTotals(currentPeriod || []);
+      const previous = calculateTotals(previousPeriod || []);
+
+      // Calculate trends
+      const calculateTrend = (currentVal: number, previousVal: number) => {
+        if (previousVal === 0) return currentVal > 0 ? 100 : 0;
+        return ((currentVal - previousVal) / previousVal) * 100;
+      };
+
+      const chartData = [
+        {
+          method: "Cash",
+          amount: current.cash,
+          trend: calculateTrend(current.cash, previous.cash),
+        },
+        {
+          method: "MTN Mobile Money",
+          amount: current.mtn,
+          trend: calculateTrend(current.mtn, previous.mtn),
+        },
+        {
+          method: "Airtel Money",
+          amount: current.airtel,
+          trend: calculateTrend(current.airtel, previous.airtel),
+        },
+      ];
+
+      setPaymentMethodData(chartData);
+    } catch (error) {
+      console.error("Error fetching payment method breakdown:", error);
+    }
   };
 
   const handleTenantSearch = async () => {
@@ -910,6 +982,91 @@ const ManagerDashboard = () => {
                     </p>
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Payment Method Breakdown */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-primary" />
+                Payment Method Breakdown
+              </CardTitle>
+              <CardDescription>
+                Collections by payment method across all agents (Last 30 days)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={{
+                  amount: {
+                    label: "Amount",
+                    color: "hsl(var(--primary))",
+                  },
+                }}
+                className="h-[300px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={paymentMethodData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis 
+                      dataKey="method" 
+                      className="text-xs"
+                      tick={{ fill: 'hsl(var(--foreground))' }}
+                    />
+                    <YAxis 
+                      className="text-xs"
+                      tick={{ fill: 'hsl(var(--foreground))' }}
+                      tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip 
+                      content={
+                        <ChartTooltipContent 
+                          formatter={(value) => `UGX ${Number(value).toLocaleString()}`}
+                        />
+                      }
+                    />
+                    <Bar 
+                      dataKey="amount" 
+                      fill="hsl(var(--primary))" 
+                      radius={[8, 8, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+
+              {/* Trend Indicators */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                {paymentMethodData.map((item, index) => (
+                  <div 
+                    key={index}
+                    className="p-4 rounded-lg border bg-card"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium">{item.method}</p>
+                      <div className={cn(
+                        "flex items-center gap-1 text-xs font-medium",
+                        item.trend > 0 ? "text-success" : item.trend < 0 ? "text-destructive" : "text-muted-foreground"
+                      )}>
+                        {item.trend > 0 ? (
+                          <ArrowUp className="h-3 w-3" />
+                        ) : item.trend < 0 ? (
+                          <ArrowDown className="h-3 w-3" />
+                        ) : (
+                          <Minus className="h-3 w-3" />
+                        )}
+                        {Math.abs(item.trend).toFixed(1)}%
+                      </div>
+                    </div>
+                    <p className="text-2xl font-bold">
+                      UGX {item.amount.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      vs. previous 30 days
+                    </p>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
