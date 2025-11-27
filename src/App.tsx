@@ -28,6 +28,7 @@ const AgentWeeklySummary = lazy(() => import("./pages/agent/WeeklySummary"));
 const AgentSettings = lazy(() => import("./pages/agent/Settings"));
 const ManagerDashboard = lazy(() => import("./pages/manager/Dashboard"));
 const ManagerAgents = lazy(() => import("./pages/manager/Agents"));
+const ManagerAgentDetail = lazy(() => import("./pages/manager/AgentDetail"));
 const ManagerVerifications = lazy(() => import("./pages/manager/Verifications"));
 const ManagerSettings = lazy(() => import("./pages/manager/Settings"));
 const AdminProfileRepair = lazy(() => import("./pages/admin/ProfileRepair"));
@@ -138,6 +139,11 @@ const App = () => {
               <Route path="/manager/agents" element={
                 <ProtectedRoute requiredRole="manager">
                   <ManagerAgents />
+                </ProtectedRoute>
+              } />
+              <Route path="/manager/agents/:agentId" element={
+                <ProtectedRoute requiredRole="manager">
+                  <ManagerAgentDetail />
                 </ProtectedRoute>
               } />
               <Route path="/manager/verifications" element={
