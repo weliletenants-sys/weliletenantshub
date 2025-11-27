@@ -53,13 +53,13 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="bg-card border-b border-border p-4 flex justify-between items-center">
+      <header className="bg-card border-b border-border p-6 flex justify-between items-center">
         <WelileLogo />
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <OfflineSyncIndicator />
           <CacheIndicator />
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
+          <Button variant="ghost" size="default" onClick={handleLogout}>
+            <LogOut className="h-5 w-5 mr-2" />
             Logout
           </Button>
         </div>

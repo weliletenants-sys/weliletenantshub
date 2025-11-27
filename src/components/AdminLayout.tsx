@@ -39,12 +39,12 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Shield className="h-6 w-6 text-primary" />
+        <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Shield className="h-7 w-7 text-primary" />
             <div>
-              <h1 className="text-xl font-bold">Admin Dashboard</h1>
-              <p className="text-xs text-muted-foreground">System Administration</p>
+              <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+              <p className="text-sm text-muted-foreground">System Administration</p>
             </div>
           </div>
           <WelileLogo />

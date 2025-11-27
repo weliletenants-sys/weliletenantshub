@@ -47,10 +47,10 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="bg-card border-b border-border p-4 flex justify-between items-center">
+      <header className="bg-card border-b border-border p-6 flex justify-between items-center">
         <WelileLogo />
-        <Button variant="ghost" size="sm" onClick={handleLogout}>
-          <LogOut className="h-4 w-4 mr-2" />
+        <Button variant="ghost" size="default" onClick={handleLogout}>
+          <LogOut className="h-5 w-5 mr-2" />
           Logout
         </Button>
       </header>

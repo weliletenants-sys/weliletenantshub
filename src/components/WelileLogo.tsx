@@ -1,7 +1,7 @@
 const WelileLogo = () => {
   return (
-    <div className="bg-primary px-6 py-2 rounded-lg inline-block">
-      <h1 className="font-chewy text-2xl text-primary-foreground">Welile</h1>
+    <div className="bg-primary px-8 py-3 rounded-lg inline-block">
+      <h1 className="font-chewy text-3xl text-primary-foreground">Welile</h1>
     </div>
   );
 };
