@@ -15,6 +15,8 @@ const AgentDashboard = () => {
   const navigate = useNavigate();
   const [agentData, setAgentData] = useState<any>(null);
   const [todaysCollections, setTodaysCollections] = useState(0);
+  const [todaysTarget, setTodaysTarget] = useState(0);
+  const [tenantsDueToday, setTenantsDueToday] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -46,15 +48,31 @@ const AgentDashboard = () => {
 
       setAgentData(agent);
 
+      const today = new Date().toISOString().split('T')[0];
+
       // Calculate today's collections
       const { data: collections } = await supabase
         .from("collections")
         .select("amount")
         .eq("agent_id", agent.id)
-        .eq("collection_date", new Date().toISOString().split('T')[0]);
+        .eq("collection_date", today);
 
       const total = collections?.reduce((sum, col) => sum + parseFloat(col.amount.toString()), 0) || 0;
       setTodaysCollections(total);
+
+      // Get tenants due today
+      const { data: dueTenantsData } = await supabase
+        .from("tenants")
+        .select("rent_amount")
+        .eq("agent_id", agent.id)
+        .eq("next_payment_date", today)
+        .eq("status", "verified");
+
+      const dueCount = dueTenantsData?.length || 0;
+      const target = dueTenantsData?.reduce((sum, tenant) => sum + parseFloat(tenant.rent_amount?.toString() || '0'), 0) || 0;
+      
+      setTenantsDueToday(dueCount);
+      setTodaysTarget(target);
     } catch (error: any) {
       toast.error("Failed to load dashboard data");
     } finally {
@@ -232,8 +250,71 @@ const AgentDashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Today's Collection Target */}
+        <Card className="border-2 border-primary/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Today's Collection Goal</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between items-end">
+              <div>
+                <p className="text-xs text-muted-foreground">Collected</p>
+                <div className="text-2xl font-bold text-success">
+                  UGX {todaysCollections.toLocaleString()}
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Target</p>
+                <div className="text-2xl font-bold">
+                  UGX {todaysTarget.toLocaleString()}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Progress 
+                value={todaysTarget > 0 ? (todaysCollections / todaysTarget) * 100 : 0} 
+                className="h-3"
+              />
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">
+                  {todaysTarget > 0 ? Math.round((todaysCollections / todaysTarget) * 100) : 0}% achieved
+                </span>
+                <span className="font-semibold text-primary">
+                  UGX {Math.max(0, todaysTarget - todaysCollections).toLocaleString()} remaining
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tenants Needing Collection */}
+        <Card className="border-2 border-orange-500/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-orange-500" />
+              Collections Due Today
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-orange-500">{tenantsDueToday}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {tenantsDueToday === 0 ? 'No collections due' : tenantsDueToday === 1 ? 'tenant needs collection' : 'tenants need collection'}
+            </p>
+            {tenantsDueToday > 0 && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full mt-3 border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white"
+                onClick={() => navigate("/agent/collections")}
+              >
+                View Due Tenants
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
           <Card>
             <CardHeader className="pb-2">
@@ -247,19 +328,6 @@ const AgentDashboard = () => {
               <p className="text-xs text-muted-foreground mt-1">
                 {agentData?.active_tenants || 0} active
               </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Today's Collections
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">UGX {todaysCollections.toLocaleString()}</div>
-              <p className="text-xs text-success mt-1">Collections due today</p>
             </CardContent>
           </Card>
 
