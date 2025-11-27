@@ -1,0 +1,401 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import ManagerLayout from "@/components/ManagerLayout";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Check, X, Clock, User, DollarSign, Calendar, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { format } from "date-fns";
+
+interface Payment {
+  id: string;
+  amount: number;
+  commission: number;
+  collection_date: string;
+  payment_method: string | null;
+  status: string | null;
+  created_at: string;
+  verified_at: string | null;
+  verified_by: string | null;
+  rejection_reason: string | null;
+  agent_id: string;
+  tenant_id: string;
+  agent: {
+    user_id: string;
+    profiles: {
+      full_name: string | null;
+      phone_number: string;
+    };
+  };
+  tenants: {
+    tenant_name: string;
+    tenant_phone: string;
+  };
+}
+
+const PaymentVerifications = () => {
+  const queryClient = useQueryClient();
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [activeTab, setActiveTab] = useState<string>("pending");
+
+  // Fetch all payments
+  const { data: payments, isLoading } = useQuery({
+    queryKey: ["all-payments"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("collections")
+        .select(`
+          *,
+          agent:agents!inner(
+            user_id,
+            profiles:profiles!inner(full_name, phone_number)
+          ),
+          tenants!inner(tenant_name, tenant_phone)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data as Payment[];
+    },
+  });
+
+  // Verify payment mutation
+  const verifyMutation = useMutation({
+    mutationFn: async (paymentId: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("collections")
+        .update({
+          status: "verified",
+          verified_by: user.id,
+          verified_at: new Date().toISOString(),
+        })
+        .eq("id", paymentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Payment verified successfully!");
+      queryClient.invalidateQueries({ queryKey: ["all-payments"] });
+    },
+    onError: (error) => {
+      toast.error("Failed to verify payment", {
+        description: error.message,
+      });
+    },
+  });
+
+  // Reject payment mutation
+  const rejectMutation = useMutation({
+    mutationFn: async ({ paymentId, reason }: { paymentId: string; reason: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("collections")
+        .update({
+          status: "rejected",
+          verified_by: user.id,
+          verified_at: new Date().toISOString(),
+          rejection_reason: reason,
+        })
+        .eq("id", paymentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Payment rejected");
+      queryClient.invalidateQueries({ queryKey: ["all-payments"] });
+      setShowRejectDialog(false);
+      setSelectedPayment(null);
+      setRejectionReason("");
+    },
+    onError: (error) => {
+      toast.error("Failed to reject payment", {
+        description: error.message,
+      });
+    },
+  });
+
+  const handleVerify = (payment: Payment) => {
+    verifyMutation.mutate(payment.id);
+  };
+
+  const handleReject = (payment: Payment) => {
+    setSelectedPayment(payment);
+    setShowRejectDialog(true);
+  };
+
+  const confirmReject = () => {
+    if (!selectedPayment || !rejectionReason.trim()) {
+      toast.error("Please provide a reason for rejection");
+      return;
+    }
+    rejectMutation.mutate({ paymentId: selectedPayment.id, reason: rejectionReason });
+  };
+
+  const pendingPayments = payments?.filter(p => p.status === "pending") || [];
+  const verifiedPayments = payments?.filter(p => p.status === "verified") || [];
+  const rejectedPayments = payments?.filter(p => p.status === "rejected") || [];
+
+  const getStatusBadge = (status: string | null) => {
+    switch (status) {
+      case "verified":
+        return <Badge className="bg-green-600">Verified</Badge>;
+      case "rejected":
+        return <Badge variant="destructive">Rejected</Badge>;
+      case "pending":
+      default:
+        return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+    }
+  };
+
+  const PaymentCard = ({ payment }: { payment: Payment }) => (
+    <Card className="mb-4">
+      <CardContent className="p-5">
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex-1">
+            <h3 className="font-semibold text-lg mb-1">{payment.tenants.tenant_name}</h3>
+            <p className="text-sm text-muted-foreground mb-2">{payment.tenants.tenant_phone}</p>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+              <User className="h-4 w-4" />
+              <span>Agent: {payment.agent.profiles.full_name || payment.agent.profiles.phone_number}</span>
+            </div>
+          </div>
+          {getStatusBadge(payment.status)}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-xs text-muted-foreground">Amount</p>
+              <p className="font-semibold">UGX {payment.amount.toLocaleString()}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-green-600" />
+            <div>
+              <p className="text-xs text-muted-foreground">Commission</p>
+              <p className="font-semibold">UGX {payment.commission.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 mb-4 text-sm">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <span className="text-muted-foreground">
+            {format(new Date(payment.collection_date), "MMM dd, yyyy")}
+          </span>
+          <span className="text-muted-foreground">•</span>
+          <span className="text-muted-foreground">{payment.payment_method || "Cash"}</span>
+        </div>
+
+        {payment.rejection_reason && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-md p-3 mb-4">
+            <p className="text-sm font-medium text-destructive mb-1">Rejection Reason:</p>
+            <p className="text-sm text-muted-foreground">{payment.rejection_reason}</p>
+          </div>
+        )}
+
+        {payment.status === "pending" && (
+          <div className="flex gap-3 mt-4">
+            <Button
+              className="flex-1"
+              onClick={() => handleVerify(payment)}
+              disabled={verifyMutation.isPending}
+            >
+              {verifyMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4 mr-2" />
+              )}
+              Verify
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={() => handleReject(payment)}
+              disabled={rejectMutation.isPending}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Reject
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  if (isLoading) {
+    return (
+      <ManagerLayout currentPage="/manager/payment-verifications">
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </ManagerLayout>
+    );
+  }
+
+  return (
+    <ManagerLayout currentPage="/manager/payment-verifications">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-2">Payment Verifications</h1>
+        <p className="text-muted-foreground">Review and verify agent payment submissions</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Review</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{pendingPayments.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Awaiting verification</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Verified</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-600">{verifiedPayments.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Commission applied</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Rejected</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-destructive">{rejectedPayments.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">No commission</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Payment Submissions</CardTitle>
+          <CardDescription>Review agent payment entries and verify for commission approval</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-3 mb-6">
+              <TabsTrigger value="pending">
+                Pending ({pendingPayments.length})
+              </TabsTrigger>
+              <TabsTrigger value="verified">
+                Verified ({verifiedPayments.length})
+              </TabsTrigger>
+              <TabsTrigger value="rejected">
+                Rejected ({rejectedPayments.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="pending">
+              {pendingPayments.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No pending payments</p>
+                </div>
+              ) : (
+                <div>
+                  {pendingPayments.map(payment => (
+                    <PaymentCard key={payment.id} payment={payment} />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="verified">
+              {verifiedPayments.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Check className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No verified payments</p>
+                </div>
+              ) : (
+                <div>
+                  {verifiedPayments.map(payment => (
+                    <PaymentCard key={payment.id} payment={payment} />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="rejected">
+              {rejectedPayments.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <X className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No rejected payments</p>
+                </div>
+              ) : (
+                <div>
+                  {rejectedPayments.map(payment => (
+                    <PaymentCard key={payment.id} payment={payment} />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject Payment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please provide a reason for rejecting this payment. This will be recorded in the audit log.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Textarea
+              placeholder="Enter rejection reason..."
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              className="min-h-[100px]"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowRejectDialog(false);
+              setRejectionReason("");
+              setSelectedPayment(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmReject}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={!rejectionReason.trim() || rejectMutation.isPending}
+            >
+              {rejectMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Reject Payment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </ManagerLayout>
+  );
+};
+
+export default PaymentVerifications;
