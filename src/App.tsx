@@ -23,6 +23,7 @@ import ManagerAgents from "./pages/manager/Agents";
 import ManagerVerifications from "./pages/manager/Verifications";
 import ManagerSettings from "./pages/manager/Settings";
 import AdminProfileRepair from "./pages/admin/ProfileRepair";
+import AdminRoleManagement from "./pages/admin/RoleManagement";
 
 const queryClient = new QueryClient();
 
@@ -108,6 +109,9 @@ const App = () => (
           } />
           <Route path="/admin/profile-repair" element={
             <AdminProfileRepair />
+          } />
+          <Route path="/admin/roles" element={
+            <AdminRoleManagement />
           } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
