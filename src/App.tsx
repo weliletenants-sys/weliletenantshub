@@ -31,6 +31,7 @@ const ManagerAgents = lazy(() => import("./pages/manager/Agents"));
 const ManagerAgentDetail = lazy(() => import("./pages/manager/AgentDetail"));
 const ManagerAgentComparison = lazy(() => import("./pages/manager/AgentComparison"));
 const ManagerWeeklyReport = lazy(() => import("./pages/manager/WeeklyReport"));
+const ManagerAuditLog = lazy(() => import("./pages/manager/AuditLog"));
 const ManagerVerifications = lazy(() => import("./pages/manager/Verifications"));
 const ManagerSettings = lazy(() => import("./pages/manager/Settings"));
 const AdminProfileRepair = lazy(() => import("./pages/admin/ProfileRepair"));
@@ -156,6 +157,11 @@ const App = () => {
               <Route path="/manager/weekly-report" element={
                 <ProtectedRoute requiredRole="manager">
                   <ManagerWeeklyReport />
+                </ProtectedRoute>
+              } />
+              <Route path="/manager/audit-log" element={
+                <ProtectedRoute requiredRole="manager">
+                  <ManagerAuditLog />
                 </ProtectedRoute>
               } />
               <Route path="/manager/verifications" element={
