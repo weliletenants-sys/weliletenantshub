@@ -17,6 +17,7 @@ const AgentNewTenant = () => {
     tenantName: "",
     tenantPhone: "",
     rentAmount: "",
+    currentBalance: "",
     landlordName: "",
     landlordPhone: "",
     lc1Name: "",
@@ -41,6 +42,7 @@ const AgentNewTenant = () => {
 
       const rentAmount = parseFloat(formData.rentAmount);
       const registrationFee = rentAmount >= 200000 ? 20000 : 10000;
+      const currentBalance = parseFloat(formData.currentBalance) || 0;
 
       const tenantData = {
         agent_id: agent.id,
@@ -52,7 +54,7 @@ const AgentNewTenant = () => {
         landlord_phone: formData.landlordPhone,
         lc1_name: formData.lc1Name,
         lc1_phone: formData.lc1Phone,
-        outstanding_balance: rentAmount + registrationFee,
+        outstanding_balance: currentBalance,
       };
 
       if (isOnline()) {
@@ -153,6 +155,20 @@ const AgentNewTenant = () => {
                       Registration fee: UGX {registrationFee.toLocaleString()}
                     </p>
                   )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="currentBalance">Current Outstanding Balance (UGX)</Label>
+                  <Input
+                    id="currentBalance"
+                    name="currentBalance"
+                    type="number"
+                    value={formData.currentBalance}
+                    onChange={handleChange}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter the total amount the tenant currently owes
+                  </p>
                 </div>
               </div>
 
