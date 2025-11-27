@@ -1,10 +1,10 @@
 import AgentLayout from "@/components/AgentLayout";
+import { EarningsSkeleton } from "@/components/TenantDetailSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { TrendingUp, Wallet, Target, DollarSign } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Skeleton } from "@/components/ui/skeleton";
 
 const AgentEarnings = () => {
   const [loading, setLoading] = useState(true);
@@ -82,13 +82,7 @@ const AgentEarnings = () => {
   if (loading) {
     return (
       <AgentLayout currentPage="/agent/earnings">
-        <div className="space-y-6">
-          <Skeleton className="h-8 w-64" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => <Skeleton key={i} className="h-32" />)}
-          </div>
-          <Skeleton className="h-64" />
-        </div>
+        <EarningsSkeleton />
       </AgentLayout>
     );
   }

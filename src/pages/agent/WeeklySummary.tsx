@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import AgentLayout from "@/components/AgentLayout";
+import { WeeklySummarySkeleton } from "@/components/TenantDetailSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, TrendingDown, AlertCircle, CheckCircle2, DollarSign } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
@@ -153,13 +153,7 @@ const WeeklySummary = () => {
   if (loading) {
     return (
       <AgentLayout currentPage="/agent/weekly-summary">
-        <div className="space-y-6">
-          <Skeleton className="h-8 w-64" />
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32" />)}
-          </div>
-          <Skeleton className="h-96" />
-        </div>
+        <WeeklySummarySkeleton />
       </AgentLayout>
     );
   }

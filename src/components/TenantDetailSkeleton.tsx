@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader } from "./ui/card";
 import { Skeleton } from "./ui/skeleton";
-import { Separator } from "./ui/separator";
 
 export const TenantDetailSkeleton = () => {
   return (
@@ -109,41 +108,151 @@ export const TenantListSkeleton = () => {
 
 export const DashboardSkeleton = () => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="space-y-2">
-        <Skeleton className="h-9 w-48" />
-        <Skeleton className="h-4 w-64" />
+      <div className="space-y-3">
+        <Skeleton className="h-8 w-48 animate-pulse" />
+        <Skeleton className="h-4 w-32 animate-pulse" style={{ animationDelay: '0.1s' }} />
       </div>
 
       {/* Action Buttons */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Skeleton className="h-14 w-full" />
-        <Skeleton className="h-14 w-full" />
+        <Skeleton className="h-12 w-full rounded-xl animate-pulse shadow-lg" />
+        <Skeleton className="h-12 w-full rounded-xl animate-pulse shadow-lg" style={{ animationDelay: '0.1s' }} />
       </div>
 
-      {/* Large Card */}
-      <Card>
-        <CardContent className="p-8">
+      {/* Motorcycle Progress Card */}
+      <Card className="animate-pulse bg-gradient-to-br from-primary/5 to-accent/5">
+        <CardContent className="p-6">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <Skeleton className="h-12 w-12 rounded-xl" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-10 w-48" />
+                <Skeleton className="h-8 w-48" />
               </div>
             </div>
-            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-6 w-full rounded-full" />
+            <div className="flex justify-between">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-20" />
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map((i) => (
-          <Card key={i}>
+      {/* Quick Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[0, 1, 2, 3].map((i) => (
+          <Card key={i} className="animate-pulse" style={{ animationDelay: `${i * 0.1}s` }}>
             <CardHeader className="pb-2">
-              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-20" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-8 w-24 mb-2" />
+              <Skeleton className="h-3 w-16" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Collection Targets */}
+      <Card className="animate-pulse">
+        <CardHeader className="pb-3">
+          <Skeleton className="h-5 w-40" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-between items-center">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-6 w-24" />
+          </div>
+          <Skeleton className="h-4 w-full rounded-full" />
+          <Skeleton className="h-4 w-48" />
+        </CardContent>
+      </Card>
+
+      {/* Chart */}
+      <Card className="animate-pulse">
+        <CardHeader>
+          <Skeleton className="h-5 w-48" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-64 w-full rounded-lg" />
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export const CollectionsSkeleton = () => {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-48 animate-pulse" />
+        <Skeleton className="h-4 w-64 animate-pulse" style={{ animationDelay: '0.1s' }} />
+      </div>
+
+      {/* Alert Card */}
+      <Card className="border-destructive/50 bg-destructive/5 animate-pulse">
+        <CardHeader>
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-4 w-56" />
+        </CardHeader>
+      </Card>
+
+      {/* Collection Cards */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {[0, 1].map((i) => (
+          <Card key={i} className="animate-pulse" style={{ animationDelay: `${i * 0.1}s` }}>
+            <CardHeader className="pb-3">
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-4 w-48" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[1, 2, 3].map((j) => (
+                <div key={j} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <div className="space-y-2 flex-1">
+                    <Skeleton className="h-5 w-40" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                  <Skeleton className="h-10 w-20 rounded-lg" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export const EarningsSkeleton = () => {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-32 animate-pulse" />
+        <Skeleton className="h-4 w-48 animate-pulse" style={{ animationDelay: '0.1s' }} />
+      </div>
+
+      {/* Wallet Balance Card */}
+      <Card className="bg-gradient-to-br from-primary/10 to-accent/10 animate-pulse">
+        <CardContent className="p-6">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-12 w-48" />
+            <Skeleton className="h-3 w-32" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Earnings Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[0, 1, 2].map((i) => (
+          <Card key={i} className="animate-pulse" style={{ animationDelay: `${i * 0.1}s` }}>
+            <CardHeader className="pb-2">
+              <Skeleton className="h-3 w-24" />
             </CardHeader>
             <CardContent>
               <Skeleton className="h-8 w-32 mb-2" />
@@ -152,6 +261,111 @@ export const DashboardSkeleton = () => {
           </Card>
         ))}
       </div>
+
+      {/* Portfolio Value */}
+      <Card className="animate-pulse">
+        <CardHeader className="pb-3">
+          <Skeleton className="h-5 w-40" />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-10 w-40" />
+          <Skeleton className="h-4 w-full rounded-full" />
+          <div className="flex justify-between">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Recent Earnings */}
+      <Card className="animate-pulse">
+        <CardHeader>
+          <Skeleton className="h-5 w-48" />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+              <Skeleton className="h-6 w-20" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export const WeeklySummarySkeleton = () => {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-48 animate-pulse" />
+        <Skeleton className="h-4 w-64 animate-pulse" style={{ animationDelay: '0.1s' }} />
+      </div>
+
+      {/* Week Selector */}
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-10 w-32 rounded-lg animate-pulse" />
+        <Skeleton className="h-10 w-48 rounded-lg animate-pulse" />
+        <Skeleton className="h-10 w-32 rounded-lg animate-pulse" />
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[0, 1, 2, 3].map((i) => (
+          <Card key={i} className="animate-pulse" style={{ animationDelay: `${i * 0.1}s` }}>
+            <CardHeader className="pb-2">
+              <Skeleton className="h-3 w-20" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-8 w-24 mb-2" />
+              <Skeleton className="h-3 w-16" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Charts */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="animate-pulse">
+          <CardHeader>
+            <Skeleton className="h-5 w-40" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-64 w-full rounded-lg" />
+          </CardContent>
+        </Card>
+        <Card className="animate-pulse" style={{ animationDelay: '0.1s' }}>
+          <CardHeader>
+            <Skeleton className="h-5 w-40" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-64 w-full rounded-lg" />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Insights */}
+      <Card className="animate-pulse">
+        <CardHeader>
+          <Skeleton className="h-5 w-32" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+              <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-3 w-3/4" />
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   );
 };
