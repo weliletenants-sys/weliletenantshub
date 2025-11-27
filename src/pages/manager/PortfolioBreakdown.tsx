@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Wallet, Users, TrendingUp, Search, User, Phone, DollarSign, ChevronRight, Download, FileDown, Calendar as CalendarIcon, X, Star, Trash2 } from "lucide-react";
+import { ArrowLeft, Wallet, Users, TrendingUp, Search, User, Phone, DollarSign, ChevronRight, ChevronLeft, Download, FileDown, Calendar as CalendarIcon, X, Star, Trash2 } from "lucide-react";
 import jsPDF from "jspdf";
 import { haptics } from "@/utils/haptics";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -50,6 +50,8 @@ const ManagerPortfolioBreakdown = () => {
   const [savedRanges, setSavedRanges] = useState<Array<{ name: string; startDate: string; endDate: string }>>([]);
   const [rangeName, setRangeName] = useState("");
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [tenantPages, setTenantPages] = useState<Record<string, number>>({});
+  const [tenantPageSize] = useState(10);
 
   // Load saved ranges from localStorage on mount
   useEffect(() => {
@@ -226,6 +228,28 @@ const ManagerPortfolioBreakdown = () => {
     localStorage.setItem('portfolio-saved-date-ranges', JSON.stringify(updatedRanges));
     haptics.light();
     toast.success("Date range deleted");
+  };
+
+  const getTenantPage = (agentId: string) => {
+    return tenantPages[agentId] || 1;
+  };
+
+  const setTenantPage = (agentId: string, page: number) => {
+    setTenantPages(prev => ({ ...prev, [agentId]: page }));
+  };
+
+  const getPaginatedTenants = (tenants: TenantData[], agentId: string) => {
+    const currentPage = getTenantPage(agentId);
+    const startIndex = (currentPage - 1) * tenantPageSize;
+    const endIndex = startIndex + tenantPageSize;
+    return {
+      tenants: tenants.slice(startIndex, endIndex),
+      totalPages: Math.ceil(tenants.length / tenantPageSize),
+      currentPage,
+      startIndex: startIndex + 1,
+      endIndex: Math.min(endIndex, tenants.length),
+      totalTenants: tenants.length,
+    };
   };
 
   const getDateRangeLabel = () => {
@@ -843,43 +867,92 @@ const ManagerPortfolioBreakdown = () => {
                             No tenants assigned to this agent
                           </p>
                         ) : (
-                          portfolio.tenants.map((tenant) => (
-                            <div
-                              key={tenant.id}
-                              className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                haptics.light();
-                                navigate(`/manager/tenants/${tenant.id}`);
-                              }}
-                            >
-                              <div className="flex-1">
-                                <p className="font-medium">{tenant.tenant_name}</p>
-                                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                  <Phone className="h-3 w-3" />
-                                  {tenant.tenant_phone}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <Badge
-                                  variant={
-                                    tenant.status === "verified"
-                                      ? "default"
-                                      : tenant.status === "pending"
-                                      ? "secondary"
-                                      : "outline"
-                                  }
-                                  className="mb-1"
-                                >
-                                  {tenant.status}
-                                </Badge>
-                                <p className="text-sm font-semibold flex items-center gap-1 justify-end">
-                                  <DollarSign className="h-4 w-4 text-primary" />
-                                  UGX {parseFloat(tenant.outstanding_balance?.toString() || "0").toLocaleString()}
-                                </p>
-                              </div>
-                            </div>
-                          ))
+                          <>
+                            {(() => {
+                              const paginationData = getPaginatedTenants(portfolio.tenants, portfolio.id);
+                              return (
+                                <>
+                                  {paginationData.tenants.map((tenant) => (
+                                    <div
+                                      key={tenant.id}
+                                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        haptics.light();
+                                        navigate(`/manager/tenants/${tenant.id}`);
+                                      }}
+                                    >
+                                      <div className="flex-1">
+                                        <p className="font-medium">{tenant.tenant_name}</p>
+                                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                          <Phone className="h-3 w-3" />
+                                          {tenant.tenant_phone}
+                                        </p>
+                                      </div>
+                                      <div className="text-right">
+                                        <Badge
+                                          variant={
+                                            tenant.status === "verified"
+                                              ? "default"
+                                              : tenant.status === "pending"
+                                              ? "secondary"
+                                              : "outline"
+                                          }
+                                          className="mb-1"
+                                        >
+                                          {tenant.status}
+                                        </Badge>
+                                        <p className="text-sm font-semibold flex items-center gap-1 justify-end">
+                                          <DollarSign className="h-4 w-4 text-primary" />
+                                          UGX {parseFloat(tenant.outstanding_balance?.toString() || "0").toLocaleString()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  
+                                  {/* Pagination Controls */}
+                                  {paginationData.totalPages > 1 && (
+                                    <div className="flex items-center justify-between pt-4 mt-4 border-t">
+                                      <div className="text-sm text-muted-foreground">
+                                        Showing {paginationData.startIndex} to {paginationData.endIndex} of {paginationData.totalTenants} tenants
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm text-muted-foreground">
+                                          Page {paginationData.currentPage} of {paginationData.totalPages}
+                                        </span>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setTenantPage(portfolio.id, paginationData.currentPage - 1);
+                                            haptics.light();
+                                          }}
+                                          disabled={paginationData.currentPage === 1}
+                                        >
+                                          <ChevronLeft className="h-4 w-4" />
+                                          Previous
+                                        </Button>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setTenantPage(portfolio.id, paginationData.currentPage + 1);
+                                            haptics.light();
+                                          }}
+                                          disabled={paginationData.currentPage === paginationData.totalPages}
+                                        >
+                                          Next
+                                          <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </>
                         )}
                       </div>
                     </CardContent>
