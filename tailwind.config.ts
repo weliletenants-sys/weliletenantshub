@@ -125,6 +125,8 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
         "highlight-pulse": "highlight-pulse 0.6s ease-in-out",
         "fade-in": "fade-in 0.3s ease-out",
+        "fade-in-delay-1": "fade-in 0.3s ease-out 0.1s both",
+        "fade-in-delay-2": "fade-in 0.3s ease-out 0.2s both",
         "shimmer": "shimmer 2s linear infinite",
       },
     },
