@@ -130,6 +130,17 @@ All colors MUST be HSL.
   transition: transform 0.2s ease;
 }
 
+/* Swipe Gesture Indicators */
+.swipe-container {
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
+}
+
+/* Tab Transition Animations */
+[role="tabpanel"] {
+  animation: fade-in 0.3s ease-out;
+}
+
 @layer base {
   * {
     @apply border-border;

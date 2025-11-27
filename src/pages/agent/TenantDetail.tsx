@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useSwipeable } from "react-swipeable";
 import AgentLayout from "@/components/AgentLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -12,9 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import PaymentReceipt from "@/components/PaymentReceipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff, Receipt, Edit } from "lucide-react";
+import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff, Receipt, Edit, History, Zap } from "lucide-react";
 import { format } from "date-fns";
 import { addPendingPayment, isOnline } from "@/lib/offlineSync";
+import { haptics } from "@/utils/haptics";
 
 const AgentTenantDetail = () => {
   const { tenantId } = useParams();
@@ -28,6 +31,7 @@ const AgentTenantDetail = () => {
   const [submitting, setSubmitting] = useState(false);
   const [lastPayment, setLastPayment] = useState<any>(null);
   const [agentInfo, setAgentInfo] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState("details");
   const [paymentForm, setPaymentForm] = useState({
     amount: "",
     paymentMethod: "cash",
@@ -39,6 +43,26 @@ const AgentTenantDetail = () => {
     lc1Name: "",
     lc1Phone: "",
     rentAmount: "",
+  });
+
+  const tabs = ["details", "payments", "actions"];
+
+  const handleSwipe = (direction: "left" | "right") => {
+    haptics.light();
+    const currentIndex = tabs.indexOf(activeTab);
+    
+    if (direction === "left" && currentIndex < tabs.length - 1) {
+      setActiveTab(tabs[currentIndex + 1]);
+    } else if (direction === "right" && currentIndex > 0) {
+      setActiveTab(tabs[currentIndex - 1]);
+    }
+  };
+
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: () => handleSwipe("left"),
+    onSwipedRight: () => handleSwipe("right"),
+    trackMouse: false,
+    preventScrollOnSwipe: true,
   });
 
   useEffect(() => {
@@ -190,6 +214,7 @@ const AgentTenantDetail = () => {
           tenant_outstanding_balance: Math.max(0, newBalance),
         });
 
+        haptics.success();
         toast.success(`Payment recorded! You earned UGX ${commission.toLocaleString()} commission`);
         
         // Show receipt dialog
@@ -473,160 +498,253 @@ const AgentTenantDetail = () => {
           </Dialog>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Tenant Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Name</p>
-                  <p className="font-medium">{tenant.tenant_name}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Phone</p>
-                  <p className="font-medium">{tenant.tenant_phone}</p>
-                </div>
-              </div>
-              {tenant.rent_amount > 0 && (
-                <div className="flex items-center gap-3">
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Monthly Rent</p>
-                    <p className="font-medium">UGX {parseFloat(tenant.rent_amount).toLocaleString()}</p>
-                  </div>
-                </div>
-              )}
-              <div className="flex items-center gap-3">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Days Remaining</p>
-                  <p className="font-medium">{tenant.days_remaining || 0} days</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Swipeable Tabs Interface */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="details">
+              <User className="h-4 w-4 mr-2" />
+              Details
+            </TabsTrigger>
+            <TabsTrigger value="payments">
+              <History className="h-4 w-4 mr-2" />
+              Payments
+            </TabsTrigger>
+            <TabsTrigger value="actions">
+              <Zap className="h-4 w-4 mr-2" />
+              Actions
+            </TabsTrigger>
+          </TabsList>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Outstanding Balance</p>
-                <p className="text-2xl font-bold">
-                  UGX {parseFloat(tenant.outstanding_balance).toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Collected</p>
-                <p className="text-xl font-semibold text-primary">
-                  UGX {totalCollected.toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Payments</p>
-                <p className="text-lg font-medium">{collections.length}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          <div {...swipeHandlers} className="mt-6">
+            <TabsContent value="details" className="m-0 animate-fade-in">
+              <div className="grid gap-6 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Tenant Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Name</p>
+                        <p className="font-medium">{tenant.tenant_name}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Phone</p>
+                        <p className="font-medium">{tenant.tenant_phone}</p>
+                      </div>
+                    </div>
+                    {tenant.rent_amount > 0 && (
+                      <div className="flex items-center gap-3">
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Monthly Rent</p>
+                          <p className="font-medium">UGX {parseFloat(tenant.rent_amount).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Days Remaining</p>
+                        <p className="font-medium">{tenant.days_remaining || 0} days</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-        {(tenant.landlord_name || tenant.landlord_phone) && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Landlord Information</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              {tenant.landlord_name && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Name</p>
-                  <p className="font-medium">{tenant.landlord_name}</p>
-                </div>
-              )}
-              {tenant.landlord_phone && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Phone</p>
-                  <p className="font-medium">{tenant.landlord_phone}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {(tenant.lc1_name || tenant.lc1_phone) && (
-          <Card>
-            <CardHeader>
-              <CardTitle>LC1 Information</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              {tenant.lc1_name && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Name</p>
-                  <p className="font-medium">{tenant.lc1_name}</p>
-                </div>
-              )}
-              {tenant.lc1_phone && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Phone</p>
-                  <p className="font-medium">{tenant.lc1_phone}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment History</CardTitle>
-            <CardDescription>
-              {collections.length} payment{collections.length !== 1 ? 's' : ''} recorded
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {collections.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No payments recorded yet
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Payment Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Outstanding Balance</p>
+                      <p className="text-2xl font-bold">
+                        UGX {parseFloat(tenant.outstanding_balance).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Collected</p>
+                      <p className="text-xl font-semibold text-primary">
+                        UGX {totalCollected.toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Payments</p>
+                      <p className="text-lg font-medium">{collections.length}</p>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Commission</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {collections.map((collection) => (
-                      <TableRow key={collection.id}>
-                        <TableCell>
-                          {format(new Date(collection.collection_date), "MMM dd, yyyy")}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          UGX {parseFloat(collection.amount).toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-primary">
-                          UGX {parseFloat(collection.commission).toLocaleString()}
-                        </TableCell>
-                        <TableCell className="capitalize">{collection.payment_method}</TableCell>
-                        <TableCell>{getPaymentStatusBadge(collection.status)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+
+              {(tenant.landlord_name || tenant.landlord_phone) && (
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle>Landlord Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 md:grid-cols-2">
+                    {tenant.landlord_name && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Name</p>
+                        <p className="font-medium">{tenant.landlord_name}</p>
+                      </div>
+                    )}
+                    {tenant.landlord_phone && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Phone</p>
+                        <p className="font-medium">{tenant.landlord_phone}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {(tenant.lc1_name || tenant.lc1_phone) && (
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle>LC1 Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 md:grid-cols-2">
+                    {tenant.lc1_name && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Name</p>
+                        <p className="font-medium">{tenant.lc1_name}</p>
+                      </div>
+                    )}
+                    {tenant.lc1_phone && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Phone</p>
+                        <p className="font-medium">{tenant.lc1_phone}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="payments" className="m-0 animate-fade-in">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment History</CardTitle>
+                  <CardDescription>
+                    {collections.length} payment{collections.length !== 1 ? 's' : ''} recorded
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {collections.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No payments recorded yet
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Commission</TableHead>
+                            <TableHead>Method</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {collections.map((collection) => (
+                            <TableRow key={collection.id}>
+                              <TableCell>
+                                {format(new Date(collection.collection_date), "MMM dd, yyyy")}
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                UGX {parseFloat(collection.amount).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-primary">
+                                UGX {parseFloat(collection.commission).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="capitalize">{collection.payment_method}</TableCell>
+                              <TableCell>{getPaymentStatusBadge(collection.status)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="actions" className="m-0 animate-fade-in">
+              <div className="grid gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Quick Actions</CardTitle>
+                    <CardDescription>Perform common tasks for this tenant</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Button
+                      className="w-full justify-start"
+                      onClick={() => setDialogOpen(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Record New Payment
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => setEditDialogOpen(true)}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Tenant Details
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        const phone = tenant.tenant_phone.replace(/\s/g, '');
+                        const message = `Hi ${tenant.tenant_name}, this is a reminder about your rent payment.`;
+                        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+                      }}
+                    >
+                      <Phone className="h-4 w-4 mr-2" />
+                      Send WhatsApp Reminder
+                    </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => {
+                          if (collections.length > 0) {
+                            const lastCollection = collections[0];
+                            setLastPayment({
+                              ...lastCollection,
+                              tenant_outstanding_balance: parseFloat(tenant.outstanding_balance),
+                            });
+                            setReceiptDialogOpen(true);
+                          }
+                        }}
+                        disabled={collections.length === 0}
+                      >
+                        <Receipt className="h-4 w-4 mr-2" />
+                        View Last Receipt
+                      </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-muted/30">
+                  <CardHeader>
+                    <CardTitle className="text-base">Swipe Tips</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      📱 Swipe left or right to navigate between tabs on mobile
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </TabsContent>
+          </div>
+        </Tabs>
 
         {/* Receipt Dialog */}
         <Dialog open={receiptDialogOpen} onOpenChange={setReceiptDialogOpen}>
