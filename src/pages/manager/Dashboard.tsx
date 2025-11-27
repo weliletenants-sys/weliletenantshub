@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
+import { useRealtimeAllTenants, useRealtimeAllCollections, useRealtimeAgents, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -19,6 +20,11 @@ const ManagerDashboard = () => {
     pendingVerifications: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+
+  // Subscribe to real-time updates for all agent activity
+  useRealtimeAllTenants();
+  useRealtimeAllCollections();
+  useRealtimeAgents();
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -56,24 +62,14 @@ const ManagerDashboard = () => {
 
     fetchStats();
 
-    // Subscribe to realtime updates
-    const channel = supabase
-      .channel('dashboard-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tenants'
-        },
-        () => {
-          fetchStats();
-        }
-      )
-      .subscribe();
+    // Listen for real-time sync events and refetch stats
+    const unregisterCallback = registerSyncCallback((table) => {
+      console.log(`Real-time update detected on ${table}, refreshing dashboard stats`);
+      fetchStats();
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      unregisterCallback();
     };
   }, []);
 
