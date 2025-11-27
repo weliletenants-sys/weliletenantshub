@@ -59,6 +59,7 @@ const ManagerAgents = () => {
     percentage: number;
   }>>([]);
   const [showPortfolioBreakdown, setShowPortfolioBreakdown] = useState(false);
+  const [portfolioSortBy, setPortfolioSortBy] = useState<"portfolio_value" | "percentage" | "tenant_count" | "agent_name">("portfolio_value");
   
   // Enable real-time updates
   useRealtimeAgents();
@@ -309,6 +310,22 @@ const ManagerAgents = () => {
 
   const hasActiveFilters = statusFilter !== "all" || motorcycleFilter !== "all" || portfolioMinFilter || portfolioMaxFilter;
 
+  // Sort portfolio breakdown based on selected option
+  const sortedPortfolioBreakdown = [...agentPortfolioBreakdown].sort((a, b) => {
+    switch (portfolioSortBy) {
+      case "portfolio_value":
+        return b.portfolio_value - a.portfolio_value;
+      case "percentage":
+        return b.percentage - a.percentage;
+      case "tenant_count":
+        return b.tenant_count - a.tenant_count;
+      case "agent_name":
+        return a.agent_name.localeCompare(b.agent_name);
+      default:
+        return 0;
+    }
+  });
+
   // Calculate statistics from filtered agents
   const activeAgents = agents.filter(a => a.tenant_count > 0).length;
   const averageCollectionRate = agents.length > 0
@@ -456,10 +473,26 @@ const ManagerAgents = () => {
             
             <CollapsibleContent>
               <CardContent className="space-y-4 pt-4 border-t">
+                {/* Sort Options */}
+                <div className="flex items-center gap-3">
+                  <label className="text-sm font-medium">Sort by:</label>
+                  <Select value={portfolioSortBy} onValueChange={(value: any) => setPortfolioSortBy(value)}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="portfolio_value">Portfolio Value (High to Low)</SelectItem>
+                      <SelectItem value="percentage">Percentage (High to Low)</SelectItem>
+                      <SelectItem value="tenant_count">Tenant Count (High to Low)</SelectItem>
+                      <SelectItem value="agent_name">Agent Name (A-Z)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {agentPortfolioBreakdown.length === 0 ? (
                   <p className="text-center text-muted-foreground py-4">No agents with portfolio data</p>
                 ) : (
-                  agentPortfolioBreakdown.map((agent) => (
+                  sortedPortfolioBreakdown.map((agent) => (
                     <div 
                       key={agent.agent_id}
                       className="space-y-2 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
