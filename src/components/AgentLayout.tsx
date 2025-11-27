@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import WelileLogo from "./WelileLogo";
+import OfflineSyncIndicator from "./OfflineSyncIndicator";
 import { supabase } from "@/integrations/supabase/client";
 import { Home, Users, Plus, DollarSign, TrendingUp, LogOut } from "lucide-react";
 import { toast } from "sonner";
@@ -49,10 +50,13 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="bg-card border-b border-border p-4 flex justify-between items-center">
         <WelileLogo />
-        <Button variant="ghost" size="sm" onClick={handleLogout}>
-          <LogOut className="h-4 w-4 mr-2" />
-          Logout
-        </Button>
+        <div className="flex items-center gap-3">
+          <OfflineSyncIndicator />
+          <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </div>
       </header>
 
       <div className="flex-1 flex flex-col md:flex-row">

@@ -13,6 +13,7 @@ import AgentTenants from "./pages/agent/Tenants";
 import AgentNewTenant from "./pages/agent/NewTenant";
 import AgentCollections from "./pages/agent/Collections";
 import AgentEarnings from "./pages/agent/Earnings";
+import AgentOfflineQueue from "./pages/agent/OfflineQueue";
 import ManagerDashboard from "./pages/manager/Dashboard";
 import ManagerAgents from "./pages/manager/Agents";
 import ManagerVerifications from "./pages/manager/Verifications";
@@ -52,6 +53,11 @@ const App = () => (
           <Route path="/agent/earnings" element={
             <ProtectedRoute requiredRole="agent">
               <AgentEarnings />
+            </ProtectedRoute>
+          } />
+          <Route path="/agent/offline-queue" element={
+            <ProtectedRoute requiredRole="agent">
+              <AgentOfflineQueue />
             </ProtectedRoute>
           } />
           <Route path="/manager/dashboard" element={
