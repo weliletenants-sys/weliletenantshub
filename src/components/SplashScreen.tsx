@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { haptics } from '@/utils/haptics';
+import { ProgressiveImage } from '@/components/ui/progressive-image';
 
 interface SplashScreenProps {
   onComplete: () => void;
@@ -36,11 +37,13 @@ const SplashScreen = ({ onComplete }: SplashScreenProps) => {
       }`}
     >
       <div className="flex flex-col items-center gap-6">
-        <div className="animate-logo-entrance w-48 h-48">
-          <img
+        <div className="animate-logo-entrance w-48 h-48 rounded-2xl shadow-2xl overflow-hidden">
+          <ProgressiveImage
             src="/welile-logo.jpg"
             alt="Welile Logo"
-            className="w-full h-full object-contain rounded-2xl shadow-2xl"
+            className="w-full h-full"
+            placeholderClassName="object-contain"
+            eager
           />
         </div>
         <div className="flex gap-2 animate-fade-in-delay-1">
