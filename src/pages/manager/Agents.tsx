@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
+import { LineChart, Line, ResponsiveContainer } from "recharts";
 
 interface AgentWithDetails {
   id: string;
@@ -33,6 +34,11 @@ interface AgentWithDetails {
     role: string;
   };
   tenant_count: number;
+}
+
+interface PortfolioTrendData {
+  date: string;
+  value: number;
 }
 
 const ManagerAgents = () => {
@@ -57,6 +63,7 @@ const ManagerAgents = () => {
     portfolio_value: number;
     tenant_count: number;
     percentage: number;
+    trend: PortfolioTrendData[];
   }>>([]);
   const [showPortfolioBreakdown, setShowPortfolioBreakdown] = useState(false);
   const [portfolioSortBy, setPortfolioSortBy] = useState<"portfolio_value" | "percentage" | "tenant_count" | "agent_name">("portfolio_value");
@@ -165,13 +172,56 @@ const ManagerAgents = () => {
           portfolioValueMap[tenant.agent_id] = (portfolioValueMap[tenant.agent_id] || 0) + Number(tenant.outstanding_balance || 0);
         });
 
+        // Fetch collections for past 7 days to calculate trend
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        const { data: collections, error: collectionsError } = await supabase
+          .from("collections")
+          .select("agent_id, amount, collection_date")
+          .in("agent_id", agentIds)
+          .gte("collection_date", sevenDaysAgo.toISOString().split('T')[0])
+          .eq("status", "verified");
+        
+        if (collectionsError) console.error("Error fetching collections:", collectionsError);
+
+        // Calculate 7-day trend data for each agent
+        const agentTrendMap: Record<string, PortfolioTrendData[]> = {};
+        
+        agentIds.forEach(agentId => {
+          const trend: PortfolioTrendData[] = [];
+          const currentPortfolio = portfolioValueMap[agentId] || 0;
+          
+          // Generate data points for past 7 days
+          for (let i = 6; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const dateStr = date.toISOString().split('T')[0];
+            
+            // Calculate collections from this date to today
+            const collectionsFromDate = (collections || [])
+              .filter(c => c.agent_id === agentId && c.collection_date >= dateStr)
+              .reduce((sum, c) => sum + Number(c.amount), 0);
+            
+            // Approximate portfolio value = current + collections since that date
+            const estimatedValue = currentPortfolio + collectionsFromDate;
+            
+            trend.push({
+              date: dateStr,
+              value: estimatedValue
+            });
+          }
+          
+          agentTrendMap[agentId] = trend;
+        });
+
         // Merge tenant counts with agent data
         const agentsWithCounts = (agentsData || []).map(agent => ({
           ...agent,
           tenant_count: tenantCountMap[agent.id] || 0,
         }));
         
-        // Build portfolio breakdown data
+        // Build portfolio breakdown data with trends
         const breakdown = agentsWithCounts
           .map(agent => ({
             agent_id: agent.id,
@@ -179,6 +229,7 @@ const ManagerAgents = () => {
             portfolio_value: portfolioValueMap[agent.id] || 0,
             tenant_count: tenantCountMap[agent.id] || 0,
             percentage: totalPortfolioValue > 0 ? ((portfolioValueMap[agent.id] || 0) / totalPortfolioValue) * 100 : 0,
+            trend: agentTrendMap[agent.id] || [],
           }))
           .sort((a, b) => b.portfolio_value - a.portfolio_value);
         
@@ -521,19 +572,38 @@ const ManagerAgents = () => {
                 {agentPortfolioBreakdown.length === 0 ? (
                   <p className="text-center text-muted-foreground py-4">No agents with portfolio data</p>
                 ) : (
-                  sortedPortfolioBreakdown.map((agent) => (
+                   sortedPortfolioBreakdown.map((agent) => (
                     <div 
                       key={agent.agent_id}
                       className="space-y-2 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
                       onClick={() => navigate(`/manager/agents/${agent.agent_id}`)}
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-4">
                         <div className="flex-1">
                           <p className="font-medium">{agent.agent_name}</p>
                           <p className="text-sm text-muted-foreground">
                             {agent.tenant_count} tenant{agent.tenant_count !== 1 ? 's' : ''}
                           </p>
                         </div>
+                        
+                        {/* 7-Day Trend Sparkline */}
+                        {agent.trend.length > 0 && (
+                          <div className="flex flex-col items-center">
+                            <ResponsiveContainer width={80} height={30}>
+                              <LineChart data={agent.trend}>
+                                <Line 
+                                  type="monotone" 
+                                  dataKey="value" 
+                                  stroke="hsl(var(--primary))" 
+                                  strokeWidth={2}
+                                  dot={false}
+                                />
+                              </LineChart>
+                            </ResponsiveContainer>
+                            <p className="text-xs text-muted-foreground mt-0.5">7-day trend</p>
+                          </div>
+                        )}
+                        
                         <div className="text-right">
                           <p className="font-bold text-lg">
                             UGX {agent.portfolio_value.toLocaleString()}
