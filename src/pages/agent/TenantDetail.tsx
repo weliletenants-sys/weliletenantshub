@@ -13,13 +13,14 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import PaymentReceipt from "@/components/PaymentReceipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff, Receipt, Edit, History, Zap, Loader2 } from "lucide-react";
+import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff, Receipt, Edit, History, Zap, Loader2, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { isOnline } from "@/lib/offlineSync";
 import { haptics } from "@/utils/haptics";
@@ -44,6 +45,8 @@ const AgentTenantDetail = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [lastPayment, setLastPayment] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("details");
   const [paymentForm, setPaymentForm] = useState({
@@ -240,6 +243,33 @@ const AgentTenantDetail = () => {
         setEditDialogOpen(false);
       }
     });
+  };
+
+  const handleDeleteTenant = async () => {
+    if (!tenantId) return;
+    
+    setIsDeleting(true);
+    haptics.heavy();
+    
+    try {
+      const { error } = await supabase
+        .from('tenants')
+        .delete()
+        .eq('id', tenantId);
+      
+      if (error) throw error;
+      
+      toast.success("Tenant deleted successfully");
+      haptics.success();
+      navigate("/agent/tenants");
+    } catch (error: any) {
+      console.error('Error deleting tenant:', error);
+      toast.error(error.message || "Failed to delete tenant");
+      haptics.error();
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+    }
   };
 
   if (loading) {
@@ -798,6 +828,16 @@ const AgentTenantDetail = () => {
                         <Receipt className="h-4 w-4 mr-2" />
                         View Last Receipt
                       </Button>
+                    <div className="pt-3 border-t">
+                      <Button
+                        variant="destructive"
+                        className="w-full justify-start"
+                        onClick={() => setDeleteDialogOpen(true)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Tenant
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -845,6 +885,38 @@ const AgentTenantDetail = () => {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Tenant</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete <strong>{tenant.tenant_name}</strong>? This action cannot be undone and will remove all payment history associated with this tenant.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteTenant}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AgentLayout>
   );
