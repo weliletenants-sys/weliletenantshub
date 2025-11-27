@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { addPendingTenant, isOnline } from "@/lib/offlineSync";
+import { CloudOff } from "lucide-react";
 
 const AgentNewTenant = () => {
   const navigate = useNavigate();
@@ -40,7 +42,7 @@ const AgentNewTenant = () => {
       const rentAmount = parseFloat(formData.rentAmount);
       const registrationFee = rentAmount >= 200000 ? 20000 : 10000;
 
-      const { error } = await supabase.from("tenants").insert({
+      const tenantData = {
         agent_id: agent.id,
         tenant_name: formData.tenantName,
         tenant_phone: formData.tenantPhone,
@@ -51,12 +53,22 @@ const AgentNewTenant = () => {
         lc1_name: formData.lc1Name,
         lc1_phone: formData.lc1Phone,
         outstanding_balance: rentAmount + registrationFee,
-      });
+      };
 
-      if (error) throw error;
+      if (isOnline()) {
+        // Online: Save directly to database
+        const { error } = await supabase.from("tenants").insert(tenantData);
+        if (error) throw error;
+        toast.success("Tenant added! UGX 5,000 credited to your wallet");
+      } else {
+        // Offline: Save to IndexedDB for later sync
+        await addPendingTenant(tenantData);
+        toast.success("Tenant saved offline! Will sync when back online.", {
+          icon: <CloudOff className="h-4 w-4" />,
+          duration: 5000,
+        });
+      }
 
-      // Add UGX 5,000 to agent's wallet (simplified - would need wallet table in production)
-      toast.success("Tenant added! UGX 5,000 credited to your wallet");
       navigate("/agent/tenants");
     } catch (error: any) {
       toast.error(error.message || "Failed to add tenant");
@@ -79,6 +91,20 @@ const AgentNewTenant = () => {
           <h1 className="text-3xl font-bold">Add New Tenant</h1>
           <p className="text-muted-foreground">Complete this form to add a new tenant</p>
         </div>
+
+        {!isOnline() && (
+          <Card className="border-warning bg-warning/5">
+            <CardContent className="py-4 flex items-center gap-3">
+              <CloudOff className="h-5 w-5 text-warning" />
+              <div className="flex-1">
+                <p className="font-medium text-sm">You're offline</p>
+                <p className="text-xs text-muted-foreground">
+                  Tenant will be saved locally and synced when back online
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
