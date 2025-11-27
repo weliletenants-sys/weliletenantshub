@@ -9,6 +9,7 @@ import WelileLogo from "@/components/WelileLogo";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Session } from "@supabase/supabase-js";
+import { ensureProfileExists } from "@/lib/profileSync";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -24,17 +25,30 @@ const Login = () => {
 
   useEffect(() => {
     // Check if user is already logged in
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
         setSession(session);
-        redirectToDashboard(session.user.user_metadata?.role || roleParam);
+        // Ensure profile exists before redirecting
+        const profileExists = await ensureProfileExists(session.user);
+        if (profileExists) {
+          redirectToDashboard(session.user.user_metadata?.role || roleParam);
+        } else {
+          toast.error("Failed to load profile. Please try logging in again.");
+          await supabase.auth.signOut();
+        }
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session) {
-        redirectToDashboard(session.user.user_metadata?.role || roleParam);
+        // Ensure profile exists before redirecting
+        const profileExists = await ensureProfileExists(session.user);
+        if (profileExists) {
+          redirectToDashboard(session.user.user_metadata?.role || roleParam);
+        } else {
+          toast.error("Failed to load profile. Please contact support.");
+        }
       }
     });
 
@@ -64,8 +78,17 @@ const Login = () => {
 
       if (error) throw error;
 
-      toast.success("Login successful!");
-      redirectToDashboard(roleParam);
+      if (data.user) {
+        // Ensure profile exists after login
+        const profileExists = await ensureProfileExists(data.user);
+        if (profileExists) {
+          toast.success("Login successful!");
+          redirectToDashboard(roleParam);
+        } else {
+          toast.error("Failed to load profile. Please contact support.");
+          await supabase.auth.signOut();
+        }
+      }
     } catch (error: any) {
       toast.error(error.message || "Login failed");
     } finally {
@@ -96,8 +119,14 @@ const Login = () => {
       if (error) throw error;
 
       if (data.user) {
-        toast.success("Account created successfully!");
-        redirectToDashboard(roleParam);
+        // Ensure profile exists after signup
+        const profileExists = await ensureProfileExists(data.user);
+        if (profileExists) {
+          toast.success("Account created successfully!");
+          redirectToDashboard(roleParam);
+        } else {
+          toast.error("Account created but profile setup failed. Please contact support.");
+        }
       }
     } catch (error: any) {
       toast.error(error.message || "Signup failed");
