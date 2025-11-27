@@ -254,7 +254,9 @@ export type Database = {
         Row: {
           agent_id: string
           created_at: string
+          daily_payment_amount: number | null
           days_remaining: number | null
+          due_date: string | null
           id: string
           landlord_id_url: string | null
           landlord_name: string | null
@@ -267,6 +269,7 @@ export type Database = {
           outstanding_balance: number | null
           registration_fee: number | null
           rent_amount: number | null
+          start_date: string | null
           status: string | null
           tenant_name: string
           tenant_phone: string
@@ -276,7 +279,9 @@ export type Database = {
         Insert: {
           agent_id: string
           created_at?: string
+          daily_payment_amount?: number | null
           days_remaining?: number | null
+          due_date?: string | null
           id?: string
           landlord_id_url?: string | null
           landlord_name?: string | null
@@ -289,6 +294,7 @@ export type Database = {
           outstanding_balance?: number | null
           registration_fee?: number | null
           rent_amount?: number | null
+          start_date?: string | null
           status?: string | null
           tenant_name: string
           tenant_phone: string
@@ -298,7 +304,9 @@ export type Database = {
         Update: {
           agent_id?: string
           created_at?: string
+          daily_payment_amount?: number | null
           days_remaining?: number | null
+          due_date?: string | null
           id?: string
           landlord_id_url?: string | null
           landlord_name?: string | null
@@ -311,6 +319,7 @@ export type Database = {
           outstanding_balance?: number | null
           registration_fee?: number | null
           rent_amount?: number | null
+          start_date?: string | null
           status?: string | null
           tenant_name?: string
           tenant_phone?: string

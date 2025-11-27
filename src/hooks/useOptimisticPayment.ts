@@ -280,6 +280,9 @@ export const useOptimisticTenantCreation = () => {
         lc1_phone: null,
         lc1_letter_url: null,
         verified_at: null,
+        start_date: null,
+        due_date: null,
+        daily_payment_amount: null,
       };
 
       // Optimistically add to list
