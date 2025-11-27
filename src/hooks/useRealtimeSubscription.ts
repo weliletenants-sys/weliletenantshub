@@ -7,6 +7,7 @@ import type { Tables } from '@/integrations/supabase/types';
 type Tenant = Tables<'tenants'>;
 type Collection = Tables<'collections'>;
 type Agent = Tables<'agents'>;
+type Profile = Tables<'profiles'>;
 
 // Global sync state management
 let syncCallbacks: Set<(table: string) => void> = new Set();
@@ -215,6 +216,47 @@ export const useRealtimeAgents = () => {
           if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
             const agent = payload.new as Agent;
             queryClient.invalidateQueries({ queryKey: ['agent', agent.id] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+};
+
+/**
+ * Real-time subscription hook for profiles
+ * Listens to profile updates (name, phone, etc.)
+ */
+export const useRealtimeProfiles = () => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('profiles-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+        },
+        (payload: RealtimePostgresChangesPayload<Profile>) => {
+          console.log('Realtime profile change:', payload);
+
+          // Notify sync indicators
+          notifySyncEvent('profiles');
+
+          // Invalidate profile queries and agent queries (since agents join profiles)
+          queryClient.invalidateQueries({ queryKey: ['profiles'] });
+          queryClient.invalidateQueries({ queryKey: ['agents'] });
+          
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+            const profile = payload.new as Profile;
+            queryClient.invalidateQueries({ queryKey: ['profile', profile.id] });
           }
         }
       )
