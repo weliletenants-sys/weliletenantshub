@@ -5,7 +5,7 @@ import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Clock, User, DollarSign, Calendar, Loader2 } from "lucide-react";
+import { Check, X, Clock, User, DollarSign, Calendar, Loader2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import PaymentReceipt from "@/components/PaymentReceipt";
 
 interface Payment {
   id: string;
@@ -51,6 +53,10 @@ const PaymentVerifications = () => {
   const queryClient = useQueryClient();
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [showReceiptPreview, setShowReceiptPreview] = useState(false);
+  const [previewPayment, setPreviewPayment] = useState<Payment | null>(null);
+  const [tenantDetails, setTenantDetails] = useState<any>(null);
+  const [loadingTenant, setLoadingTenant] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [activeTab, setActiveTab] = useState<string>("pending");
 
@@ -180,6 +186,29 @@ const PaymentVerifications = () => {
     setShowRejectDialog(true);
   };
 
+  const handleViewReceipt = async (payment: Payment) => {
+    setPreviewPayment(payment);
+    setLoadingTenant(true);
+    setShowReceiptPreview(true);
+    
+    // Fetch full tenant details including balance
+    try {
+      const { data: tenant, error } = await supabase
+        .from("tenants")
+        .select("*")
+        .eq("id", payment.tenant_id)
+        .single();
+
+      if (error) throw error;
+      setTenantDetails(tenant);
+    } catch (error) {
+      console.error("Error fetching tenant details:", error);
+      toast.error("Failed to load tenant details");
+    } finally {
+      setLoadingTenant(false);
+    }
+  };
+
   const confirmReject = () => {
     if (!selectedPayment || !rejectionReason.trim()) {
       toast.error("Please provide a reason for rejection");
@@ -252,31 +281,42 @@ const PaymentVerifications = () => {
           </div>
         )}
 
-        {payment.status === "pending" && (
-          <div className="flex gap-3 mt-4">
-            <Button
-              className="flex-1"
-              onClick={() => handleVerify(payment)}
-              disabled={verifyMutation.isPending}
-            >
-              {verifyMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4 mr-2" />
-              )}
-              Verify
-            </Button>
-            <Button
-              variant="destructive"
-              className="flex-1"
-              onClick={() => handleReject(payment)}
-              disabled={rejectMutation.isPending}
-            >
-              <X className="h-4 w-4 mr-2" />
-              Reject
-            </Button>
-          </div>
-        )}
+        <div className="flex gap-3 mt-4">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => handleViewReceipt(payment)}
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            View Receipt
+          </Button>
+          
+          {payment.status === "pending" && (
+            <>
+              <Button
+                className="flex-1"
+                onClick={() => handleVerify(payment)}
+                disabled={verifyMutation.isPending}
+              >
+                {verifyMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4 mr-2" />
+                )}
+                Verify
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => handleReject(payment)}
+                disabled={rejectMutation.isPending}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Reject
+              </Button>
+            </>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -430,6 +470,44 @@ const PaymentVerifications = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Receipt Preview Dialog */}
+      <Dialog open={showReceiptPreview} onOpenChange={setShowReceiptPreview}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Payment Receipt Preview</DialogTitle>
+          </DialogHeader>
+          {loadingTenant ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : previewPayment && tenantDetails ? (
+            <PaymentReceipt
+              paymentData={{
+                amount: previewPayment.amount,
+                commission: previewPayment.commission,
+                collectionDate: previewPayment.collection_date,
+                paymentMethod: previewPayment.payment_method || "cash",
+              }}
+              tenantData={{
+                tenant_name: previewPayment.tenants.tenant_name,
+                tenant_phone: previewPayment.tenants.tenant_phone,
+                rent_amount: tenantDetails.rent_amount || 0,
+                outstanding_balance: tenantDetails.outstanding_balance || 0,
+              }}
+              agentData={{
+                agent_name: previewPayment.agent.profiles.full_name || previewPayment.agent.profiles.phone_number,
+                agent_phone: previewPayment.agent.profiles.phone_number,
+              }}
+              receiptNumber={previewPayment.id.slice(0, 8).toUpperCase()}
+            />
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              No receipt data available
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </ManagerLayout>
   );
 };
