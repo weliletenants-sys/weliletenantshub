@@ -26,18 +26,16 @@ const AgentDashboard = () => {
 
   // Show overdue notification on dashboard load
   useEffect(() => {
-    if (overdueTenants.length > 0 && !loading) {
+    if (overdueTenants.length > 0 && !isLoading) {
       const totalOverdue = overdueTenants.reduce((sum, t) => sum + (t.outstanding_balance || 0), 0);
       const mostOverdue = Math.max(...overdueTenants.map(t => t.daysOverdue));
       
-      toast({
-        title: "⚠️ Overdue Payments Alert",
+      toast.error("⚠️ Overdue Payments Alert", {
         description: `${overdueTenants.length} tenant${overdueTenants.length > 1 ? 's' : ''} overdue • ${mostOverdue} days max • UGX ${totalOverdue.toLocaleString()} owed`,
-        variant: "destructive",
         duration: 8000,
       });
     }
-  }, [overdueTenants, loading, toast]);
+  }, [overdueTenants, isLoading]);
 
   const fetchAgentData = async () => {
     try {
