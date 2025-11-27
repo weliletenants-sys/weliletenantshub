@@ -17,9 +17,11 @@ import AgentEarnings from "./pages/agent/Earnings";
 import AgentOfflineQueue from "./pages/agent/OfflineQueue";
 import AgentAIAssistant from "./pages/agent/AIAssistant";
 import AgentWeeklySummary from "./pages/agent/WeeklySummary";
+import AgentSettings from "./pages/agent/Settings";
 import ManagerDashboard from "./pages/manager/Dashboard";
 import ManagerAgents from "./pages/manager/Agents";
 import ManagerVerifications from "./pages/manager/Verifications";
+import ManagerSettings from "./pages/manager/Settings";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +80,11 @@ const App = () => (
               <AgentWeeklySummary />
             </ProtectedRoute>
           } />
+          <Route path="/agent/settings" element={
+            <ProtectedRoute requiredRole="agent">
+              <AgentSettings />
+            </ProtectedRoute>
+          } />
           <Route path="/manager/dashboard" element={
             <ProtectedRoute requiredRole="manager">
               <ManagerDashboard />
@@ -91,6 +98,11 @@ const App = () => (
           <Route path="/manager/verifications" element={
             <ProtectedRoute requiredRole="manager">
               <ManagerVerifications />
+            </ProtectedRoute>
+          } />
+          <Route path="/manager/settings" element={
+            <ProtectedRoute requiredRole="manager">
+              <ManagerSettings />
             </ProtectedRoute>
           } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
