@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { z } from "zod";
 
 interface TenantData {
   id: string;
@@ -53,6 +54,7 @@ const ManagerPortfolioBreakdown = () => {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [tenantPages, setTenantPages] = useState<Record<string, number>>({});
   const [tenantPageSizes, setTenantPageSizes] = useState<Record<string, number>>({});
+  const [jumpToPageInputs, setJumpToPageInputs] = useState<Record<string, string>>({});
   const defaultPageSize = 10;
 
   // Load saved ranges from localStorage on mount
@@ -248,6 +250,40 @@ const ManagerPortfolioBreakdown = () => {
     setTenantPageSizes(prev => ({ ...prev, [agentId]: size }));
     // Reset to page 1 when changing page size
     setTenantPage(agentId, 1);
+  };
+
+  const handleJumpToPage = (agentId: string, totalPages: number) => {
+    const inputValue = jumpToPageInputs[agentId] || "";
+    
+    // Validate input using zod
+    const pageSchema = z.number().int().min(1).max(totalPages);
+    
+    try {
+      const pageNumber = parseInt(inputValue, 10);
+      
+      if (isNaN(pageNumber)) {
+        toast.error("Please enter a valid page number");
+        return;
+      }
+      
+      const validatedPage = pageSchema.parse(pageNumber);
+      setTenantPage(agentId, validatedPage);
+      setJumpToPageInputs(prev => ({ ...prev, [agentId]: "" }));
+      haptics.success();
+      toast.success(`Jumped to page ${validatedPage}`);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(`Page must be between 1 and ${totalPages}`);
+      } else {
+        toast.error("Invalid page number");
+      }
+    }
+  };
+
+  const updateJumpToPageInput = (agentId: string, value: string) => {
+    // Only allow digits and limit to reasonable length
+    const sanitized = value.replace(/[^0-9]/g, "").slice(0, 5);
+    setJumpToPageInputs(prev => ({ ...prev, [agentId]: sanitized }));
   };
 
   const getPaginatedTenants = (tenants: TenantData[], agentId: string) => {
@@ -927,7 +963,7 @@ const ManagerPortfolioBreakdown = () => {
                                   {/* Pagination Controls */}
                                   {paginationData.totalPages > 1 && (
                                     <div className="flex flex-col gap-4 pt-4 mt-4 border-t">
-                                      <div className="flex items-center justify-between">
+                                      <div className="flex items-center justify-between flex-wrap gap-4">
                                         <div className="flex items-center gap-4">
                                           <div className="text-sm text-muted-foreground">
                                             Showing {paginationData.startIndex} to {paginationData.endIndex} of {paginationData.totalTenants} tenants
@@ -982,6 +1018,41 @@ const ManagerPortfolioBreakdown = () => {
                                             <ChevronRight className="h-4 w-4" />
                                           </Button>
                                         </div>
+                                      </div>
+                                      
+                                      {/* Jump to Page */}
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm text-muted-foreground">Jump to page:</span>
+                                        <Input
+                                          type="text"
+                                          inputMode="numeric"
+                                          placeholder="Page #"
+                                          value={jumpToPageInputs[portfolio.id] || ""}
+                                          onChange={(e) => {
+                                            e.stopPropagation();
+                                            updateJumpToPageInput(portfolio.id, e.target.value);
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              handleJumpToPage(portfolio.id, paginationData.totalPages);
+                                            }
+                                          }}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="w-24 h-8"
+                                        />
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleJumpToPage(portfolio.id, paginationData.totalPages);
+                                          }}
+                                          disabled={!jumpToPageInputs[portfolio.id]}
+                                        >
+                                          Go
+                                        </Button>
                                       </div>
                                     </div>
                                   )}
