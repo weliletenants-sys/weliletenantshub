@@ -68,6 +68,7 @@ const ManagerAgents = () => {
   const [showPortfolioBreakdown, setShowPortfolioBreakdown] = useState(false);
   const [portfolioSortBy, setPortfolioSortBy] = useState<"portfolio_value" | "percentage" | "tenant_count" | "agent_name">("portfolio_value");
   const [portfolioSortDirection, setPortfolioSortDirection] = useState<"asc" | "desc">("desc");
+  const [portfolioGrowthFilter, setPortfolioGrowthFilter] = useState<"all" | "positive" | "negative">("all");
   
   // Enable real-time updates
   useRealtimeAgents();
@@ -362,30 +363,46 @@ const ManagerAgents = () => {
 
   const hasActiveFilters = statusFilter !== "all" || motorcycleFilter !== "all" || portfolioMinFilter || portfolioMaxFilter;
 
-  // Sort portfolio breakdown based on selected option
-  const sortedPortfolioBreakdown = [...agentPortfolioBreakdown].sort((a, b) => {
-    let comparison = 0;
-    
-    switch (portfolioSortBy) {
-      case "portfolio_value":
-        comparison = b.portfolio_value - a.portfolio_value;
-        break;
-      case "percentage":
-        comparison = b.percentage - a.percentage;
-        break;
-      case "tenant_count":
-        comparison = b.tenant_count - a.tenant_count;
-        break;
-      case "agent_name":
-        comparison = a.agent_name.localeCompare(b.agent_name);
-        break;
-      default:
-        comparison = 0;
-    }
-    
-    // Apply sort direction
-    return portfolioSortDirection === "asc" ? -comparison : comparison;
-  });
+  // Sort and filter portfolio breakdown based on selected options
+  const sortedPortfolioBreakdown = [...agentPortfolioBreakdown]
+    .filter((agent) => {
+      // Filter by growth trend if selected
+      if (portfolioGrowthFilter === "all") return true;
+      
+      const firstValue = agent.trend[0]?.value || 0;
+      const lastValue = agent.trend[agent.trend.length - 1]?.value || 0;
+      const percentChange = firstValue !== 0 
+        ? ((lastValue - firstValue) / firstValue) * 100 
+        : 0;
+      
+      if (portfolioGrowthFilter === "positive") return percentChange >= 0;
+      if (portfolioGrowthFilter === "negative") return percentChange < 0;
+      
+      return true;
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      
+      switch (portfolioSortBy) {
+        case "portfolio_value":
+          comparison = b.portfolio_value - a.portfolio_value;
+          break;
+        case "percentage":
+          comparison = b.percentage - a.percentage;
+          break;
+        case "tenant_count":
+          comparison = b.tenant_count - a.tenant_count;
+          break;
+        case "agent_name":
+          comparison = a.agent_name.localeCompare(b.agent_name);
+          break;
+        default:
+          comparison = 0;
+      }
+      
+      // Apply sort direction
+      return portfolioSortDirection === "asc" ? -comparison : comparison;
+    });
 
   // Calculate statistics from filtered agents
   const activeAgents = agents.filter(a => a.tenant_count > 0).length;
@@ -534,7 +551,7 @@ const ManagerAgents = () => {
             
             <CollapsibleContent>
               <CardContent className="space-y-4 pt-4 border-t">
-                {/* Sort Options */}
+                {/* Sort and Filter Options */}
                 <div className="flex items-center gap-3 flex-wrap">
                   <label className="text-sm font-medium">Sort by:</label>
                   <Select value={portfolioSortBy} onValueChange={(value: any) => setPortfolioSortBy(value)}>
@@ -567,10 +584,35 @@ const ManagerAgents = () => {
                       </>
                     )}
                   </Button>
+                  
+                  <div className="flex items-center gap-2 ml-auto">
+                    <label className="text-sm font-medium">Growth:</label>
+                    <Select value={portfolioGrowthFilter} onValueChange={(value: any) => setPortfolioGrowthFilter(value)}>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Agents</SelectItem>
+                        <SelectItem value="positive">Positive ↑</SelectItem>
+                        <SelectItem value="negative">Negative ↓</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+                
+                {/* Filter Results Count */}
+                {portfolioGrowthFilter !== "all" && (
+                  <div className="text-sm text-muted-foreground">
+                    Showing {sortedPortfolioBreakdown.length} of {agentPortfolioBreakdown.length} agents with {portfolioGrowthFilter} growth trends
+                  </div>
+                )}
 
-                {agentPortfolioBreakdown.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">No agents with portfolio data</p>
+                {sortedPortfolioBreakdown.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">
+                    {portfolioGrowthFilter !== "all" 
+                      ? `No agents with ${portfolioGrowthFilter} growth trends` 
+                      : "No agents with portfolio data"}
+                  </p>
                 ) : (
                    sortedPortfolioBreakdown.map((agent) => (
                     <div 
