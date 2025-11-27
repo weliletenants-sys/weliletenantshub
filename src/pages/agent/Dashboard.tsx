@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { Bike, TrendingUp, Users, DollarSign, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { haptics } from "@/utils/haptics";
 
 const AgentDashboard = () => {
   const [agentData, setAgentData] = useState<any>(null);
@@ -60,6 +61,7 @@ const AgentDashboard = () => {
   };
 
   const handleRefresh = async () => {
+    haptics.refresh();
     await fetchAgentData();
     toast.success("Dashboard refreshed");
   };

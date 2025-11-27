@@ -7,6 +7,7 @@ import { Users, UserCheck, AlertCircle, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { haptics } from "@/utils/haptics";
 
 const ManagerDashboard = () => {
   const [stats, setStats] = useState({
@@ -75,6 +76,7 @@ const ManagerDashboard = () => {
   }, []);
 
   const handleRefresh = async () => {
+    haptics.refresh();
     const [agentsResult, tenantsResult] = await Promise.all([
       supabase.from("agents").select("*"),
       supabase.from("tenants").select("*"),
