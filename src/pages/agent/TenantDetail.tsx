@@ -49,6 +49,7 @@ const AgentTenantDetail = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [lastPayment, setLastPayment] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("details");
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
   const [paymentForm, setPaymentForm] = useState({
     amount: "",
     paymentMethod: "cash",
@@ -718,6 +719,38 @@ const AgentTenantDetail = () => {
                   <CardDescription>
                     {collections.length} payment{collections.length !== 1 ? 's' : ''} recorded
                   </CardDescription>
+                  
+                  {/* Payment Method Filter */}
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    <Button
+                      size="sm"
+                      variant={paymentMethodFilter === "all" ? "default" : "outline"}
+                      onClick={() => setPaymentMethodFilter("all")}
+                    >
+                      All ({collections.length})
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={paymentMethodFilter === "cash" ? "default" : "outline"}
+                      onClick={() => setPaymentMethodFilter("cash")}
+                    >
+                      Cash ({collections.filter(c => c.payment_method === "cash").length})
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={paymentMethodFilter === "mtn" ? "default" : "outline"}
+                      onClick={() => setPaymentMethodFilter("mtn")}
+                    >
+                      MTN ({collections.filter(c => c.payment_method === "mtn").length})
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={paymentMethodFilter === "airtel" ? "default" : "outline"}
+                      onClick={() => setPaymentMethodFilter("airtel")}
+                    >
+                      Airtel ({collections.filter(c => c.payment_method === "airtel").length})
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {collections.length === 0 ? (
@@ -725,51 +758,63 @@ const AgentTenantDetail = () => {
                       No payments recorded yet
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>Commission</TableHead>
-                            <TableHead>Method</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {collections.map((collection) => {
-                            const isOptimistic = collection.id.startsWith('optimistic-');
-                            return (
-                              <TableRow 
-                                key={collection.id}
-                                className={isOptimistic ? "bg-primary/5" : ""}
-                              >
-                                <TableCell>
-                                  {format(new Date(collection.collection_date), "MMM dd, yyyy")}
-                                </TableCell>
-                                <TableCell className="font-medium">
-                                  UGX {parseFloat(collection.amount?.toString() || '0').toLocaleString()}
-                                </TableCell>
-                                <TableCell className="text-primary">
-                                  UGX {parseFloat(collection.commission?.toString() || '0').toLocaleString()}
-                                </TableCell>
-                                <TableCell className="capitalize">{collection.payment_method}</TableCell>
-                                <TableCell>
-                                  {isOptimistic ? (
-                                    <Badge variant="secondary" className="gap-1">
-                                      <Zap className="h-3 w-3 animate-pulse" />
-                                      Processing
-                                    </Badge>
-                                  ) : (
-                                    getPaymentStatusBadge(collection.status)
-                                  )}
-                                </TableCell>
+                    (() => {
+                      const filteredCollections = paymentMethodFilter === "all" 
+                        ? collections 
+                        : collections.filter(c => c.payment_method === paymentMethodFilter);
+                      
+                      return filteredCollections.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No {paymentMethodFilter} payments found
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Amount</TableHead>
+                                <TableHead>Commission</TableHead>
+                                <TableHead>Method</TableHead>
+                                <TableHead>Status</TableHead>
                               </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
+                            </TableHeader>
+                            <TableBody>
+                              {filteredCollections.map((collection) => {
+                                const isOptimistic = collection.id.startsWith('optimistic-');
+                                return (
+                                  <TableRow 
+                                    key={collection.id}
+                                    className={isOptimistic ? "bg-primary/5" : ""}
+                                  >
+                                    <TableCell>
+                                      {format(new Date(collection.collection_date), "MMM dd, yyyy")}
+                                    </TableCell>
+                                    <TableCell className="font-medium">
+                                      UGX {parseFloat(collection.amount?.toString() || '0').toLocaleString()}
+                                    </TableCell>
+                                    <TableCell className="text-primary">
+                                      UGX {parseFloat(collection.commission?.toString() || '0').toLocaleString()}
+                                    </TableCell>
+                                    <TableCell className="capitalize">{collection.payment_method}</TableCell>
+                                    <TableCell>
+                                      {isOptimistic ? (
+                                        <Badge variant="secondary" className="gap-1">
+                                          <Zap className="h-3 w-3 animate-pulse" />
+                                          Processing
+                                        </Badge>
+                                      ) : (
+                                        getPaymentStatusBadge(collection.status)
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      );
+                    })()
                   )}
                 </CardContent>
               </Card>
