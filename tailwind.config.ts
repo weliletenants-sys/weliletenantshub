@@ -111,6 +111,27 @@ export default {
             transform: "translateY(0)",
           },
         },
+        "scale-in": {
+          "0%": {
+            transform: "scale(0.8)",
+            opacity: "0",
+          },
+          "100%": {
+            transform: "scale(1)",
+            opacity: "1",
+          },
+        },
+        "spin": {
+          "0%": {
+            transform: "rotate(0deg) scale(0.8)",
+          },
+          "50%": {
+            transform: "rotate(180deg) scale(1.05)",
+          },
+          "100%": {
+            transform: "rotate(360deg) scale(1)",
+          },
+        },
         "shimmer": {
           "0%": {
             backgroundPosition: "-200% 0",
@@ -127,6 +148,9 @@ export default {
         "fade-in": "fade-in 0.3s ease-out",
         "fade-in-delay-1": "fade-in 0.3s ease-out 0.1s both",
         "fade-in-delay-2": "fade-in 0.3s ease-out 0.2s both",
+        "scale-in": "scale-in 0.6s ease-out",
+        "spin": "spin 2s ease-in-out",
+        "logo-entrance": "scale-in 0.6s ease-out, spin 2s ease-in-out",
         "shimmer": "shimmer 2s linear infinite",
       },
     },
