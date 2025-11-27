@@ -4,12 +4,14 @@ import PullToRefresh from "react-simple-pull-to-refresh";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 import { useRealtimeAllTenants, useRealtimeAllCollections, useRealtimeAgents, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -20,6 +22,11 @@ const ManagerDashboard = () => {
     pendingVerifications: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [showTenantSearch, setShowTenantSearch] = useState(false);
+  const [showAgentSearch, setShowAgentSearch] = useState(false);
+  const [tenantSearchQuery, setTenantSearchQuery] = useState("");
+  const [agentSearchQuery, setAgentSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
 
   // Subscribe to real-time updates for all agent activity
   useRealtimeAllTenants();
@@ -94,6 +101,88 @@ const ManagerDashboard = () => {
     toast.success("Dashboard refreshed");
   };
 
+  const handleTenantSearch = async () => {
+    if (!tenantSearchQuery.trim()) {
+      toast.error("Please enter a search term");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("tenants")
+        .select(`
+          *,
+          agents (
+            profiles:user_id (
+              full_name,
+              phone_number
+            )
+          )
+        `)
+        .or(`tenant_name.ilike.%${tenantSearchQuery}%,tenant_phone.ilike.%${tenantSearchQuery}%`)
+        .limit(10);
+
+      if (error) throw error;
+
+      setSearchResults(data || []);
+      
+      if (!data || data.length === 0) {
+        toast.info("No tenants found matching your search");
+      }
+    } catch (error) {
+      console.error("Search error:", error);
+      toast.error("Failed to search tenants");
+    }
+  };
+
+  const handleAgentSearch = async () => {
+    if (!agentSearchQuery.trim()) {
+      toast.error("Please enter a search term");
+      return;
+    }
+
+    try {
+      const { data: profiles, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, full_name, phone_number")
+        .eq("role", "agent")
+        .or(`full_name.ilike.%${agentSearchQuery}%,phone_number.ilike.%${agentSearchQuery}%`)
+        .limit(10);
+
+      if (profileError) throw profileError;
+
+      const userIds = profiles?.map(p => p.id) || [];
+
+      if (userIds.length === 0) {
+        setSearchResults([]);
+        toast.info("No agents found matching your search");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("agents")
+        .select(`
+          *,
+          profiles:user_id (
+            full_name,
+            phone_number
+          )
+        `)
+        .in("user_id", userIds);
+
+      if (error) throw error;
+
+      setSearchResults(data || []);
+      
+      if (!data || data.length === 0) {
+        toast.info("No agents found matching your search");
+      }
+    } catch (error) {
+      console.error("Search error:", error);
+      toast.error("Failed to search agents");
+    }
+  };
+
   if (isLoading) {
     return (
       <ManagerLayout currentPage="/manager/dashboard">
@@ -163,6 +252,61 @@ const ManagerDashboard = () => {
           <div>
             <h1 className="text-3xl font-bold">Manager Dashboard</h1>
             <p className="text-muted-foreground">Service Centre Overview</p>
+          </div>
+
+          {/* Quick Search Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserCheck className="h-5 w-5" />
+                  Search Tenants
+                </CardTitle>
+                <CardDescription>
+                  Find tenants by name or phone number
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={() => {
+                    setShowTenantSearch(true);
+                    setSearchResults([]);
+                    setTenantSearchQuery("");
+                  }}
+                >
+                  <Search className="h-5 w-5 mr-2" />
+                  Search Tenants
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Search Agents
+                </CardTitle>
+                <CardDescription>
+                  Find agents by name or phone number
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={() => {
+                    setShowAgentSearch(true);
+                    setSearchResults([]);
+                    setAgentSearchQuery("");
+                  }}
+                >
+                  <Search className="h-5 w-5 mr-2" />
+                  Search Agents
+                </Button>
+              </CardContent>
+            </Card>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -288,6 +432,130 @@ const ManagerDashboard = () => {
         </div>
       </div>
       </PullToRefresh>
+
+      {/* Tenant Search Dialog */}
+      <Dialog open={showTenantSearch} onOpenChange={setShowTenantSearch}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Search Tenants</DialogTitle>
+            <DialogDescription>
+              Search for tenants by name or phone number across all agents
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter tenant name or phone number..."
+                value={tenantSearchQuery}
+                onChange={(e) => setTenantSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleTenantSearch();
+                  }
+                }}
+              />
+              <Button onClick={handleTenantSearch}>
+                <Search className="h-4 w-4 mr-2" />
+                Search
+              </Button>
+            </div>
+
+            {searchResults.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-medium text-sm text-muted-foreground">Search Results ({searchResults.length})</h3>
+                {searchResults.map((tenant: any) => (
+                  <Card 
+                    key={tenant.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => {
+                      navigate(`/agent/tenants/${tenant.id}`);
+                      setShowTenantSearch(false);
+                    }}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-semibold">{tenant.tenant_name}</h4>
+                          <p className="text-sm text-muted-foreground">{tenant.tenant_phone}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Agent: {tenant.agents?.profiles?.full_name || 'Unknown'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">UGX {Number(tenant.outstanding_balance || 0).toLocaleString()}</p>
+                          <p className="text-xs text-muted-foreground">Outstanding</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Agent Search Dialog */}
+      <Dialog open={showAgentSearch} onOpenChange={setShowAgentSearch}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Search Agents</DialogTitle>
+            <DialogDescription>
+              Search for agents by name or phone number
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter agent name or phone number..."
+                value={agentSearchQuery}
+                onChange={(e) => setAgentSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAgentSearch();
+                  }
+                }}
+              />
+              <Button onClick={handleAgentSearch}>
+                <Search className="h-4 w-4 mr-2" />
+                Search
+              </Button>
+            </div>
+
+            {searchResults.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-medium text-sm text-muted-foreground">Search Results ({searchResults.length})</h3>
+                {searchResults.map((agent: any) => (
+                  <Card 
+                    key={agent.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => {
+                      navigate(`/manager/agents/${agent.id}`);
+                      setShowAgentSearch(false);
+                    }}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-semibold">{agent.profiles?.full_name || 'Unknown Agent'}</h4>
+                          <p className="text-sm text-muted-foreground">{agent.profiles?.phone_number}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {agent.active_tenants || 0} active tenants
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">{Number(agent.collection_rate || 0).toFixed(1)}%</p>
+                          <p className="text-xs text-muted-foreground">Collection Rate</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </ManagerLayout>
   );
 };
