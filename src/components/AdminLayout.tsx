@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Shield, Wrench, UserCog, Home, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import WelileLogo from "@/components/WelileLogo";
+import Breadcrumbs from "@/components/Breadcrumbs";
 import { cn } from "@/lib/utils";
 
 interface AdminLayoutProps {
@@ -101,6 +102,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
           {/* Main Content */}
           <main className="min-h-[calc(100vh-200px)]">
+            <Breadcrumbs />
             {children}
           </main>
         </div>

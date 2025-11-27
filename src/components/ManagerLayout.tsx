@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import WelileLogo from "./WelileLogo";
+import Breadcrumbs from "./Breadcrumbs";
 import { supabase } from "@/integrations/supabase/client";
 import { LayoutDashboard, Users, CheckSquare, LogOut, Settings, Home } from "lucide-react";
 import { toast } from "sonner";
@@ -83,6 +84,7 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
         </nav>
 
         <main className="flex-1 p-4 md:p-6 overflow-y-auto">
+          <Breadcrumbs />
           {children}
         </main>
       </div>
