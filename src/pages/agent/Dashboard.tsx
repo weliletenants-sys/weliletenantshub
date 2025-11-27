@@ -3,6 +3,7 @@ import AgentLayout from "@/components/AgentLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { Bike, TrendingUp, Users, DollarSign, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -10,6 +11,7 @@ import { toast } from "sonner";
 const AgentDashboard = () => {
   const [agentData, setAgentData] = useState<any>(null);
   const [todaysCollections, setTodaysCollections] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchAgentData();
@@ -17,6 +19,7 @@ const AgentDashboard = () => {
 
   const fetchAgentData = async () => {
     try {
+      setIsLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -50,11 +53,73 @@ const AgentDashboard = () => {
       setTodaysCollections(total);
     } catch (error: any) {
       toast.error("Failed to load dashboard data");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const portfolioPercentage = agentData ? (agentData.portfolio_value / agentData.portfolio_limit) * 100 : 0;
   const tenantsToMotorcycle = Math.max(0, 50 - (agentData?.active_tenants || 0));
+
+  if (isLoading) {
+    return (
+      <AgentLayout currentPage="/agent/dashboard">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground">Welcome back! Here's your overview</p>
+          </div>
+
+          {/* Motorcycle Banner Skeleton */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <div className="flex-1 space-y-3">
+                  <Skeleton className="h-8 w-3/4" />
+                  <Skeleton className="h-6 w-1/2" />
+                  <Skeleton className="h-10 w-2/3" />
+                  <Skeleton className="h-3 w-full mt-4" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Metrics Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i}>
+                <CardHeader className="pb-2">
+                  <Skeleton className="h-4 w-24" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-32 mb-2" />
+                  <Skeleton className="h-3 w-20" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Collection Rate Skeleton */}
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-48 mb-2" />
+              <Skeleton className="h-4 w-full" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-12" />
+                </div>
+                <Skeleton className="h-3 w-full" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </AgentLayout>
+    );
+  }
 
   return (
     <AgentLayout currentPage="/agent/dashboard">
