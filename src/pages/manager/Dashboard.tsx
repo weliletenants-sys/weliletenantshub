@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import PullToRefresh from "react-simple-pull-to-refresh";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, UserCheck, AlertCircle, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const ManagerDashboard = () => {
   const [stats, setStats] = useState({
@@ -72,6 +74,26 @@ const ManagerDashboard = () => {
     };
   }, []);
 
+  const handleRefresh = async () => {
+    const [agentsResult, tenantsResult] = await Promise.all([
+      supabase.from("agents").select("*"),
+      supabase.from("tenants").select("*"),
+    ]);
+
+    const totalAgents = agentsResult.data?.length || 0;
+    const totalTenants = tenantsResult.data?.length || 0;
+    const pendingVerifications = tenantsResult.data?.filter(t => t.status === 'pending').length || 0;
+
+    setStats({
+      totalAgents,
+      activeAgents: totalAgents,
+      totalTenants,
+      pendingVerifications,
+    });
+    
+    toast.success("Dashboard refreshed");
+  };
+
   if (isLoading) {
     return (
       <ManagerLayout currentPage="/manager/dashboard">
@@ -136,13 +158,14 @@ const ManagerDashboard = () => {
 
   return (
     <ManagerLayout currentPage="/manager/dashboard">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Manager Dashboard</h1>
-          <p className="text-muted-foreground">Service Centre Overview</p>
-        </div>
+      <PullToRefresh onRefresh={handleRefresh} pullingContent="">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">Manager Dashboard</h1>
+            <p className="text-muted-foreground">Service Centre Overview</p>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -243,6 +266,7 @@ const ManagerDashboard = () => {
           </Card>
         </div>
       </div>
+      </PullToRefresh>
     </ManagerLayout>
   );
 };

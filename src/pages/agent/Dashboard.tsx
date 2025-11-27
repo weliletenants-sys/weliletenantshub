@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import PullToRefresh from "react-simple-pull-to-refresh";
 import AgentLayout from "@/components/AgentLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -56,6 +57,11 @@ const AgentDashboard = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    await fetchAgentData();
+    toast.success("Dashboard refreshed");
   };
 
   const portfolioPercentage = agentData ? (agentData.portfolio_value / agentData.portfolio_limit) * 100 : 0;
@@ -123,11 +129,12 @@ const AgentDashboard = () => {
 
   return (
     <AgentLayout currentPage="/agent/dashboard">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back! Here's your overview</p>
-        </div>
+      <PullToRefresh onRefresh={handleRefresh} pullingContent="">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground">Welcome back! Here's your overview</p>
+          </div>
 
         {/* Motorcycle Countdown Banner */}
         <Card className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground">
@@ -245,6 +252,7 @@ const AgentDashboard = () => {
           </CardContent>
         </Card>
       </div>
+      </PullToRefresh>
     </AgentLayout>
   );
 };
