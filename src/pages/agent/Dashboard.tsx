@@ -24,9 +24,19 @@ const AgentDashboard = () => {
         .from("agents")
         .select("*")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching agent data:", error);
+        toast.error("Failed to load dashboard data");
+        return;
+      }
+
+      if (!agent) {
+        toast.error("Agent profile not found. Please contact support.");
+        return;
+      }
+
       setAgentData(agent);
 
       // Calculate today's collections
