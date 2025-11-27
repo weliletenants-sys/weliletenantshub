@@ -511,8 +511,8 @@ const AgentTenantDetail = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="mobile_money">Mobile Money</SelectItem>
-                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="mtn">MTN Mobile Money</SelectItem>
+                      <SelectItem value="airtel">Airtel Money</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
