@@ -10,6 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 import { useRealtimeAllTenants, useRealtimeAllCollections, useRealtimeAgents, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
+import { useRealtimeSyncStatus } from "@/hooks/useRealtimeSyncStatus";
+import { DataSyncBadge } from "@/components/RealtimeSyncIndicator";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -60,6 +62,9 @@ const ManagerDashboard = () => {
   useRealtimeAllTenants();
   useRealtimeAllCollections();
   useRealtimeAgents();
+
+  // Track sync status for tenants table (for portfolio value updates)
+  const { lastSyncTime } = useRealtimeSyncStatus('tenants');
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -629,16 +634,24 @@ const ManagerDashboard = () => {
 
           <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-primary" />
-                Total Portfolio Value
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-primary" />
+                  Total Portfolio Value
+                </div>
+                <DataSyncBadge 
+                  isSyncing={false} 
+                  lastSyncTime={lastSyncTime}
+                  label=""
+                  className="text-xs"
+                />
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
                 UGX {stats.totalPortfolioValue.toLocaleString()}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Combined agent portfolios</p>
+              <p className="text-xs text-muted-foreground mt-1">Combined outstanding balances</p>
             </CardContent>
           </Card>
         </div>
