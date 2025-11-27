@@ -547,13 +547,13 @@ const AgentTenantDetail = () => {
                   </CardHeader>
                   <CardContent className="grid gap-4 md:grid-cols-2">
                     {tenant.landlord_name && (
-                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in' : ''}`}>
+                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in-delay-1' : ''}`}>
                         <p className="text-sm text-muted-foreground">Name</p>
                         <p className="font-medium">{tenant.landlord_name}</p>
                       </div>
                     )}
                     {tenant.landlord_phone && (
-                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in' : ''}`}>
+                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in-delay-2' : ''}`}>
                         <p className="text-sm text-muted-foreground">Phone</p>
                         <p className="font-medium">{tenant.landlord_phone}</p>
                       </div>
@@ -572,13 +572,13 @@ const AgentTenantDetail = () => {
                   </CardHeader>
                   <CardContent className="grid gap-4 md:grid-cols-2">
                     {tenant.lc1_name && (
-                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in' : ''}`}>
+                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in-delay-1' : ''}`}>
                         <p className="text-sm text-muted-foreground">Name</p>
                         <p className="font-medium">{tenant.lc1_name}</p>
                       </div>
                     )}
                     {tenant.lc1_phone && (
-                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in' : ''}`}>
+                      <div className={`transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in-delay-2' : ''}`}>
                         <p className="text-sm text-muted-foreground">Phone</p>
                         <p className="font-medium">{tenant.lc1_phone}</p>
                       </div>

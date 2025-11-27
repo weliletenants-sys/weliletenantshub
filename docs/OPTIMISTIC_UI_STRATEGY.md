@@ -209,7 +209,9 @@ When landlord or LC1 information updates:
 **Animation Effects**:
 - **Highlight Pulse**: Card subtly scales and changes background color
 - **Ring Border**: Primary color ring appears around updated cards
-- **Fade-In**: Individual field values fade in smoothly
+- **Staggered Fade-In**: Fields cascade in sequentially (100ms delay between each)
+  - Name field: Fades in at 0ms
+  - Phone field: Fades in at 100ms
 - **Duration**: 600ms for complete animation cycle
 
 #### Quick Payment Dialog
@@ -343,10 +345,16 @@ if (!isOnline()) {
    }`}
    ```
 
-2. **Fade-in for individual field changes**
+2. **Staggered fade-in for sequential field changes**
    ```tsx
+   // First field
    className={`transition-all duration-300 ${
-     isPending ? 'animate-fade-in' : ''
+     isPending ? 'animate-fade-in-delay-1' : ''
+   }`}
+   
+   // Second field  
+   className={`transition-all duration-300 ${
+     isPending ? 'animate-fade-in-delay-2' : ''
    }`}
    ```
 
