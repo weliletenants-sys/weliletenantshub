@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
@@ -26,14 +27,46 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/agent/dashboard" element={<AgentDashboard />} />
-          <Route path="/agent/tenants" element={<AgentTenants />} />
-          <Route path="/agent/new-tenant" element={<AgentNewTenant />} />
-          <Route path="/agent/collections" element={<AgentCollections />} />
-          <Route path="/agent/earnings" element={<AgentEarnings />} />
-          <Route path="/manager/dashboard" element={<ManagerDashboard />} />
-          <Route path="/manager/agents" element={<ManagerAgents />} />
-          <Route path="/manager/verifications" element={<ManagerVerifications />} />
+          <Route path="/agent/dashboard" element={
+            <ProtectedRoute requiredRole="agent">
+              <AgentDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/agent/tenants" element={
+            <ProtectedRoute requiredRole="agent">
+              <AgentTenants />
+            </ProtectedRoute>
+          } />
+          <Route path="/agent/new-tenant" element={
+            <ProtectedRoute requiredRole="agent">
+              <AgentNewTenant />
+            </ProtectedRoute>
+          } />
+          <Route path="/agent/collections" element={
+            <ProtectedRoute requiredRole="agent">
+              <AgentCollections />
+            </ProtectedRoute>
+          } />
+          <Route path="/agent/earnings" element={
+            <ProtectedRoute requiredRole="agent">
+              <AgentEarnings />
+            </ProtectedRoute>
+          } />
+          <Route path="/manager/dashboard" element={
+            <ProtectedRoute requiredRole="manager">
+              <ManagerDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/manager/agents" element={
+            <ProtectedRoute requiredRole="manager">
+              <ManagerAgents />
+            </ProtectedRoute>
+          } />
+          <Route path="/manager/verifications" element={
+            <ProtectedRoute requiredRole="manager">
+              <ManagerVerifications />
+            </ProtectedRoute>
+          } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
