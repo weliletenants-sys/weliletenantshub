@@ -4,7 +4,7 @@ import PullToRefresh from "react-simple-pull-to-refresh";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -29,6 +29,7 @@ const ManagerDashboard = () => {
     pendingPayments: 0,
     verifiedPayments: 0,
     rejectedPayments: 0,
+    totalPortfolioValue: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [showTenantSearch, setShowTenantSearch] = useState(false);
@@ -76,6 +77,11 @@ const ManagerDashboard = () => {
         const totalTenants = tenantsResult.data?.length || 0;
         const pendingVerifications = tenantsResult.data?.filter(t => t.status === 'pending').length || 0;
 
+        // Calculate total portfolio value
+        const totalPortfolioValue = agentsResult.data?.reduce((sum, agent) => {
+          return sum + (parseFloat(agent.portfolio_value?.toString() || '0'));
+        }, 0) || 0;
+
         // Fetch payment verification stats
         const { data: collectionsData } = await supabase
           .from("collections")
@@ -93,6 +99,7 @@ const ManagerDashboard = () => {
           pendingPayments,
           verifiedPayments,
           rejectedPayments,
+          totalPortfolioValue,
         });
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
@@ -125,6 +132,11 @@ const ManagerDashboard = () => {
     const totalTenants = tenantsResult.data?.length || 0;
     const pendingVerifications = tenantsResult.data?.filter(t => t.status === 'pending').length || 0;
 
+    // Calculate total portfolio value
+    const totalPortfolioValue = agentsResult.data?.reduce((sum, agent) => {
+      return sum + (parseFloat(agent.portfolio_value?.toString() || '0'));
+    }, 0) || 0;
+
     // Fetch payment verification stats
     const { data: collectionsData } = await supabase
       .from("collections")
@@ -142,6 +154,7 @@ const ManagerDashboard = () => {
       pendingPayments,
       verifiedPayments,
       rejectedPayments,
+      totalPortfolioValue,
     });
     
     toast.success("Dashboard refreshed");
@@ -477,16 +490,18 @@ const ManagerDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                Performance
+                <Wallet className="h-4 w-4 text-primary" />
+                Total Portfolio Value
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-success">94.2%</div>
-              <p className="text-xs text-muted-foreground mt-1">Avg collection rate</p>
+              <div className="text-2xl font-bold text-primary">
+                UGX {stats.totalPortfolioValue.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Combined agent portfolios</p>
             </CardContent>
           </Card>
         </div>
