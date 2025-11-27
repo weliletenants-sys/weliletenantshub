@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import WelileLogo from "./WelileLogo";
 import OfflineSyncIndicator from "./OfflineSyncIndicator";
+import Breadcrumbs from "./Breadcrumbs";
 import { supabase } from "@/integrations/supabase/client";
 import { Home, Users, Plus, DollarSign, TrendingUp, LogOut, MessageSquare, BarChart3, Settings } from "lucide-react";
 import { toast } from "sonner";
@@ -91,6 +92,7 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
         </nav>
 
         <main className="flex-1 p-4 md:p-6 overflow-y-auto">
+          <Breadcrumbs />
           {children}
         </main>
       </div>
