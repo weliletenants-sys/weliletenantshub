@@ -60,6 +60,7 @@ const ManagerDashboard = () => {
   const [maxTenantsFilter, setMaxTenantsFilter] = useState<string>("");
   const [agentGrowthComparison, setAgentGrowthComparison] = useState<any[]>([]);
   const [paymentMethodData, setPaymentMethodData] = useState<any[]>([]);
+  const [agentPaymentMethodData, setAgentPaymentMethodData] = useState<any[]>([]);
 
   // Track previous values for change detection
   const [prevPortfolioValue, setPrevPortfolioValue] = useState<number | null>(null);
@@ -245,6 +246,9 @@ const ManagerDashboard = () => {
         
         // Fetch payment method breakdown
         await fetchPaymentMethodBreakdown();
+        
+        // Fetch agent payment method breakdown
+        await fetchAgentPaymentMethodBreakdown(agentsResult.data || []);
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
       } finally {
@@ -336,6 +340,7 @@ const ManagerDashboard = () => {
     
     await calculateAgentGrowthComparison(agentsResult.data || []);
     await fetchPaymentMethodBreakdown();
+    await fetchAgentPaymentMethodBreakdown(agentsResult.data || []);
     
     toast.success("Dashboard refreshed");
   };
@@ -402,6 +407,72 @@ const ManagerDashboard = () => {
       setPaymentMethodData(chartData);
     } catch (error) {
       console.error("Error fetching payment method breakdown:", error);
+    }
+  };
+
+  const fetchAgentPaymentMethodBreakdown = async (agents: any[]) => {
+    if (!agents || agents.length === 0) {
+      setAgentPaymentMethodData([]);
+      return;
+    }
+
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      // Fetch collections for all agents
+      const { data: collections } = await supabase
+        .from("collections")
+        .select("agent_id, amount, payment_method")
+        .eq("status", "verified")
+        .gte("collection_date", thirtyDaysAgo.toISOString().split('T')[0]);
+
+      // Calculate payment method breakdown per agent
+      const agentBreakdown = await Promise.all(
+        agents.slice(0, 10).map(async (agent) => {
+          // Get agent profile
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", agent.user_id)
+            .single();
+
+          const agentCollections = collections?.filter(c => c.agent_id === agent.id) || [];
+
+          const cashTotal = agentCollections
+            .filter(c => c.payment_method === "cash")
+            .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
+
+          const mtnTotal = agentCollections
+            .filter(c => c.payment_method === "mtn")
+            .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
+
+          const airtelTotal = agentCollections
+            .filter(c => c.payment_method === "airtel")
+            .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
+
+          const totalCollections = cashTotal + mtnTotal + airtelTotal;
+
+          return {
+            id: agent.id,
+            name: profile?.full_name || 'Unknown Agent',
+            cash: cashTotal,
+            mtn: mtnTotal,
+            airtel: airtelTotal,
+            total: totalCollections,
+            cashPercent: totalCollections > 0 ? (cashTotal / totalCollections) * 100 : 0,
+            mtnPercent: totalCollections > 0 ? (mtnTotal / totalCollections) * 100 : 0,
+            airtelPercent: totalCollections > 0 ? (airtelTotal / totalCollections) * 100 : 0,
+          };
+        })
+      );
+
+      // Sort by total collections (highest first)
+      agentBreakdown.sort((a, b) => b.total - a.total);
+
+      setAgentPaymentMethodData(agentBreakdown.filter(a => a.total > 0));
+    } catch (error) {
+      console.error("Error fetching agent payment method breakdown:", error);
     }
   };
 
@@ -1068,6 +1139,119 @@ const ManagerDashboard = () => {
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Agent Payment Method Preferences */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                Agent Payment Method Preferences
+              </CardTitle>
+              <CardDescription>
+                Compare payment method usage across top agents (Last 30 days)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {agentPaymentMethodData.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No payment data available for agents
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {agentPaymentMethodData.map((agent, index) => (
+                    <div 
+                      key={agent.id}
+                      className="p-4 rounded-lg border bg-card hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => navigate(`/manager/agents/${agent.id}`)}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="font-semibold text-base">{agent.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Total: UGX {agent.total.toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          #{index + 1}
+                        </div>
+                      </div>
+
+                      {/* Payment Method Distribution Bars */}
+                      <div className="space-y-2">
+                        {/* Cash */}
+                        {agent.cash > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">Cash</span>
+                              <span className="font-medium">
+                                UGX {agent.cash.toLocaleString()} ({agent.cashPercent.toFixed(1)}%)
+                              </span>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-2">
+                              <div 
+                                className="bg-blue-500 h-2 rounded-full transition-all"
+                                style={{ width: `${agent.cashPercent}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* MTN */}
+                        {agent.mtn > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">MTN Mobile Money</span>
+                              <span className="font-medium">
+                                UGX {agent.mtn.toLocaleString()} ({agent.mtnPercent.toFixed(1)}%)
+                              </span>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-2">
+                              <div 
+                                className="bg-yellow-500 h-2 rounded-full transition-all"
+                                style={{ width: `${agent.mtnPercent}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Airtel */}
+                        {agent.airtel > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">Airtel Money</span>
+                              <span className="font-medium">
+                                UGX {agent.airtel.toLocaleString()} ({agent.airtelPercent.toFixed(1)}%)
+                              </span>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-2">
+                              <div 
+                                className="bg-red-500 h-2 rounded-full transition-all"
+                                style={{ width: `${agent.airtelPercent}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Preferred Method Badge */}
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <p className="text-xs text-muted-foreground">
+                          Preferred method: 
+                          <span className="ml-1 font-medium text-foreground">
+                            {agent.cashPercent >= agent.mtnPercent && agent.cashPercent >= agent.airtelPercent
+                              ? "Cash"
+                              : agent.mtnPercent >= agent.airtelPercent
+                              ? "MTN Mobile Money"
+                              : "Airtel Money"}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
