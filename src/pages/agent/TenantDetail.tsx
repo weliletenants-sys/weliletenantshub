@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import PaymentReceipt from "@/components/PaymentReceipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff, Receipt } from "lucide-react";
+import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff, Receipt, Edit } from "lucide-react";
 import { format } from "date-fns";
 import { addPendingPayment, isOnline } from "@/lib/offlineSync";
 
@@ -24,6 +24,7 @@ const AgentTenantDetail = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [lastPayment, setLastPayment] = useState<any>(null);
   const [agentInfo, setAgentInfo] = useState<any>(null);
@@ -31,6 +32,13 @@ const AgentTenantDetail = () => {
     amount: "",
     paymentMethod: "cash",
     collectionDate: format(new Date(), "yyyy-MM-dd"),
+  });
+  const [editForm, setEditForm] = useState({
+    landlordName: "",
+    landlordPhone: "",
+    lc1Name: "",
+    lc1Phone: "",
+    rentAmount: "",
   });
 
   useEffect(() => {
@@ -83,6 +91,15 @@ const AgentTenantDetail = () => {
 
       if (tenantError) throw tenantError;
       setTenant(tenantData);
+      
+      // Set edit form with current data
+      setEditForm({
+        landlordName: tenantData.landlord_name || "",
+        landlordPhone: tenantData.landlord_phone || "",
+        lc1Name: tenantData.lc1_name || "",
+        lc1Phone: tenantData.lc1_phone || "",
+        rentAmount: tenantData.rent_amount?.toString() || "",
+      });
 
       // Fetch collections history
       const { data: collectionsData, error: collectionsError } = await supabase
@@ -206,6 +223,38 @@ const AgentTenantDetail = () => {
     }
   };
 
+  const handleEditTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    try {
+      const rentAmount = editForm.rentAmount ? parseFloat(editForm.rentAmount) : 0;
+      const registrationFee = rentAmount >= 200000 ? 20000 : 10000;
+
+      const { error } = await supabase
+        .from("tenants")
+        .update({
+          landlord_name: editForm.landlordName || "",
+          landlord_phone: editForm.landlordPhone || "",
+          lc1_name: editForm.lc1Name || "",
+          lc1_phone: editForm.lc1Phone || "",
+          rent_amount: rentAmount,
+          registration_fee: registrationFee,
+        })
+        .eq("id", tenantId);
+
+      if (error) throw error;
+
+      toast.success("Tenant details updated successfully");
+      setEditDialogOpen(false);
+      fetchTenantDetails();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update tenant");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <AgentLayout currentPage="/agent/tenants">
@@ -249,6 +298,101 @@ const AgentTenantDetail = () => {
               Offline Mode
             </Badge>
           )}
+          
+          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Details
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Tenant Details</DialogTitle>
+                <DialogDescription>
+                  Update landlord, LC1, and rent information
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleEditTenant} className="space-y-4">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-sm">Landlord Details</h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="landlordName">Landlord Name</Label>
+                    <Input
+                      id="landlordName"
+                      value={editForm.landlordName}
+                      onChange={(e) => setEditForm({ ...editForm, landlordName: e.target.value })}
+                      placeholder="Enter landlord name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="landlordPhone">Landlord Phone</Label>
+                    <Input
+                      id="landlordPhone"
+                      type="tel"
+                      value={editForm.landlordPhone}
+                      onChange={(e) => setEditForm({ ...editForm, landlordPhone: e.target.value })}
+                      placeholder="e.g., 0700123456"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-sm">LC1 Details</h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="lc1Name">LC1 Name</Label>
+                    <Input
+                      id="lc1Name"
+                      value={editForm.lc1Name}
+                      onChange={(e) => setEditForm({ ...editForm, lc1Name: e.target.value })}
+                      placeholder="Enter LC1 name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lc1Phone">LC1 Phone</Label>
+                    <Input
+                      id="lc1Phone"
+                      type="tel"
+                      value={editForm.lc1Phone}
+                      onChange={(e) => setEditForm({ ...editForm, lc1Phone: e.target.value })}
+                      placeholder="e.g., 0700123456"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="rentAmount">Monthly Rent Amount (UGX)</Label>
+                  <Input
+                    id="rentAmount"
+                    type="number"
+                    value={editForm.rentAmount}
+                    onChange={(e) => setEditForm({ ...editForm, rentAmount: e.target.value })}
+                    placeholder="Enter monthly rent"
+                    min="0"
+                  />
+                  {editForm.rentAmount && parseFloat(editForm.rentAmount) > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Registration fee: UGX {(parseFloat(editForm.rentAmount) >= 200000 ? 20000 : 10000).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setEditDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="flex-1" disabled={submitting}>
+                    {submitting ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
           
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -349,13 +493,15 @@ const AgentTenantDetail = () => {
                   <p className="font-medium">{tenant.tenant_phone}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Monthly Rent</p>
-                  <p className="font-medium">UGX {parseFloat(tenant.rent_amount).toLocaleString()}</p>
+              {tenant.rent_amount > 0 && (
+                <div className="flex items-center gap-3">
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Monthly Rent</p>
+                    <p className="font-medium">UGX {parseFloat(tenant.rent_amount).toLocaleString()}</p>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="flex items-center gap-3">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
@@ -391,37 +537,49 @@ const AgentTenantDetail = () => {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Landlord Information</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            <div>
-              <p className="text-sm text-muted-foreground">Name</p>
-              <p className="font-medium">{tenant.landlord_name}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Phone</p>
-              <p className="font-medium">{tenant.landlord_phone}</p>
-            </div>
-          </CardContent>
-        </Card>
+        {(tenant.landlord_name || tenant.landlord_phone) && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Landlord Information</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+              {tenant.landlord_name && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Name</p>
+                  <p className="font-medium">{tenant.landlord_name}</p>
+                </div>
+              )}
+              {tenant.landlord_phone && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Phone</p>
+                  <p className="font-medium">{tenant.landlord_phone}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>LC1 Information</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            <div>
-              <p className="text-sm text-muted-foreground">Name</p>
-              <p className="font-medium">{tenant.lc1_name}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Phone</p>
-              <p className="font-medium">{tenant.lc1_phone}</p>
-            </div>
-          </CardContent>
-        </Card>
+        {(tenant.lc1_name || tenant.lc1_phone) && (
+          <Card>
+            <CardHeader>
+              <CardTitle>LC1 Information</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+              {tenant.lc1_name && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Name</p>
+                  <p className="font-medium">{tenant.lc1_name}</p>
+                </div>
+              )}
+              {tenant.lc1_phone && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Phone</p>
+                  <p className="font-medium">{tenant.lc1_phone}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

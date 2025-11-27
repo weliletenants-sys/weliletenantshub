@@ -193,16 +193,16 @@ export type Database = {
           days_remaining: number | null
           id: string
           landlord_id_url: string | null
-          landlord_name: string
-          landlord_phone: string
+          landlord_name: string | null
+          landlord_phone: string | null
           last_payment_date: string | null
           lc1_letter_url: string | null
-          lc1_name: string
-          lc1_phone: string
+          lc1_name: string | null
+          lc1_phone: string | null
           next_payment_date: string | null
           outstanding_balance: number | null
-          registration_fee: number
-          rent_amount: number
+          registration_fee: number | null
+          rent_amount: number | null
           status: string | null
           tenant_name: string
           tenant_phone: string
@@ -215,16 +215,16 @@ export type Database = {
           days_remaining?: number | null
           id?: string
           landlord_id_url?: string | null
-          landlord_name: string
-          landlord_phone: string
+          landlord_name?: string | null
+          landlord_phone?: string | null
           last_payment_date?: string | null
           lc1_letter_url?: string | null
-          lc1_name: string
-          lc1_phone: string
+          lc1_name?: string | null
+          lc1_phone?: string | null
           next_payment_date?: string | null
           outstanding_balance?: number | null
-          registration_fee: number
-          rent_amount: number
+          registration_fee?: number | null
+          rent_amount?: number | null
           status?: string | null
           tenant_name: string
           tenant_phone: string
@@ -237,16 +237,16 @@ export type Database = {
           days_remaining?: number | null
           id?: string
           landlord_id_url?: string | null
-          landlord_name?: string
-          landlord_phone?: string
+          landlord_name?: string | null
+          landlord_phone?: string | null
           last_payment_date?: string | null
           lc1_letter_url?: string | null
-          lc1_name?: string
-          lc1_phone?: string
+          lc1_name?: string | null
+          lc1_phone?: string | null
           next_payment_date?: string | null
           outstanding_balance?: number | null
-          registration_fee?: number
-          rent_amount?: number
+          registration_fee?: number | null
+          rent_amount?: number | null
           status?: string | null
           tenant_name?: string
           tenant_phone?: string
