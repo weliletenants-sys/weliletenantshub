@@ -8,7 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
-import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap } from "lucide-react";
+import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 import QuickPaymentDialog from "@/components/QuickPaymentDialog";
@@ -27,6 +28,7 @@ const AgentDashboard = () => {
   const [pendingVerifications, setPendingVerifications] = useState(0);
   const [verifiedPayments, setVerifiedPayments] = useState(0);
   const [rejectedPayments, setRejectedPayments] = useState(0);
+  const [paymentMethodBreakdown, setPaymentMethodBreakdown] = useState<any[]>([]);
   
   // Service worker for caching
   useServiceWorker();
@@ -153,6 +155,70 @@ const AgentDashboard = () => {
       setPendingVerifications(pendingData?.length || 0);
       setVerifiedPayments(verifiedData?.length || 0);
       setRejectedPayments(rejectedData?.length || 0);
+
+      // Fetch payment method breakdown (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      const sixtyDaysAgoStr = sixtyDaysAgo.toISOString().split('T')[0];
+
+      // Current period (last 30 days)
+      const { data: currentPeriodData } = await supabase
+        .from("collections")
+        .select("payment_method, amount")
+        .eq("agent_id", agent.id)
+        .gte("collection_date", thirtyDaysAgoStr)
+        .eq("status", "verified");
+
+      // Previous period (30-60 days ago)
+      const { data: previousPeriodData } = await supabase
+        .from("collections")
+        .select("payment_method, amount")
+        .eq("agent_id", agent.id)
+        .gte("collection_date", sixtyDaysAgoStr)
+        .lt("collection_date", thirtyDaysAgoStr)
+        .eq("status", "verified");
+
+      // Calculate totals by payment method
+      const methodTotals: { [key: string]: { current: number; previous: number } } = {
+        cash: { current: 0, previous: 0 },
+        mtn: { current: 0, previous: 0 },
+        airtel: { current: 0, previous: 0 },
+      };
+
+      currentPeriodData?.forEach(item => {
+        const method = item.payment_method || 'cash';
+        if (methodTotals[method]) {
+          methodTotals[method].current += parseFloat(item.amount.toString());
+        }
+      });
+
+      previousPeriodData?.forEach(item => {
+        const method = item.payment_method || 'cash';
+        if (methodTotals[method]) {
+          methodTotals[method].previous += parseFloat(item.amount.toString());
+        }
+      });
+
+      // Build chart data with trends
+      const breakdownData = Object.entries(methodTotals).map(([method, totals]) => {
+        const trendPercent = totals.previous > 0 
+          ? ((totals.current - totals.previous) / totals.previous) * 100 
+          : totals.current > 0 ? 100 : 0;
+        
+        return {
+          method: method === 'cash' ? 'Cash' : method === 'mtn' ? 'MTN' : 'Airtel',
+          amount: totals.current,
+          trend: trendPercent,
+          trendIcon: trendPercent > 5 ? 'up' : trendPercent < -5 ? 'down' : 'neutral',
+          color: method === 'cash' ? 'hsl(var(--success))' : method === 'mtn' ? 'hsl(var(--warning))' : 'hsl(var(--destructive))',
+        };
+      });
+
+      setPaymentMethodBreakdown(breakdownData);
     } catch (error: any) {
       toast.error("Failed to load dashboard data");
     } finally {
@@ -441,6 +507,81 @@ const AgentDashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Payment Method Breakdown Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Method Breakdown</CardTitle>
+            <CardDescription>
+              Collections by payment type (Last 30 days vs. previous 30 days)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {/* Chart */}
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={paymentMethodBreakdown}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                  <XAxis 
+                    dataKey="method" 
+                    tick={{ fill: 'hsl(var(--foreground))' }}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                  />
+                  <YAxis 
+                    tick={{ fill: 'hsl(var(--foreground))' }}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                    tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                  />
+                  <Tooltip 
+                    formatter={(value: any) => [`UGX ${parseFloat(value).toLocaleString()}`, 'Amount']}
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--popover))',
+                      borderColor: 'hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Bar dataKey="amount" radius={[8, 8, 0, 0]}>
+                    {paymentMethodBreakdown.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+
+              {/* Trend Indicators */}
+              <div className="grid grid-cols-3 gap-4">
+                {paymentMethodBreakdown.map((item) => (
+                  <div key={item.method} className="text-center p-4 rounded-lg border" style={{ borderColor: item.color, backgroundColor: `${item.color}15` }}>
+                    <div className="text-xl font-bold" style={{ color: item.color }}>
+                      UGX {item.amount.toLocaleString()}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">{item.method}</p>
+                    <div className="flex items-center justify-center gap-1 mt-2">
+                      {item.trendIcon === 'up' && (
+                        <>
+                          <ArrowUp className="h-4 w-4 text-success" />
+                          <span className="text-xs font-semibold text-success">+{item.trend.toFixed(0)}%</span>
+                        </>
+                      )}
+                      {item.trendIcon === 'down' && (
+                        <>
+                          <ArrowDown className="h-4 w-4 text-destructive" />
+                          <span className="text-xs font-semibold text-destructive">{item.trend.toFixed(0)}%</span>
+                        </>
+                      )}
+                      {item.trendIcon === 'neutral' && (
+                        <>
+                          <Minus className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs font-semibold text-muted-foreground">{item.trend.toFixed(0)}%</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Payment Verification Stats */}
         <Card>
