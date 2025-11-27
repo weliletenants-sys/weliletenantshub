@@ -138,6 +138,60 @@ const AgentDashboard = () => {
             <p className="text-muted-foreground">Welcome back! Here's your overview</p>
           </div>
 
+        {/* Portfolio Value Hero Section */}
+        <Card className="bg-gradient-to-br from-primary via-primary/90 to-primary/70 text-primary-foreground overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24" />
+          <CardContent className="p-8 relative z-10">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
+                  <TrendingUp className="h-8 w-8" />
+                </div>
+                <div>
+                  <p className="text-sm opacity-90 font-medium">Your Portfolio Capacity</p>
+                  <h2 className="text-4xl font-bold tracking-tight">
+                    UGX {(agentData?.portfolio_value || 0).toLocaleString()}
+                  </h2>
+                </div>
+              </div>
+              
+              <div className="space-y-3 bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <div className="flex justify-between items-end">
+                  <div>
+                    <p className="text-sm opacity-90">Target Portfolio Limit</p>
+                    <p className="text-3xl font-bold">UGX 20,000,000</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm opacity-90">Remaining Capacity</p>
+                    <p className="text-2xl font-bold">
+                      UGX {((agentData?.portfolio_limit || 20000000) - (agentData?.portfolio_value || 0)).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <Progress value={portfolioPercentage} className="h-4 bg-white/20" />
+                <div className="flex justify-between text-sm">
+                  <span className="opacity-90">{portfolioPercentage.toFixed(1)}% utilized</span>
+                  <span className="font-semibold">{(100 - portfolioPercentage).toFixed(1)}% available to grow</span>
+                </div>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border-2 border-white/30">
+                <p className="text-lg font-semibold">
+                  💡 You can add up to{" "}
+                  <span className="text-2xl font-bold">
+                    {Math.floor(((agentData?.portfolio_limit || 20000000) - (agentData?.portfolio_value || 0)) / 100000)}
+                  </span>{" "}
+                  more tenants!
+                </p>
+                <p className="text-sm opacity-90 mt-1">
+                  Each new tenant grows your income and brings you closer to your goals
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Motorcycle Countdown Banner */}
         <Card className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground">
           <CardContent className="p-6">
@@ -167,21 +221,7 @@ const AgentDashboard = () => {
         </Card>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Portfolio Value</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                UGX {(agentData?.portfolio_value || 0).toLocaleString()}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                / {(agentData?.portfolio_limit || 20000000).toLocaleString()} limit
-              </p>
-              <Progress value={portfolioPercentage} className="mt-2" />
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 
           <Card>
             <CardHeader className="pb-2">
