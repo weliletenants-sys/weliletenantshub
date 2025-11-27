@@ -49,9 +49,15 @@ const AgentSettings = () => {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+
+      if (!profileData) {
+        toast.error('Profile not found. Please contact support.');
+        navigate('/login');
+        return;
+      }
 
       setProfile({
         full_name: profileData.full_name || '',
