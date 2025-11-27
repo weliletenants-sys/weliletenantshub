@@ -57,7 +57,10 @@ const AgentTenantDetail = () => {
     lc1Name: "",
     lc1Phone: "",
     rentAmount: "",
+    startDate: "",
+    dueDate: "",
   });
+  const [dailyPaymentAmount, setDailyPaymentAmount] = useState<number | null>(null);
   
   // Optimistic mutations
   const paymentMutation = useOptimisticPayment();
@@ -78,9 +81,35 @@ const AgentTenantDetail = () => {
         lc1Name: tenant.lc1_name || "",
         lc1Phone: tenant.lc1_phone || "",
         rentAmount: tenant.rent_amount?.toString() || "",
+        startDate: tenant.start_date || "",
+        dueDate: tenant.due_date || "",
       });
+      
+      // Set existing daily payment amount if available
+      if (tenant.daily_payment_amount) {
+        setDailyPaymentAmount(parseFloat(tenant.daily_payment_amount.toString()));
+      }
     }
   }, [tenant]);
+  
+  // Auto-calculate daily payment amount when rent amount or dates change
+  useEffect(() => {
+    if (editForm.rentAmount && editForm.startDate && editForm.dueDate) {
+      const rentAmount = parseFloat(editForm.rentAmount);
+      const startDate = new Date(editForm.startDate);
+      const dueDate = new Date(editForm.dueDate);
+      
+      if (rentAmount > 0 && dueDate > startDate) {
+        const daysDiff = Math.ceil((dueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        const dailyAmount = rentAmount / daysDiff;
+        setDailyPaymentAmount(dailyAmount);
+      } else {
+        setDailyPaymentAmount(null);
+      }
+    } else {
+      setDailyPaymentAmount(null);
+    }
+  }, [editForm.rentAmount, editForm.startDate, editForm.dueDate]);
 
   // Handle errors
   useEffect(() => {
@@ -202,6 +231,9 @@ const AgentTenantDetail = () => {
         lc1_phone: editForm.lc1Phone || "",
         rent_amount: rentAmount,
         registration_fee: registrationFee,
+        start_date: editForm.startDate || null,
+        due_date: editForm.dueDate || null,
+        daily_payment_amount: dailyPaymentAmount,
       }
     }, {
       onSuccess: () => {
@@ -343,6 +375,40 @@ const AgentTenantDetail = () => {
                     </p>
                   )}
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="startDate">Start Date</Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={editForm.startDate}
+                    onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="dueDate">Due Date</Label>
+                  <Input
+                    id="dueDate"
+                    type="date"
+                    value={editForm.dueDate}
+                    onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })}
+                    min={editForm.startDate}
+                  />
+                </div>
+
+                {dailyPaymentAmount !== null && (
+                  <div className="rounded-lg bg-primary/10 p-4 space-y-1">
+                    <p className="text-sm font-semibold text-primary">Daily Payment Amount</p>
+                    <p className="text-2xl font-bold">UGX {dailyPaymentAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Based on {editForm.rentAmount ? `UGX ${parseFloat(editForm.rentAmount).toLocaleString()}` : 'rent'} over{' '}
+                      {editForm.startDate && editForm.dueDate && 
+                        Math.ceil((new Date(editForm.dueDate).getTime() - new Date(editForm.startDate).getTime()) / (1000 * 60 * 60 * 24))
+                      } days
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex gap-3 pt-4">
                   <Button
