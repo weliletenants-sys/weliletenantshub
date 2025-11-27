@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import WelileLogo from "@/components/WelileLogo";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { User } from "@supabase/supabase-js";
+import { Session } from "@supabase/supabase-js";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -20,25 +20,21 @@ const Login = () => {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
     // Check if user is already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        redirectToDashboard(roleParam);
+      if (session) {
+        setSession(session);
+        redirectToDashboard(session.user.user_metadata?.role || roleParam);
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        if (event === 'SIGNED_IN') {
-          redirectToDashboard(roleParam);
-        }
-      } else {
-        setUser(null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) {
+        redirectToDashboard(session.user.user_metadata?.role || roleParam);
       }
     });
 
