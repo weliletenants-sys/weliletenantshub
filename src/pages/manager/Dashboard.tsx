@@ -12,6 +12,12 @@ import { haptics } from "@/utils/haptics";
 import { useRealtimeAllTenants, useRealtimeAllCollections, useRealtimeAgents, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon, ChevronDown, ChevronUp } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -27,6 +33,19 @@ const ManagerDashboard = () => {
   const [tenantSearchQuery, setTenantSearchQuery] = useState("");
   const [agentSearchQuery, setAgentSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  
+  // Tenant filters
+  const [tenantStatusFilter, setTenantStatusFilter] = useState<string>("all");
+  const [minBalanceFilter, setMinBalanceFilter] = useState<string>("");
+  const [maxBalanceFilter, setMaxBalanceFilter] = useState<string>("");
+  const [startDateFilter, setStartDateFilter] = useState<Date | undefined>();
+  const [endDateFilter, setEndDateFilter] = useState<Date | undefined>();
+  
+  // Agent filters
+  const [agentStatusFilter, setAgentStatusFilter] = useState<string>("all");
+  const [minTenantsFilter, setMinTenantsFilter] = useState<string>("");
+  const [maxTenantsFilter, setMaxTenantsFilter] = useState<string>("");
 
   // Subscribe to real-time updates for all agent activity
   useRealtimeAllTenants();
@@ -108,7 +127,7 @@ const ManagerDashboard = () => {
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("tenants")
         .select(`
           *,
@@ -119,8 +138,30 @@ const ManagerDashboard = () => {
             )
           )
         `)
-        .or(`tenant_name.ilike.%${tenantSearchQuery}%,tenant_phone.ilike.%${tenantSearchQuery}%`)
-        .limit(10);
+        .or(`tenant_name.ilike.%${tenantSearchQuery}%,tenant_phone.ilike.%${tenantSearchQuery}%`);
+
+      // Apply status filter
+      if (tenantStatusFilter !== "all") {
+        query = query.eq("status", tenantStatusFilter);
+      }
+
+      // Apply balance range filter
+      if (minBalanceFilter) {
+        query = query.gte("outstanding_balance", parseFloat(minBalanceFilter));
+      }
+      if (maxBalanceFilter) {
+        query = query.lte("outstanding_balance", parseFloat(maxBalanceFilter));
+      }
+
+      // Apply date range filter
+      if (startDateFilter) {
+        query = query.gte("created_at", format(startDateFilter, "yyyy-MM-dd"));
+      }
+      if (endDateFilter) {
+        query = query.lte("created_at", format(endDateFilter, "yyyy-MM-dd"));
+      }
+
+      const { data, error } = await query.limit(20);
 
       if (error) throw error;
 
@@ -147,7 +188,7 @@ const ManagerDashboard = () => {
         .select("id, full_name, phone_number")
         .eq("role", "agent")
         .or(`full_name.ilike.%${agentSearchQuery}%,phone_number.ilike.%${agentSearchQuery}%`)
-        .limit(10);
+        .limit(50);
 
       if (profileError) throw profileError;
 
@@ -159,7 +200,7 @@ const ManagerDashboard = () => {
         return;
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("agents")
         .select(`
           *,
@@ -170,17 +211,69 @@ const ManagerDashboard = () => {
         `)
         .in("user_id", userIds);
 
+      const { data: agentsData, error } = await query;
+
       if (error) throw error;
 
-      setSearchResults(data || []);
-      
-      if (!data || data.length === 0) {
-        toast.info("No agents found matching your search");
+      // Fetch tenant counts for filtering
+      if (agentsData && agentsData.length > 0) {
+        const agentIds = agentsData.map(a => a.id);
+        const { data: tenantCounts } = await supabase
+          .from("tenants")
+          .select("agent_id")
+          .in("agent_id", agentIds);
+
+        const tenantCountMap = (tenantCounts || []).reduce((acc: Record<string, number>, tenant) => {
+          acc[tenant.agent_id] = (acc[tenant.agent_id] || 0) + 1;
+          return acc;
+        }, {});
+
+        let filteredAgents = agentsData.map(agent => ({
+          ...agent,
+          tenant_count: tenantCountMap[agent.id] || 0,
+        }));
+
+        // Apply status filter (active/inactive based on tenant count)
+        if (agentStatusFilter === "active") {
+          filteredAgents = filteredAgents.filter(a => a.tenant_count > 0);
+        } else if (agentStatusFilter === "inactive") {
+          filteredAgents = filteredAgents.filter(a => a.tenant_count === 0);
+        }
+
+        // Apply tenant count range filter
+        if (minTenantsFilter) {
+          filteredAgents = filteredAgents.filter(a => a.tenant_count >= parseInt(minTenantsFilter));
+        }
+        if (maxTenantsFilter) {
+          filteredAgents = filteredAgents.filter(a => a.tenant_count <= parseInt(maxTenantsFilter));
+        }
+
+        setSearchResults(filteredAgents);
+        
+        if (filteredAgents.length === 0) {
+          toast.info("No agents found matching your search");
+        }
+      } else {
+        setSearchResults([]);
       }
     } catch (error) {
       console.error("Search error:", error);
       toast.error("Failed to search agents");
     }
+  };
+
+  const clearTenantFilters = () => {
+    setTenantStatusFilter("all");
+    setMinBalanceFilter("");
+    setMaxBalanceFilter("");
+    setStartDateFilter(undefined);
+    setEndDateFilter(undefined);
+  };
+
+  const clearAgentFilters = () => {
+    setAgentStatusFilter("all");
+    setMinTenantsFilter("");
+    setMaxTenantsFilter("");
   };
 
   if (isLoading) {
@@ -271,9 +364,11 @@ const ManagerDashboard = () => {
                   className="w-full" 
                   size="lg"
                   onClick={() => {
-                    setShowTenantSearch(true);
-                    setSearchResults([]);
-                    setTenantSearchQuery("");
+                  setShowTenantSearch(true);
+                  setSearchResults([]);
+                  setTenantSearchQuery("");
+                  clearTenantFilters();
+                  setShowAdvancedFilters(false);
                   }}
                 >
                   <Search className="h-5 w-5 mr-2" />
@@ -297,9 +392,11 @@ const ManagerDashboard = () => {
                   className="w-full" 
                   size="lg"
                   onClick={() => {
-                    setShowAgentSearch(true);
-                    setSearchResults([]);
-                    setAgentSearchQuery("");
+                  setShowAgentSearch(true);
+                  setSearchResults([]);
+                  setAgentSearchQuery("");
+                  clearAgentFilters();
+                  setShowAdvancedFilters(false);
                   }}
                 >
                   <Search className="h-5 w-5 mr-2" />
@@ -460,6 +557,126 @@ const ManagerDashboard = () => {
               </Button>
             </div>
 
+            {/* Advanced Filters Toggle */}
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            >
+              {showAdvancedFilters ? <ChevronUp className="h-4 w-4 mr-2" /> : <ChevronDown className="h-4 w-4 mr-2" />}
+              Advanced Filters
+            </Button>
+
+            {/* Advanced Filters Panel */}
+            {showAdvancedFilters && (
+              <Card className="p-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Status Filter */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Status</label>
+                    <Select value={tenantStatusFilter} onValueChange={setTenantStatusFilter}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="verified">Verified</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Min Balance */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Min Balance (UGX)</label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 0"
+                      value={minBalanceFilter}
+                      onChange={(e) => setMinBalanceFilter(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Max Balance */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Max Balance (UGX)</label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 1000000"
+                      value={maxBalanceFilter}
+                      onChange={(e) => setMaxBalanceFilter(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Start Date */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Registration Start Date</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !startDateFilter && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {startDateFilter ? format(startDateFilter, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={startDateFilter}
+                          onSelect={setStartDateFilter}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* End Date */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Registration End Date</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !endDateFilter && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {endDateFilter ? format(endDateFilter, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={endDateFilter}
+                          onSelect={setEndDateFilter}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={clearTenantFilters} className="flex-1">
+                    Clear Filters
+                  </Button>
+                  <Button onClick={handleTenantSearch} className="flex-1">
+                    Apply Filters
+                  </Button>
+                </div>
+              </Card>
+            )}
+
             {searchResults.length > 0 && (
               <div className="space-y-2">
                 <h3 className="font-medium text-sm text-muted-foreground">Search Results ({searchResults.length})</h3>
@@ -521,6 +738,69 @@ const ManagerDashboard = () => {
                 Search
               </Button>
             </div>
+
+            {/* Advanced Filters Toggle */}
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            >
+              {showAdvancedFilters ? <ChevronUp className="h-4 w-4 mr-2" /> : <ChevronDown className="h-4 w-4 mr-2" />}
+              Advanced Filters
+            </Button>
+
+            {/* Advanced Filters Panel */}
+            {showAdvancedFilters && (
+              <Card className="p-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Status Filter */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Status</label>
+                    <Select value={agentStatusFilter} onValueChange={setAgentStatusFilter}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Min Tenants */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Min Tenants</label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 0"
+                      value={minTenantsFilter}
+                      onChange={(e) => setMinTenantsFilter(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Max Tenants */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Max Tenants</label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 100"
+                      value={maxTenantsFilter}
+                      onChange={(e) => setMaxTenantsFilter(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={clearAgentFilters} className="flex-1">
+                    Clear Filters
+                  </Button>
+                  <Button onClick={handleAgentSearch} className="flex-1">
+                    Apply Filters
+                  </Button>
+                </div>
+              </Card>
+            )}
 
             {searchResults.length > 0 && (
               <div className="space-y-2">
