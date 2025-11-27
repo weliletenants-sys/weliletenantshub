@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useRealtimeAgents, useRealtimeAllTenants } from "@/hooks/useRealtimeSubscription";
+import { useRealtimeAgents, useRealtimeAllTenants, useRealtimeProfiles, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
 
 const ManagerAgents = () => {
   const [agents, setAgents] = useState<any[]>([]);
@@ -14,16 +14,19 @@ const ManagerAgents = () => {
   // Enable real-time updates
   useRealtimeAgents();
   useRealtimeAllTenants();
-
-  useEffect(() => {
-    fetchAgents();
-  }, []);
+  useRealtimeProfiles();
 
   const fetchAgents = async () => {
     try {
       const { data, error } = await supabase
         .from("agents")
-        .select("*");
+        .select(`
+          *,
+          profiles:user_id (
+            full_name,
+            phone_number
+          )
+        `);
 
       if (error) throw error;
       setAgents(data || []);
@@ -33,6 +36,22 @@ const ManagerAgents = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchAgents();
+    
+    // Listen for real-time updates and refetch
+    const unregisterCallback = registerSyncCallback((table) => {
+      if (table === 'agents' || table === 'profiles') {
+        console.log(`Real-time update detected on ${table}, refreshing agents list`);
+        fetchAgents();
+      }
+    });
+
+    return () => {
+      unregisterCallback();
+    };
+  }, []);
 
   return (
     <ManagerLayout currentPage="/manager/agents">
@@ -78,8 +97,10 @@ const ManagerAgents = () => {
                   ) : (
                     agents.map((agent) => (
                       <TableRow key={agent.id} className="cursor-pointer hover:bg-muted/50">
-                        <TableCell className="font-medium">{agent.user_id}</TableCell>
-                        <TableCell>-</TableCell>
+                        <TableCell className="font-medium">
+                          {agent.profiles?.full_name || 'Unknown Agent'}
+                        </TableCell>
+                        <TableCell>{agent.profiles?.phone_number || '-'}</TableCell>
                         <TableCell>
                           {agent.active_tenants} / {agent.total_tenants}
                         </TableCell>

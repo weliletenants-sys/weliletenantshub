@@ -7,6 +7,8 @@ import { CheckCircle2, XCircle, Phone, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+import { useRealtimeAllTenants, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
+
 interface Tenant {
   id: string;
   tenant_name: string;
@@ -16,42 +18,52 @@ interface Tenant {
   lc1_phone: string;
   rent_amount: number;
   status: string | null;
+  agent_id: string;
+  agents?: {
+    profiles?: {
+      full_name: string;
+      phone_number: string;
+    };
+  };
 }
 
 const ManagerVerifications = () => {
   const [pendingVerifications, setPendingVerifications] = useState<Tenant[]>([]);
+  
+  // Enable real-time updates
+  useRealtimeAllTenants();
+
+  const fetchPendingVerifications = async () => {
+    const { data } = await supabase
+      .from("tenants")
+      .select(`
+        *,
+        agents (
+          profiles:user_id (
+            full_name,
+            phone_number
+          )
+        )
+      `)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+
+    setPendingVerifications(data || []);
+  };
 
   useEffect(() => {
-    const fetchPendingVerifications = async () => {
-      const { data } = await supabase
-        .from("tenants")
-        .select("*")
-        .eq("status", "pending")
-        .order("created_at", { ascending: false });
-
-      setPendingVerifications(data || []);
-    };
-
     fetchPendingVerifications();
 
-    // Subscribe to realtime updates
-    const channel = supabase
-      .channel('verifications-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tenants'
-        },
-        () => {
-          fetchPendingVerifications();
-        }
-      )
-      .subscribe();
+    // Listen for real-time updates and refetch
+    const unregisterCallback = registerSyncCallback((table) => {
+      if (table === 'tenants') {
+        console.log(`Real-time update detected on ${table}, refreshing verifications`);
+        fetchPendingVerifications();
+      }
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      unregisterCallback();
     };
   }, []);
 
@@ -105,7 +117,9 @@ const ManagerVerifications = () => {
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle>{verification.tenant_name}</CardTitle>
-                      <CardDescription>New tenant registration</CardDescription>
+                      <CardDescription>
+                        Submitted by {verification.agents?.profiles?.full_name || 'Unknown Agent'}
+                      </CardDescription>
                     </div>
                     <Badge variant="secondary">Pending</Badge>
                   </div>
