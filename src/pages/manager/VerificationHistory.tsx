@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Search, CheckCircle, XCircle, Clock, Filter, X, ChevronLeft, ChevronRight, CalendarIcon, User, History } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useRealtimeAllCollections } from "@/hooks/useRealtimeSubscription";
 
 interface VerificationRecord {
@@ -55,12 +56,77 @@ const VerificationHistory = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [trendData, setTrendData] = useState<Array<{
+    date: string;
+    verified: number;
+    rejected: number;
+    total: number;
+  }>>([]);
 
   const fetchVerifications = async () => {
     try {
       setLoading(true);
 
-      // Build query
+      // Build query for trend data (without pagination)
+      let trendQuery = supabase
+        .from("collections")
+        .select("verified_at, status")
+        .in("status", ["verified", "rejected"])
+        .not("verified_at", "is", null)
+        .order("verified_at", { ascending: true });
+
+      // Apply same filters to trend query
+      if (statusFilter !== "all") {
+        trendQuery = trendQuery.eq("status", statusFilter);
+      }
+
+      if (paymentMethodFilter !== "all") {
+        trendQuery = trendQuery.eq("payment_method", paymentMethodFilter);
+      }
+
+      if (startDate) {
+        trendQuery = trendQuery.gte("verified_at", format(startDate, "yyyy-MM-dd"));
+      }
+
+      if (endDate) {
+        const endOfDay = new Date(endDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        trendQuery = trendQuery.lte("verified_at", endOfDay.toISOString());
+      }
+
+      // Fetch trend data
+      const { data: trendRecords } = await trendQuery;
+
+      // Process trend data - group by date
+      const trendMap = new Map<string, { verified: number; rejected: number }>();
+      
+      (trendRecords || []).forEach((record) => {
+        const dateKey = format(new Date(record.verified_at!), "yyyy-MM-dd");
+        const existing = trendMap.get(dateKey) || { verified: 0, rejected: 0 };
+        
+        if (record.status === "verified") {
+          existing.verified += 1;
+        } else if (record.status === "rejected") {
+          existing.rejected += 1;
+        }
+        
+        trendMap.set(dateKey, existing);
+      });
+
+      // Convert to array and sort by date
+      const trendArray = Array.from(trendMap.entries())
+        .map(([date, counts]) => ({
+          date: format(new Date(date), "MMM dd"),
+          fullDate: date,
+          verified: counts.verified,
+          rejected: counts.rejected,
+          total: counts.verified + counts.rejected,
+        }))
+        .sort((a, b) => a.fullDate.localeCompare(b.fullDate));
+
+      setTrendData(trendArray);
+
+      // Build query for table data
       let query = supabase
         .from("collections")
         .select(
@@ -413,6 +479,91 @@ const VerificationHistory = () => {
                       />
                     </PopoverContent>
                   </Popover>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Trend Chart */}
+        {trendData.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Verification Trends</CardTitle>
+              <CardDescription>
+                Daily breakdown of verified and rejected payments
+                {(startDate || endDate) && (
+                  <span className="ml-2">
+                    ({startDate && endDate
+                      ? `${format(startDate, "MMM dd, yyyy")} - ${format(endDate, "MMM dd, yyyy")}`
+                      : startDate
+                      ? `From ${format(startDate, "MMM dd, yyyy")}`
+                      : `Until ${format(endDate!, "MMM dd, yyyy")}`})
+                  </span>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={trendData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis 
+                      dataKey="date" 
+                      className="text-xs"
+                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    />
+                    <YAxis 
+                      className="text-xs"
+                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                      }}
+                      labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    />
+                    <Legend 
+                      wrapperStyle={{ paddingTop: '20px' }}
+                      iconType="circle"
+                    />
+                    <Bar 
+                      dataKey="verified" 
+                      fill="hsl(var(--chart-2))" 
+                      name="Verified"
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Bar 
+                      dataKey="rejected" 
+                      fill="hsl(var(--destructive))" 
+                      name="Rejected"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              
+              {/* Chart Summary */}
+              <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-chart-2">
+                    {trendData.reduce((sum, d) => sum + d.verified, 0)}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Total Verified</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-destructive">
+                    {trendData.reduce((sum, d) => sum + d.rejected, 0)}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Total Rejected</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold">
+                    {trendData.reduce((sum, d) => sum + d.total, 0)}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Total Records</p>
                 </div>
               </div>
             </CardContent>
