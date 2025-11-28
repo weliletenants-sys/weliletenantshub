@@ -75,13 +75,16 @@ export default defineConfig(({ mode }) => ({
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
+        sourcemap: true,
+        // Cache versioning for automatic invalidation
+        navigateFallback: null,
         runtimeCaching: [
           // Google Fonts - Cache first with long expiration
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: "CacheFirst",
             options: {
-              cacheName: "google-fonts-cache",
+              cacheName: "google-fonts-cache-v1",
               expiration: {
                 maxEntries: 10,
                 maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
@@ -96,9 +99,9 @@ export default defineConfig(({ mode }) => ({
             urlPattern: /\/rest\/v1\/(agents|tenants|collections)\?.*/i,
             handler: "StaleWhileRevalidate",
             options: {
-              cacheName: "dashboard-data-cache",
+              cacheName: "dashboard-data-cache-v1",
               expiration: {
-                maxEntries: 100,
+                maxEntries: 150,
                 maxAgeSeconds: 60 * 60 * 2 // 2 hours
               },
               cacheableResponse: {
@@ -107,22 +110,65 @@ export default defineConfig(({ mode }) => ({
               plugins: [
                 {
                   cacheKeyWillBeUsed: async ({ request }) => {
-                    // Cache based on URL without auth headers for better hit rate
-                    return request.url;
+                    // Remove auth tokens from cache key for better hit rate
+                    const url = new URL(request.url);
+                    url.searchParams.delete('apikey');
+                    return url.toString();
+                  },
+                  // Add timestamp for cache invalidation
+                  cachedResponseWillBeUsed: async ({ cachedResponse }) => {
+                    if (!cachedResponse) return null;
+                    
+                    const cacheTime = cachedResponse.headers.get('sw-cache-time');
+                    if (cacheTime) {
+                      const age = Date.now() - parseInt(cacheTime);
+                      // Auto-invalidate after 2 hours
+                      if (age > 2 * 60 * 60 * 1000) {
+                        return null;
+                      }
+                    }
+                    return cachedResponse;
+                  },
+                  cacheWillUpdate: async ({ response }) => {
+                    const clonedResponse = response.clone();
+                    const headers = new Headers(clonedResponse.headers);
+                    headers.set('sw-cache-time', Date.now().toString());
+                    
+                    return new Response(clonedResponse.body, {
+                      status: clonedResponse.status,
+                      statusText: clonedResponse.statusText,
+                      headers
+                    });
                   }
                 }
               ]
             }
           },
-          // Profile and User Data - Cache first with background sync
+          // Profile and User Data - Network first with cache fallback
           {
             urlPattern: /\/rest\/v1\/profiles\?.*/i,
-            handler: "CacheFirst",
+            handler: "NetworkFirst",
             options: {
-              cacheName: "profile-cache",
+              cacheName: "profile-cache-v1",
+              networkTimeoutSeconds: 5,
               expiration: {
-                maxEntries: 20,
+                maxEntries: 30,
                 maxAgeSeconds: 60 * 60 * 24 // 24 hours
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // Service Centre Manager Data - Stale While Revalidate
+          {
+            urlPattern: /\/rest\/v1\/service_centre_managers\?.*/i,
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "manager-data-cache-v1",
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 3 // 3 hours
               },
               cacheableResponse: {
                 statuses: [0, 200]
@@ -131,13 +177,28 @@ export default defineConfig(({ mode }) => ({
           },
           // Images and Media - Cache first with long expiration
           {
-            urlPattern: /\.(png|jpg|jpeg|svg|gif|webp)$/i,
+            urlPattern: /\.(png|jpg|jpeg|svg|gif|webp|avif)$/i,
             handler: "CacheFirst",
             options: {
-              cacheName: "images-cache",
+              cacheName: "images-cache-v1",
+              expiration: {
+                maxEntries: 150,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          // Storage bucket images - Cache first
+          {
+            urlPattern: /\/storage\/v1\/object\/public\/.*/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "storage-images-cache-v1",
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
               },
               cacheableResponse: {
                 statuses: [0, 200]
@@ -147,20 +208,22 @@ export default defineConfig(({ mode }) => ({
           // Auth endpoints - Network only (never cache auth)
           {
             urlPattern: /\/auth\/.*/i,
-            handler: "NetworkOnly",
-            options: {
-              cacheName: "auth-cache"
-            }
+            handler: "NetworkOnly"
+          },
+          // Realtime endpoints - Network only
+          {
+            urlPattern: /\/realtime\/.*/i,
+            handler: "NetworkOnly"
           },
           // All other Supabase API calls - Network first with fallback
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
             handler: "NetworkFirst",
             options: {
-              cacheName: "supabase-api-cache",
-              networkTimeoutSeconds: 8,
+              cacheName: "supabase-api-cache-v1",
+              networkTimeoutSeconds: 10,
               expiration: {
-                maxEntries: 75,
+                maxEntries: 100,
                 maxAgeSeconds: 60 * 30 // 30 minutes
               },
               cacheableResponse: {

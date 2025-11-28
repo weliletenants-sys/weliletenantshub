@@ -65,7 +65,7 @@ const App = () => {
     return !hasShownSplash;
   });
 
-  // Initialize cache cleanup on app start
+  // Initialize cache cleanup and service worker on app start
   useEffect(() => {
     clearOldCaches();
   }, []);
