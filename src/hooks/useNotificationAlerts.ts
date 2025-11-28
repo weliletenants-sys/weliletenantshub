@@ -5,6 +5,31 @@ interface NotificationAlert {
   vibrateForPayment: () => void;
 }
 
+interface NotificationPreferences {
+  soundEnabled: boolean;
+  vibrationEnabled: boolean;
+}
+
+const PREFERENCES_KEY = 'notification_preferences';
+
+const getPreferences = (): NotificationPreferences => {
+  const stored = localStorage.getItem(PREFERENCES_KEY);
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return { soundEnabled: true, vibrationEnabled: true };
+    }
+  }
+  return { soundEnabled: true, vibrationEnabled: true };
+};
+
+export const setNotificationPreferences = (preferences: NotificationPreferences) => {
+  localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
+};
+
+export const getNotificationPreferences = getPreferences;
+
 export const useNotificationAlerts = (): NotificationAlert => {
   const audioContextRef = useRef<AudioContext | null>(null);
 
@@ -28,6 +53,12 @@ export const useNotificationAlerts = (): NotificationAlert => {
   }, []);
 
   const playPaymentAlert = () => {
+    // Check if sound is enabled in preferences
+    const preferences = getPreferences();
+    if (!preferences.soundEnabled) {
+      return;
+    }
+
     if (!audioContextRef.current) {
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
@@ -92,6 +123,12 @@ export const useNotificationAlerts = (): NotificationAlert => {
   };
 
   const vibrateForPayment = () => {
+    // Check if vibration is enabled in preferences
+    const preferences = getPreferences();
+    if (!preferences.vibrationEnabled) {
+      return;
+    }
+
     // Check if vibration API is supported
     if ('vibrate' in navigator) {
       // Pattern: short-long-short vibration for payment notifications
