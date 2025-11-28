@@ -7,18 +7,22 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { User, Phone, Shield, Loader2, Lock, Eye, EyeOff, RefreshCw, CheckCircle, FileText } from "lucide-react";
+import { User, Phone, Shield, Loader2, Lock, Eye, EyeOff, RefreshCw, CheckCircle, FileText, Bell, Volume2, Vibrate } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { ChangelogDialog } from "@/components/ChangelogDialog";
 import { changelog } from "@/data/changelog";
+import { getNotificationPreferences, setNotificationPreferences } from "@/hooks/useNotificationAlerts";
 
 const AgentSettings = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [vibrationEnabled, setVibrationEnabled] = useState(true);
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
@@ -43,6 +47,11 @@ const AgentSettings = () => {
 
   useEffect(() => {
     fetchProfile();
+    
+    // Load notification preferences
+    const preferences = getNotificationPreferences();
+    setSoundEnabled(preferences.soundEnabled);
+    setVibrationEnabled(preferences.vibrationEnabled);
   }, []);
 
   const fetchProfile = async () => {
@@ -155,6 +164,18 @@ const AgentSettings = () => {
       toast.error('Failed to change password');
     } finally {
       setChangingPassword(false);
+    }
+  };
+
+  const handleNotificationPreferenceChange = (type: 'sound' | 'vibration', enabled: boolean) => {
+    if (type === 'sound') {
+      setSoundEnabled(enabled);
+      setNotificationPreferences({ soundEnabled: enabled, vibrationEnabled });
+      toast.success(enabled ? "Notification sounds enabled" : "Notification sounds disabled");
+    } else {
+      setVibrationEnabled(enabled);
+      setNotificationPreferences({ soundEnabled, vibrationEnabled: enabled });
+      toast.success(enabled ? "Notification vibration enabled" : "Notification vibration disabled");
     }
   };
 
@@ -373,6 +394,62 @@ const AgentSettings = () => {
                 </>
               )}
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Notification Preferences Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Bell className="h-5 w-5 text-primary" />
+              <CardTitle>Notification Preferences</CardTitle>
+            </div>
+            <CardDescription>
+              Customize how you receive payment notifications
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Sound Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Volume2 className="h-5 w-5 text-muted-foreground" />
+                <div className="space-y-0.5">
+                  <Label htmlFor="sound-toggle" className="text-base cursor-pointer">
+                    Notification Sounds
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Play sound alerts for payment notifications
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="sound-toggle"
+                checked={soundEnabled}
+                onCheckedChange={(checked) => handleNotificationPreferenceChange('sound', checked)}
+              />
+            </div>
+
+            <Separator />
+
+            {/* Vibration Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Vibrate className="h-5 w-5 text-muted-foreground" />
+                <div className="space-y-0.5">
+                  <Label htmlFor="vibration-toggle" className="text-base cursor-pointer">
+                    Notification Vibration
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Vibrate device for payment notifications
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="vibration-toggle"
+                checked={vibrationEnabled}
+                onCheckedChange={(checked) => handleNotificationPreferenceChange('vibration', checked)}
+              />
+            </div>
           </CardContent>
         </Card>
 
