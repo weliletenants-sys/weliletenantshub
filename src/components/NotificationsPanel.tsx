@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CalendarIcon, Search, XCircle, Send, ChevronDown, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format, formatDistanceToNow, isToday, isYesterday, isThisWeek } from "date-fns";
@@ -415,20 +416,28 @@ export const NotificationsPanel = () => {
           : `/manager/tenants/${tenantId}`;
         
         return (
-          <span
-            key={index}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 hover:scale-105 transition-all font-semibold underline decoration-2 underline-offset-2 decoration-primary/60 hover:decoration-primary shadow-sm hover:shadow-md"
-            onClick={(e) => {
-              e.stopPropagation();
-              haptics.light();
-              navigate(tenantRoute);
-              setOpen(false);
-            }}
-          >
-            <AlertCircle className="h-3.5 w-3.5 animate-pulse" />
-            {tenantName}
-            <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
-          </span>
+          <TooltipProvider key={index}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 hover:scale-105 transition-all font-semibold underline decoration-2 underline-offset-2 decoration-primary/60 hover:decoration-primary shadow-sm hover:shadow-md"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    haptics.light();
+                    navigate(tenantRoute);
+                    setOpen(false);
+                  }}
+                >
+                  <AlertCircle className="h-3.5 w-3.5 animate-pulse" />
+                  {tenantName}
+                  <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Tap to view tenant details</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         );
       }
       return <span key={index}>{part}</span>;
@@ -754,17 +763,26 @@ export const NotificationsPanel = () => {
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <span className="text-muted-foreground text-xs">Tenant:</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    haptics.light();
-                    navigate(`/agent/tenants/${notification.payment_data!.tenant_id}`);
-                    setOpen(false);
-                  }}
-                  className="block w-full text-left font-semibold text-primary hover:text-primary/80 underline decoration-2 underline-offset-2 transition-colors cursor-pointer"
-                >
-                  {notification.payment_data.tenant_name}
-                </button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          haptics.light();
+                          navigate(`/agent/tenants/${notification.payment_data!.tenant_id}`);
+                          setOpen(false);
+                        }}
+                        className="block w-full text-left font-semibold text-primary hover:text-primary/80 underline decoration-2 underline-offset-2 transition-colors cursor-pointer"
+                      >
+                        {notification.payment_data.tenant_name}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Tap to view tenant details</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               <div>
                 <span className="text-muted-foreground text-xs">Amount:</span>
