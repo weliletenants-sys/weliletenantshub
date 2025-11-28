@@ -279,3 +279,38 @@ export const useRealtimeProfiles = () => {
     };
   }, [queryClient]);
 };
+
+/**
+ * Real-time subscription hook for notifications
+ * Listens to all notification changes for the current user
+ */
+export const useRealtimeNotifications = () => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('notifications-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+        },
+        (payload) => {
+          console.log('Realtime notification change:', payload);
+          
+          // Notify sync indicators
+          notifySyncEvent('notifications');
+          
+          // Invalidate notifications queries
+          queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+};
