@@ -275,7 +275,7 @@ const AgentDashboard = () => {
         .eq("recipient_id", user.id)
         .eq("read", false)
         .order("created_at", { ascending: false })
-        .limit(3);
+        .limit(10);
 
       if (error) throw error;
 
@@ -347,6 +347,86 @@ const AgentDashboard = () => {
               <p className="text-sm text-muted-foreground">Your stats at a glance</p>
             </div>
 
+          {/* Manager Messages - HIGHLY PROMINENT DISPLAY */}
+          {managerNotifications.length > 0 && (
+            <Card className="border-4 border-primary bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 shadow-2xl animate-pulse-slow">
+              <CardHeader className="pb-4 bg-primary/10 rounded-t-lg border-b-2 border-primary/30">
+                <CardTitle className="flex items-center gap-3 text-primary text-2xl font-bold">
+                  <div className="relative">
+                    <MessageSquare className="h-8 w-8 animate-bounce" />
+                    <div className="absolute -top-1 -right-1 h-5 w-5 bg-destructive rounded-full flex items-center justify-center">
+                      <span className="text-[10px] font-bold text-white">{managerNotifications.length}</span>
+                    </div>
+                  </div>
+                  Manager Messages
+                </CardTitle>
+                <CardDescription className="text-sm font-medium">
+                  📢 Important updates from your manager - Read now!
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                {managerNotifications.map((notification) => (
+                  <Card
+                    key={notification.id}
+                    className={`relative ${getPriorityColor(notification.priority)} border-3 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02]`}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-3 right-3 h-8 w-8 z-10 hover:bg-destructive/20"
+                      onClick={() => handleDismissNotification(notification.id)}
+                    >
+                      <X className="h-5 w-5" />
+                    </Button>
+                    <CardContent className="p-5 pr-12">
+                      <div className="flex items-start gap-3">
+                        <span className="text-3xl flex-shrink-0">{getPriorityIcon(notification.priority)}</span>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-xl mb-2 leading-tight">{notification.title}</h4>
+                          <p className="text-base whitespace-pre-wrap mb-3 leading-relaxed">
+                            {notification.message}
+                          </p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className="text-sm font-semibold px-3 py-1">
+                              👤 {notification.profiles?.full_name || "Manager"}
+                            </Badge>
+                            <span className="text-sm text-muted-foreground font-medium">
+                              🕐 {format(new Date(notification.created_at), "MMM d, h:mm a")}
+                            </span>
+                            {notification.priority !== "normal" && (
+                              <Badge className={`text-sm font-bold px-3 py-1 ${
+                                notification.priority === "urgent" 
+                                  ? "bg-destructive animate-pulse"
+                                  : notification.priority === "high"
+                                  ? "bg-orange-500"
+                                  : "bg-muted"
+                              }`}>
+                                {notification.priority === "urgent" && "🚨 "}
+                                {notification.priority.toUpperCase()}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                <Button
+                  variant="default"
+                  size="lg"
+                  className="w-full text-base font-bold shadow-lg"
+                  onClick={() => {
+                    // Open notifications panel - this will be handled by clicking the bell icon
+                    document.querySelector('[data-notification-trigger]')?.dispatchEvent(new Event('click'));
+                  }}
+                >
+                  <Bell className="h-5 w-5 mr-2" />
+                  View All Notifications
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Quick Action Buttons */}
           <div className="grid grid-cols-2 gap-3">
             <Button 
@@ -378,80 +458,6 @@ const AgentDashboard = () => {
             onOpenChange={setQuickPaymentOpen}
             onSuccess={fetchAgentData}
           />
-
-          {/* Manager Messages - Prominent Display */}
-          {managerNotifications.length > 0 && (
-            <Card className="border-2 border-primary bg-gradient-to-br from-primary/5 to-primary/10 shadow-lg hover:shadow-xl transition-all">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-primary text-lg">
-                  <MessageSquare className="h-5 w-5" />
-                  Messages from Manager ({managerNotifications.length})
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Important updates and communications
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {managerNotifications.map((notification) => (
-                  <Card
-                    key={notification.id}
-                    className={`relative ${getPriorityColor(notification.priority)} border-2 hover:shadow-md transition-shadow`}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-2 right-2 h-6 w-6"
-                      onClick={() => handleDismissNotification(notification.id)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                    <CardContent className="p-4 pr-10">
-                      <div className="flex items-start gap-2 mb-2">
-                        <span className="text-lg">{getPriorityIcon(notification.priority)}</span>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-bold text-base mb-1">{notification.title}</h4>
-                          <p className="text-sm whitespace-pre-wrap mb-2">
-                            {notification.message}
-                          </p>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant="outline" className="text-xs">
-                              {notification.profiles?.full_name || "Manager"}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {format(new Date(notification.created_at), "MMM d, h:mm a")}
-                            </span>
-                            {notification.priority !== "normal" && (
-                              <Badge className={
-                                notification.priority === "urgent" 
-                                  ? "bg-destructive"
-                                  : notification.priority === "high"
-                                  ? "bg-orange-500"
-                                  : "bg-muted"
-                              }>
-                                {notification.priority.toUpperCase()}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => {
-                    // Open notifications panel - this will be handled by clicking the bell icon
-                    document.querySelector('[data-notification-trigger]')?.dispatchEvent(new Event('click'));
-                  }}
-                >
-                  <Bell className="h-4 w-4 mr-2" />
-                  View All Notifications
-                </Button>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Overdue Payment Notifications */}
           {overdueTenants.length > 0 && (
