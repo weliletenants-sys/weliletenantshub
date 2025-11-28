@@ -419,6 +419,11 @@ const AgentDashboard = () => {
                             <span className="text-sm text-muted-foreground font-medium">
                               🕐 {format(new Date(notification.created_at), "MMM d, h:mm a")}
                             </span>
+                            {notification.read_at && (
+                              <Badge variant="secondary" className="text-xs px-2 py-1">
+                                ✓ Read {format(new Date(notification.read_at), "MMM d, h:mm a")}
+                              </Badge>
+                            )}
                             {notification.priority !== "normal" && (
                               <Badge className={`text-sm font-bold px-3 py-1 ${
                                 notification.priority === "urgent" 

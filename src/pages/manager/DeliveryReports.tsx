@@ -406,9 +406,15 @@ const DeliveryReports = () => {
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-orange-500" />
+                              <span className="text-orange-500 font-medium">
+                                {msg.unread_count} unread
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
                               <Clock className="h-4 w-4 text-muted-foreground" />
                               <span className="text-muted-foreground">
-                                {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
+                                Sent {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
                               </span>
                             </div>
                           </div>
@@ -441,35 +447,93 @@ const DeliveryReports = () => {
                                   <TableHead>Phone</TableHead>
                                   <TableHead>Status</TableHead>
                                   <TableHead>Read At</TableHead>
+                                  <TableHead>Response Time</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {msg.recipients.map((recipient, idx) => (
-                                  <TableRow key={`${recipient.recipient_id}-${idx}`}>
-                                    <TableCell className="font-medium">
-                                      {recipient.recipient_name || "Unknown"}
-                                    </TableCell>
-                                    <TableCell>{recipient.recipient_phone}</TableCell>
-                                    <TableCell>
-                                      {recipient.read ? (
-                                        <Badge variant="default" className="bg-green-600">
-                                          <CheckCircle className="h-3 w-3 mr-1" />
-                                          Read
-                                        </Badge>
-                                      ) : (
-                                        <Badge variant="secondary">
-                                          <Clock className="h-3 w-3 mr-1" />
-                                          Unread
-                                        </Badge>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="text-sm text-muted-foreground">
-                                      {recipient.read_at
-                                        ? formatDistanceToNow(new Date(recipient.read_at), { addSuffix: true })
-                                        : "-"}
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
+                                {msg.recipients
+                                  .sort((a, b) => {
+                                    // Sort: read first, then by read_at time
+                                    if (a.read && !b.read) return -1;
+                                    if (!a.read && b.read) return 1;
+                                    if (a.read_at && b.read_at) {
+                                      return new Date(b.read_at).getTime() - new Date(a.read_at).getTime();
+                                    }
+                                    return 0;
+                                  })
+                                  .map((recipient, idx) => {
+                                    const responseTime = recipient.read_at 
+                                      ? Math.floor((new Date(recipient.read_at).getTime() - new Date(msg.created_at).getTime()) / 1000 / 60)
+                                      : null;
+                                    const isFastReader = responseTime && responseTime < 5;
+                                    const isSlowReader = responseTime && responseTime > 60;
+                                    
+                                    return (
+                                      <TableRow key={`${recipient.recipient_id}-${idx}`}>
+                                        <TableCell className="font-medium">
+                                          {recipient.recipient_name || "Unknown"}
+                                        </TableCell>
+                                        <TableCell>{recipient.recipient_phone}</TableCell>
+                                        <TableCell>
+                                          {recipient.read ? (
+                                            <Badge variant="default" className="bg-green-600">
+                                              <CheckCircle className="h-3 w-3 mr-1" />
+                                              Read
+                                            </Badge>
+                                          ) : (
+                                            <Badge variant="secondary">
+                                              <Clock className="h-3 w-3 mr-1" />
+                                              Unread
+                                            </Badge>
+                                          )}
+                                        </TableCell>
+                                        <TableCell>
+                                          {recipient.read_at ? (
+                                            <div className="space-y-1">
+                                              <div className="text-sm font-medium text-foreground">
+                                                {format(new Date(recipient.read_at), "MMM d, yyyy")}
+                                              </div>
+                                              <div className="text-xs text-muted-foreground">
+                                                {format(new Date(recipient.read_at), "h:mm a")}
+                                              </div>
+                                              <div className="text-xs text-muted-foreground italic">
+                                                ({formatDistanceToNow(new Date(recipient.read_at), { addSuffix: true })})
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <span className="text-sm text-muted-foreground">-</span>
+                                          )}
+                                        </TableCell>
+                                        <TableCell>
+                                          {responseTime !== null ? (
+                                            <div className="flex items-center gap-2">
+                                              <Badge 
+                                                variant={isFastReader ? "default" : isSlowReader ? "secondary" : "outline"}
+                                                className={
+                                                  isFastReader 
+                                                    ? "bg-green-600 text-white" 
+                                                    : isSlowReader 
+                                                    ? "bg-orange-500 text-white"
+                                                    : ""
+                                                }
+                                              >
+                                                {responseTime < 1 
+                                                  ? "< 1 min" 
+                                                  : responseTime < 60 
+                                                  ? `${responseTime} min`
+                                                  : responseTime < 1440
+                                                  ? `${Math.floor(responseTime / 60)}h ${responseTime % 60}m`
+                                                  : `${Math.floor(responseTime / 1440)} days`}
+                                              </Badge>
+                                              {isFastReader && <span className="text-green-600 text-xs">⚡ Fast</span>}
+                                            </div>
+                                          ) : (
+                                            <span className="text-sm text-muted-foreground">-</span>
+                                          )}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
                               </TableBody>
                             </Table>
                           </div>
