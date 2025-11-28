@@ -13,9 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Search, XCircle, Send } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { CalendarIcon, Search, XCircle, Send, ChevronDown, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { format, formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow, isToday, isYesterday, isThisWeek } from "date-fns";
 import { useOptimisticPayment } from "@/hooks/useOptimisticPayment";
 import { useQueryClient } from "@tanstack/react-query";
 import PaymentReceipt from "./PaymentReceipt";
@@ -65,6 +66,12 @@ export const NotificationsPanel = () => {
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [quickReplyText, setQuickReplyText] = useState<Record<string, string>>({});
   const [sendingReply, setSendingReply] = useState<string | null>(null);
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    today: false,
+    yesterday: false,
+    thisWeek: false,
+    older: false
+  });
   const observerTarget = useRef<HTMLDivElement>(null);
   const [receiptData, setReceiptData] = useState<{
     paymentData: {
@@ -252,6 +259,39 @@ export const NotificationsPanel = () => {
     } finally {
       setSendingReply(null);
     }
+  };
+
+  // Group notifications by date
+  const groupNotificationsByDate = (notifications: Notification[]) => {
+    const groups = {
+      today: [] as Notification[],
+      yesterday: [] as Notification[],
+      thisWeek: [] as Notification[],
+      older: [] as Notification[]
+    };
+
+    notifications.forEach(notification => {
+      const date = new Date(notification.created_at);
+      
+      if (isToday(date)) {
+        groups.today.push(notification);
+      } else if (isYesterday(date)) {
+        groups.yesterday.push(notification);
+      } else if (isThisWeek(date, { weekStartsOn: 1 })) {
+        groups.thisWeek.push(notification);
+      } else {
+        groups.older.push(notification);
+      }
+    });
+
+    return groups;
+  };
+
+  const toggleSection = (section: string) => {
+    setCollapsedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
   };
   
   // Infinite scroll observer
@@ -491,6 +531,192 @@ export const NotificationsPanel = () => {
     return priority.charAt(0).toUpperCase() + priority.slice(1);
   };
 
+  const renderNotificationCard = (notification: Notification) => (
+    <Card 
+      key={notification.id}
+      className={`${!notification.read ? 'border-primary/50 bg-primary/5' : ''} cursor-pointer hover:shadow-md transition-shadow`}
+      onClick={() => {
+        if (!notification.read) {
+          markAsRead(notification.id);
+        }
+      }}
+    >
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {getPriorityIcon(notification.priority)}
+            <CardTitle className="text-base truncate">{notification.title}</CardTitle>
+          </div>
+          <Badge className={`${getPriorityColor(notification.priority)} shrink-0 px-2 py-1`}>
+            {getPriorityLabel(notification.priority)}
+          </Badge>
+        </div>
+        <CardDescription className="text-xs space-y-1">
+          <div>From: {notification.profiles?.full_name || "System"} • {format(new Date(notification.created_at), "MMM d, h:mm a")}</div>
+          {notification.read && notification.read_at && (
+            <div className="flex items-center gap-1 text-green-600 font-medium">
+              <Check className="h-3 w-3" />
+              Read {formatDistanceToNow(new Date(notification.read_at), { addSuffix: true })} 
+              <span className="text-muted-foreground font-normal">
+                ({format(new Date(notification.read_at), "MMM d, h:mm a")})
+              </span>
+            </div>
+          )}
+          {!notification.read && (
+            <div className="flex items-center gap-1 text-orange-500 font-medium">
+              <AlertCircle className="h-3 w-3" />
+              Unread
+            </div>
+          )}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="pb-4">
+        <p className="text-sm whitespace-pre-wrap">
+          {renderMessageWithClickableTags(notification.message)}
+        </p>
+        
+        {/* Quick Reply Section - Only for messages from managers */}
+        {!notification.payment_data && notification.sender_id !== notification.recipient_id && (
+          <div className="mt-3 space-y-2">
+            <div className="flex gap-2">
+              <Textarea
+                placeholder="Type your reply..."
+                value={quickReplyText[notification.id] || ""}
+                onChange={(e) => setQuickReplyText(prev => ({
+                  ...prev,
+                  [notification.id]: e.target.value
+                }))}
+                className="min-h-[60px] resize-none"
+                maxLength={1000}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    handleQuickReply(notification.id, notification.sender_id);
+                  }
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                {quickReplyText[notification.id]?.length || 0}/1000 • Press Ctrl+Enter to send
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedNotificationId(notification.id);
+                    setThreadDialogOpen(true);
+                    if (!notification.read) {
+                      markAsRead(notification.id);
+                    }
+                  }}
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  View Thread
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleQuickReply(notification.id, notification.sender_id);
+                  }}
+                  disabled={sendingReply === notification.id || !quickReplyText[notification.id]?.trim()}
+                >
+                  {sendingReply === notification.id ? (
+                    "Sending..."
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Send Reply
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Original Reply Button - For payment notifications or when quick reply is not shown */}
+        {notification.payment_data && (
+          <div className="mt-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedNotificationId(notification.id);
+                setThreadDialogOpen(true);
+                if (!notification.read) {
+                  markAsRead(notification.id);
+                }
+              }}
+              className="w-full"
+            >
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Reply to Message
+            </Button>
+          </div>
+        )}
+        
+        {/* Payment data display */}
+        {notification.payment_data && (
+          <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground">Payment Details</span>
+              {notification.payment_data.applied && (
+                <Badge className="bg-green-100 text-green-700 border-green-200">
+                  <Check className="h-3 w-3 mr-1" />
+                  Applied
+                </Badge>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <span className="text-muted-foreground">Tenant:</span>
+                <p className="font-medium">{notification.payment_data.tenant_name}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Amount:</span>
+                <p className="font-medium">UGX {notification.payment_data.amount.toLocaleString()}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Method:</span>
+                <p className="font-medium capitalize">{notification.payment_data.payment_method}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Date:</span>
+                <p className="font-medium">{format(new Date(notification.payment_data.payment_date), "MMM d, yyyy")}</p>
+              </div>
+            </div>
+            
+            {!notification.payment_data.applied && (
+              <Button
+                size="sm"
+                className="w-full mt-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleApplyPayment(notification);
+                }}
+                disabled={applyingPayment === notification.id}
+              >
+                {applyingPayment === notification.id ? (
+                  <>Applying...</>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Apply Payment to Tenant Account
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
   return (
     <>
     <Sheet open={open} onOpenChange={setOpen}>
@@ -629,192 +855,114 @@ export const NotificationsPanel = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-3 pb-4">
-              {filteredNotifications.map((notification) => (
-                <Card 
-                  key={notification.id}
-                  className={`${!notification.read ? 'border-primary/50 bg-primary/5' : ''} cursor-pointer hover:shadow-md transition-shadow`}
-                  onClick={() => {
-                    if (!notification.read) {
-                      markAsRead(notification.id);
-                    }
-                  }}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        {getPriorityIcon(notification.priority)}
-                        <CardTitle className="text-base truncate">{notification.title}</CardTitle>
-                      </div>
-                      <Badge className={`${getPriorityColor(notification.priority)} shrink-0 px-2 py-1`}>
-                        {getPriorityLabel(notification.priority)}
-                      </Badge>
-                    </div>
-                    <CardDescription className="text-xs space-y-1">
-                      <div>From: {notification.profiles?.full_name || "System"} • {format(new Date(notification.created_at), "MMM d, h:mm a")}</div>
-                      {notification.read && notification.read_at && (
-                        <div className="flex items-center gap-1 text-green-600 font-medium">
-                          <Check className="h-3 w-3" />
-                          Read {formatDistanceToNow(new Date(notification.read_at), { addSuffix: true })} 
-                          <span className="text-muted-foreground font-normal">
-                            ({format(new Date(notification.read_at), "MMM d, h:mm a")})
-                          </span>
-                        </div>
-                      )}
-                      {!notification.read && (
-                        <div className="flex items-center gap-1 text-orange-500 font-medium">
-                          <AlertCircle className="h-3 w-3" />
-                          Unread
-                        </div>
-                      )}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pb-4">
-                    <p className="text-sm whitespace-pre-wrap">
-                      {renderMessageWithClickableTags(notification.message)}
-                    </p>
-                    
-                    {/* Quick Reply Section - Only for messages from managers */}
-                    {!notification.payment_data && notification.sender_id !== notification.recipient_id && (
-                      <div className="mt-3 space-y-2">
-                        <div className="flex gap-2">
-                          <Textarea
-                            placeholder="Type your reply..."
-                            value={quickReplyText[notification.id] || ""}
-                            onChange={(e) => setQuickReplyText(prev => ({
-                              ...prev,
-                              [notification.id]: e.target.value
-                            }))}
-                            className="min-h-[60px] resize-none"
-                            maxLength={1000}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                                e.preventDefault();
-                                handleQuickReply(notification.id, notification.sender_id);
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">
-                            {quickReplyText[notification.id]?.length || 0}/1000 • Press Ctrl+Enter to send
-                          </span>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedNotificationId(notification.id);
-                                setThreadDialogOpen(true);
-                                if (!notification.read) {
-                                  markAsRead(notification.id);
-                                }
-                              }}
-                            >
-                              <MessageSquare className="h-4 w-4 mr-2" />
-                              View Thread
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleQuickReply(notification.id, notification.sender_id);
-                              }}
-                              disabled={sendingReply === notification.id || !quickReplyText[notification.id]?.trim()}
-                            >
-                              {sendingReply === notification.id ? (
-                                "Sending..."
-                              ) : (
-                                <>
-                                  <Send className="h-4 w-4 mr-2" />
-                                  Send Reply
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Original Reply Button - For payment notifications or when quick reply is not shown */}
-                    {notification.payment_data && (
-                      <div className="mt-3">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedNotificationId(notification.id);
-                            setThreadDialogOpen(true);
-                            if (!notification.read) {
-                              markAsRead(notification.id);
-                            }
-                          }}
-                          className="w-full"
-                        >
-                          <MessageSquare className="h-4 w-4 mr-2" />
-                          Reply to Message
-                        </Button>
-                      </div>
-                    )}
-                    
-                    {/* Payment data display */}
-                    {notification.payment_data && (
-                      <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-muted-foreground">Payment Details</span>
-                          {notification.payment_data.applied && (
-                            <Badge className="bg-green-100 text-green-700 border-green-200">
-                              <Check className="h-3 w-3 mr-1" />
-                              Applied
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Tenant:</span>
-                            <p className="font-medium">{notification.payment_data.tenant_name}</p>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Amount:</span>
-                            <p className="font-medium">UGX {notification.payment_data.amount.toLocaleString()}</p>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Method:</span>
-                            <p className="font-medium capitalize">{notification.payment_data.payment_method}</p>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Date:</span>
-                            <p className="font-medium">{format(new Date(notification.payment_data.payment_date), "MMM d, yyyy")}</p>
-                          </div>
-                        </div>
-                        
-                        {!notification.payment_data.applied && (
-                          <Button
-                            size="sm"
-                            className="w-full mt-2"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleApplyPayment(notification);
-                            }}
-                            disabled={applyingPayment === notification.id}
-                          >
-                            {applyingPayment === notification.id ? (
-                              <>Applying...</>
+            <div className="space-y-4 pb-4">
+              {(() => {
+                const groupedNotifications = groupNotificationsByDate(filteredNotifications);
+                
+                return (
+                  <>
+                    {/* Today Section */}
+                    {groupedNotifications.today.length > 0 && (
+                      <Collapsible
+                        open={!collapsedSections.today}
+                        onOpenChange={() => toggleSection('today')}
+                      >
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                          <div className="flex items-center gap-2">
+                            {collapsedSections.today ? (
+                              <ChevronRight className="h-4 w-4" />
                             ) : (
-                              <>
-                                <Check className="h-4 w-4 mr-2" />
-                                Apply Payment to Tenant Account
-                              </>
+                              <ChevronDown className="h-4 w-4" />
                             )}
-                          </Button>
-                        )}
-                      </div>
+                            <span className="font-semibold text-sm">Today</span>
+                            <Badge variant="secondary" className="text-xs">
+                              {groupedNotifications.today.length}
+                            </Badge>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-3 mt-3">
+                          {groupedNotifications.today.map(renderNotificationCard)}
+                        </CollapsibleContent>
+                      </Collapsible>
                     )}
-                  </CardContent>
-                </Card>
-              ))}
+
+                    {/* Yesterday Section */}
+                    {groupedNotifications.yesterday.length > 0 && (
+                      <Collapsible
+                        open={!collapsedSections.yesterday}
+                        onOpenChange={() => toggleSection('yesterday')}
+                      >
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                          <div className="flex items-center gap-2">
+                            {collapsedSections.yesterday ? (
+                              <ChevronRight className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                            <span className="font-semibold text-sm">Yesterday</span>
+                            <Badge variant="secondary" className="text-xs">
+                              {groupedNotifications.yesterday.length}
+                            </Badge>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-3 mt-3">
+                          {groupedNotifications.yesterday.map(renderNotificationCard)}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
+
+                    {/* This Week Section */}
+                    {groupedNotifications.thisWeek.length > 0 && (
+                      <Collapsible
+                        open={!collapsedSections.thisWeek}
+                        onOpenChange={() => toggleSection('thisWeek')}
+                      >
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                          <div className="flex items-center gap-2">
+                            {collapsedSections.thisWeek ? (
+                              <ChevronRight className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                            <span className="font-semibold text-sm">This Week</span>
+                            <Badge variant="secondary" className="text-xs">
+                              {groupedNotifications.thisWeek.length}
+                            </Badge>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-3 mt-3">
+                          {groupedNotifications.thisWeek.map(renderNotificationCard)}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
+
+                    {/* Older Section */}
+                    {groupedNotifications.older.length > 0 && (
+                      <Collapsible
+                        open={!collapsedSections.older}
+                        onOpenChange={() => toggleSection('older')}
+                      >
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                          <div className="flex items-center gap-2">
+                            {collapsedSections.older ? (
+                              <ChevronRight className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                            <span className="font-semibold text-sm">Older</span>
+                            <Badge variant="secondary" className="text-xs">
+                              {groupedNotifications.older.length}
+                            </Badge>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-3 mt-3">
+                          {groupedNotifications.older.map(renderNotificationCard)}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
+                  </>
+                );
+              })()}
               
               {/* Infinite scroll trigger */}
               <div ref={observerTarget} className="h-4 flex items-center justify-center">
