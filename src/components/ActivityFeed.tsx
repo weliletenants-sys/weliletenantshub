@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, UserPlus, DollarSign, Edit, Trash2, Clock } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { Activity, UserPlus, DollarSign, Edit, Trash2, Clock, Filter, X, CalendarIcon, ChevronDown } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
 import { registerSyncCallback } from "@/hooks/useRealtimeSubscription";
+import { cn } from "@/lib/utils";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface ActivityItem {
   id: string;
@@ -23,7 +29,16 @@ interface ActivityFeedProps {
 
 export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [filteredActivities, setFilteredActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Filter states
+  const [activityTypeFilter, setActivityTypeFilter] = useState<string>("all");
+  const [agentFilter, setAgentFilter] = useState<string>("all");
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
+  const [availableAgents, setAvailableAgents] = useState<Array<{ id: string; name: string }>>([]);
 
   const fetchRecentActivities = async () => {
     try {
@@ -142,12 +157,66 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
         .slice(0, maxItems);
 
       setActivities(allActivities);
+      
+      // Extract unique agents for filter dropdown
+      const uniqueAgents = Array.from(
+        new Map(
+          allActivities.map(activity => [activity.agentName, activity.agentName])
+        ).entries()
+      ).map(([name]) => ({ id: name, name }));
+      
+      setAvailableAgents(uniqueAgents);
     } catch (error) {
       console.error('Error fetching activities:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Apply filters whenever activities or filter criteria change
+  useEffect(() => {
+    let filtered = [...activities];
+
+    // Filter by activity type
+    if (activityTypeFilter !== "all") {
+      filtered = filtered.filter(activity => activity.type === activityTypeFilter);
+    }
+
+    // Filter by agent
+    if (agentFilter !== "all") {
+      filtered = filtered.filter(activity => activity.agentName === agentFilter);
+    }
+
+    // Filter by date range
+    if (startDate) {
+      filtered = filtered.filter(activity => 
+        new Date(activity.timestamp) >= startDate
+      );
+    }
+
+    if (endDate) {
+      const endOfDay = new Date(endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(activity => 
+        new Date(activity.timestamp) <= endOfDay
+      );
+    }
+
+    setFilteredActivities(filtered);
+  }, [activities, activityTypeFilter, agentFilter, startDate, endDate]);
+
+  const clearFilters = () => {
+    setActivityTypeFilter("all");
+    setAgentFilter("all");
+    setStartDate(undefined);
+    setEndDate(undefined);
+  };
+
+  const hasActiveFilters = 
+    activityTypeFilter !== "all" || 
+    agentFilter !== "all" || 
+    startDate !== undefined || 
+    endDate !== undefined;
 
   useEffect(() => {
     fetchRecentActivities();
@@ -234,26 +303,187 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
             <Activity className="h-5 w-5 text-primary" />
             <CardTitle>Live Activity Feed</CardTitle>
           </div>
-          <Badge variant="outline" className="animate-pulse">
-            <div className="h-2 w-2 rounded-full bg-green-500 mr-2" />
-            Live
-          </Badge>
+          <div className="flex items-center gap-2">
+            {hasActiveFilters && (
+              <Badge variant="secondary" className="text-xs">
+                {filteredActivities.length} filtered
+              </Badge>
+            )}
+            <Badge variant="outline" className="animate-pulse">
+              <div className="h-2 w-2 rounded-full bg-green-500 mr-2" />
+              Live
+            </Badge>
+          </div>
         </div>
         <CardDescription>Real-time stream of agent activities</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {/* Filter Controls */}
+        <Collapsible open={showFilters} onOpenChange={setShowFilters}>
+          <div className="flex items-center justify-between">
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm" className="w-full justify-between">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  <span>Filters</span>
+                  {hasActiveFilters && (
+                    <Badge variant="secondary" className="h-5 text-xs">
+                      {[
+                        activityTypeFilter !== "all" && "Type",
+                        agentFilter !== "all" && "Agent",
+                        startDate && "Start",
+                        endDate && "End"
+                      ].filter(Boolean).length}
+                    </Badge>
+                  )}
+                </div>
+                <ChevronDown className={cn(
+                  "h-4 w-4 transition-transform",
+                  showFilters && "rotate-180"
+                )} />
+              </Button>
+            </CollapsibleTrigger>
+          </div>
+
+          <CollapsibleContent className="pt-4">
+            <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Activity Type Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Activity Type</label>
+                  <Select value={activityTypeFilter} onValueChange={setActivityTypeFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="tenant_added">Tenant Added</SelectItem>
+                      <SelectItem value="tenant_updated">Tenant Updated</SelectItem>
+                      <SelectItem value="tenant_deleted">Tenant Deleted</SelectItem>
+                      <SelectItem value="payment_recorded">Payment Recorded</SelectItem>
+                      <SelectItem value="profile_updated">Profile Updated</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Agent Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Agent</label>
+                  <Select value={agentFilter} onValueChange={setAgentFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Agents</SelectItem>
+                      {availableAgents.map((agent) => (
+                        <SelectItem key={agent.id} value={agent.name}>
+                          {agent.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Start Date */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Start Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !startDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {startDate ? format(startDate, "PPP") : <span>Pick start date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate}
+                        onSelect={setStartDate}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* End Date */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">End Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !endDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {endDate ? format(endDate, "PPP") : <span>Pick end date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDate}
+                        onSelect={setEndDate}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {/* Clear Filters Button */}
+              {hasActiveFilters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="w-full"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Clear All Filters
+                </Button>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
         <ScrollArea className="h-[400px] pr-4">
-          {activities.length === 0 ? (
+          {filteredActivities.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[300px] text-center">
               <Activity className="h-12 w-12 text-muted-foreground mb-3 opacity-50" />
-              <p className="text-muted-foreground">No recent activities</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Agent actions will appear here in real-time
+              <p className="text-muted-foreground">
+                {hasActiveFilters ? "No activities match your filters" : "No recent activities"}
               </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {hasActiveFilters 
+                  ? "Try adjusting your filter criteria" 
+                  : "Agent actions will appear here in real-time"}
+              </p>
+              {hasActiveFilters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="mt-4"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Clear Filters
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
-              {activities.map((activity) => (
+              {filteredActivities.map((activity) => (
                 <div
                   key={activity.id}
                   className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors duration-200"
