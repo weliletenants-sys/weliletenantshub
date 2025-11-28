@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ManagerLayout from "@/components/ManagerLayout";
+import { AgentDetailSkeleton } from "@/components/TenantDetailSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -141,7 +142,7 @@ const ManagerAgentDetail = () => {
   if (loading) {
     return (
       <ManagerLayout currentPage="/manager/agents">
-        <div className="text-center py-8">Loading agent details...</div>
+        <AgentDetailSkeleton />
       </ManagerLayout>
     );
   }
