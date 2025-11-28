@@ -8,9 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Send, FileText, Trash2, Share2, Lock, Tag, Code2, Eye, Save, FolderOpen, DollarSign } from "lucide-react";
+import { MessageSquare, Send, FileText, Trash2, Share2, Lock, Tag, Code2, Eye, Save, FolderOpen, DollarSign, Check, ChevronsUpDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { CustomTemplateDialog } from "./CustomTemplateDialog";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -113,6 +116,7 @@ interface BulkMessageDialogProps {
 interface Tenant {
   id: string;
   tenant_name: string;
+  tenant_phone: string;
   agent_name: string;
 }
 
@@ -162,6 +166,8 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "mtn" | "airtel">("cash");
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [tenantSearchOpen, setTenantSearchOpen] = useState(false);
+  const [tenantSearchQuery, setTenantSearchQuery] = useState("");
 
   // Available template variables
   const TEMPLATE_VARIABLES = [
@@ -202,6 +208,7 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
         .select(`
           id,
           tenant_name,
+          tenant_phone,
           agents!inner(
             profiles!inner(full_name)
           )
@@ -213,6 +220,7 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
       const formattedTenants = (tenantsData || []).map((t: any) => ({
         id: t.id,
         tenant_name: t.tenant_name,
+        tenant_phone: t.tenant_phone,
         agent_name: t.agents?.profiles?.full_name || "Unknown Agent"
       }));
 
@@ -578,6 +586,8 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
     setPaymentAmount("");
     setPaymentMethod("cash");
     setPaymentDate(new Date().toISOString().split('T')[0]);
+    setTenantSearchOpen(false);
+    setTenantSearchQuery("");
   };
 
   const handleSendPayment = async () => {
@@ -816,18 +826,71 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
               <>
                 <div className="space-y-2">
                   <Label htmlFor="payment-tenant">Select Tenant *</Label>
-                  <Select value={paymentTenantId} onValueChange={setPaymentTenantId}>
-                    <SelectTrigger id="payment-tenant">
-                      <SelectValue placeholder="Choose a tenant..." />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[200px]">
-                      {tenants.map((tenant) => (
-                        <SelectItem key={tenant.id} value={tenant.id}>
-                          {tenant.tenant_name} (Agent: {tenant.agent_name})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={tenantSearchOpen} onOpenChange={setTenantSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={tenantSearchOpen}
+                        className="w-full justify-between"
+                      >
+                        {paymentTenantId
+                          ? tenants.find((tenant) => tenant.id === paymentTenantId)?.tenant_name
+                          : "Search tenant by name..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput 
+                          placeholder="Type tenant name..." 
+                          value={tenantSearchQuery}
+                          onValueChange={setTenantSearchQuery}
+                        />
+                        <CommandList>
+                          <CommandEmpty>No tenant found.</CommandEmpty>
+                          <CommandGroup>
+                            {tenants
+                              .filter((tenant) => 
+                                tenant.tenant_name.toLowerCase().includes(tenantSearchQuery.toLowerCase()) ||
+                                tenant.agent_name.toLowerCase().includes(tenantSearchQuery.toLowerCase()) ||
+                                tenant.tenant_phone.includes(tenantSearchQuery)
+                              )
+                              .map((tenant) => (
+                                <CommandItem
+                                  key={tenant.id}
+                                  value={tenant.id}
+                                  onSelect={(currentValue) => {
+                                    setPaymentTenantId(currentValue === paymentTenantId ? "" : currentValue);
+                                    setTenantSearchOpen(false);
+                                    setTenantSearchQuery("");
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      paymentTenantId === tenant.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{tenant.tenant_name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      Agent: {tenant.agent_name} • {tenant.tenant_phone}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {paymentTenantId && (
+                    <p className="text-xs text-muted-foreground">
+                      Selected: {tenants.find(t => t.id === paymentTenantId)?.tenant_name} 
+                      (Agent: {tenants.find(t => t.id === paymentTenantId)?.agent_name})
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
