@@ -63,10 +63,16 @@ export const useRealtimeTenants = (agentId: string | null | undefined) => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Realtime subscription error for tenants');
+        }
+      });
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(channel).catch((error) => {
+        console.error('Error removing tenants channel:', error);
+      });
     };
   }, [agentId, queryClient]);
 };
@@ -104,10 +110,16 @@ export const useRealtimeCollections = (tenantId: string | undefined) => {
           queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Realtime subscription error for collections');
+        }
+      });
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(channel).catch((error) => {
+        console.error('Error removing collections channel:', error);
+      });
     };
   }, [tenantId, queryClient]);
 };
