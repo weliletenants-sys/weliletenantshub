@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Bell, X, AlertCircle, Info, AlertTriangle, Zap } from "lucide-react";
+import { Bell, X, AlertCircle, Info, AlertTriangle, Zap, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { format } from "date-fns";
+import { useOptimisticPayment } from "@/hooks/useOptimisticPayment";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Notification {
   id: string;
@@ -18,6 +20,14 @@ interface Notification {
   priority: "low" | "normal" | "high" | "urgent";
   read: boolean;
   created_at: string;
+  payment_data?: {
+    tenant_id: string;
+    tenant_name: string;
+    amount: number;
+    payment_method: string;
+    payment_date: string;
+    applied: boolean;
+  };
   profiles?: {
     full_name: string | null;
   };
@@ -25,10 +35,14 @@ interface Notification {
 
 export const NotificationsPanel = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [applyingPayment, setApplyingPayment] = useState<string | null>(null);
+  
+  const optimisticPayment = useOptimisticPayment();
 
   const fetchNotifications = async () => {
     try {
@@ -49,7 +63,7 @@ export const NotificationsPanel = () => {
 
       if (error) throw error;
 
-      setNotifications((data || []) as Notification[]);
+      setNotifications((data || []) as unknown as Notification[]);
       setUnreadCount((data || []).filter(n => !n.read).length);
     } catch (error: any) {
       console.error("Error fetching notifications:", error);
@@ -164,6 +178,69 @@ export const NotificationsPanel = () => {
     }
   };
 
+  const handleApplyPayment = async (notification: Notification) => {
+    if (!notification.payment_data || notification.payment_data.applied) {
+      return;
+    }
+
+    setApplyingPayment(notification.id);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Get agent ID
+      const { data: agentData, error: agentError } = await supabase
+        .from("agents")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (agentError) throw agentError;
+
+      const paymentData = notification.payment_data;
+      
+      // Calculate commission (5%)
+      const commission = paymentData.amount * 0.05;
+
+      // Apply payment using optimistic mutation
+      await optimisticPayment.mutateAsync({
+        tenantId: paymentData.tenant_id,
+        agentId: agentData.id,
+        amount: paymentData.amount,
+        commission: commission,
+        paymentMethod: paymentData.payment_method,
+        collectionDate: paymentData.payment_date,
+      });
+
+      // Mark payment as applied in notification
+      const { error: updateError } = await supabase
+        .from("notifications")
+        .update({ 
+          payment_data: {
+            ...paymentData,
+            applied: true
+          }
+        })
+        .eq("id", notification.id);
+
+      if (updateError) throw updateError;
+
+      toast.success("Payment applied successfully", {
+        description: `UGX ${paymentData.amount.toLocaleString()} recorded for ${paymentData.tenant_name}`
+      });
+
+      fetchNotifications();
+    } catch (error: any) {
+      console.error("Error applying payment:", error);
+      toast.error("Failed to apply payment", {
+        description: error.message
+      });
+    } finally {
+      setApplyingPayment(null);
+    }
+  };
+
   const getPriorityIcon = (priority: string) => {
     switch (priority) {
       case "urgent":
@@ -269,6 +346,60 @@ export const NotificationsPanel = () => {
                     <p className="text-sm whitespace-pre-wrap">
                       {renderMessageWithClickableTags(notification.message)}
                     </p>
+                    
+                    {/* Payment data display */}
+                    {notification.payment_data && (
+                      <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-muted-foreground">Payment Details</span>
+                          {notification.payment_data.applied && (
+                            <Badge className="bg-green-100 text-green-700 border-green-200">
+                              <Check className="h-3 w-3 mr-1" />
+                              Applied
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Tenant:</span>
+                            <p className="font-medium">{notification.payment_data.tenant_name}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Amount:</span>
+                            <p className="font-medium">UGX {notification.payment_data.amount.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Method:</span>
+                            <p className="font-medium capitalize">{notification.payment_data.payment_method}</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Date:</span>
+                            <p className="font-medium">{format(new Date(notification.payment_data.payment_date), "MMM d, yyyy")}</p>
+                          </div>
+                        </div>
+                        
+                        {!notification.payment_data.applied && (
+                          <Button
+                            size="sm"
+                            className="w-full mt-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleApplyPayment(notification);
+                            }}
+                            disabled={applyingPayment === notification.id}
+                          >
+                            {applyingPayment === notification.id ? (
+                              <>Applying...</>
+                            ) : (
+                              <>
+                                <Check className="h-4 w-4 mr-2" />
+                                Apply Payment to Tenant Account
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
