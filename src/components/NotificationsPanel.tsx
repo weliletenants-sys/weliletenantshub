@@ -307,6 +307,18 @@ export const NotificationsPanel = () => {
       [section]: !prev[section]
     }));
   };
+
+  // Calculate payment statistics
+  const paymentStats = {
+    pendingCount: notifications.filter(n => n.payment_data && !n.payment_data.applied).length,
+    pendingTotal: notifications
+      .filter(n => n.payment_data && !n.payment_data.applied)
+      .reduce((sum, n) => sum + (n.payment_data?.amount || 0), 0),
+    appliedCount: notifications.filter(n => n.payment_data && n.payment_data.applied).length,
+    appliedTotal: notifications
+      .filter(n => n.payment_data && n.payment_data.applied)
+      .reduce((sum, n) => sum + (n.payment_data?.amount || 0), 0),
+  };
   
   // Infinite scroll observer
   useEffect(() => {
@@ -859,6 +871,61 @@ export const NotificationsPanel = () => {
             </TabsList>
           </Tabs>
         </SheetHeader>
+
+        {/* Payment Stats Summary - Show only if there are payment notifications */}
+        {(paymentStats.pendingCount > 0 || paymentStats.appliedCount > 0) && (
+          <div className="p-6 pb-4 border-b bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
+            <div className="grid grid-cols-2 gap-3">
+              {/* Pending Payments Card */}
+              <Card className="border-2 border-orange-200 dark:border-orange-800 bg-white dark:bg-gray-900">
+                <CardHeader className="pb-2 pt-3 px-3">
+                  <CardDescription className="text-xs font-medium text-orange-600 dark:text-orange-400">
+                    PENDING PAYMENTS
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="px-3 pb-3">
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                      {paymentStats.pendingCount}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      UGX {paymentStats.pendingTotal.toLocaleString()}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Applied Payments Card */}
+              <Card className="border-2 border-green-200 dark:border-green-800 bg-white dark:bg-gray-900">
+                <CardHeader className="pb-2 pt-3 px-3">
+                  <CardDescription className="text-xs font-medium text-green-600 dark:text-green-400">
+                    APPLIED PAYMENTS
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="px-3 pb-3">
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {paymentStats.appliedCount}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      UGX {paymentStats.appliedTotal.toLocaleString()}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Total Summary */}
+            <div className="mt-3 p-2 rounded-lg bg-white/60 dark:bg-gray-900/60 border border-border">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold text-muted-foreground">Total Payment Value:</span>
+                <span className="font-bold text-primary">
+                  UGX {(paymentStats.pendingTotal + paymentStats.appliedTotal).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <ScrollArea className="flex-1 p-6">
           {loading ? (
