@@ -15,6 +15,7 @@ import { ChangelogDialog } from "@/components/ChangelogDialog";
 import { changelog } from "@/data/changelog";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
+import { PerformanceIndicator } from "@/components/PerformanceIndicator";
 
 // Eagerly load critical pages
 import Index from "./pages/Index";
@@ -99,6 +100,7 @@ const AppContent = () => {
       <Toaster />
       <Sonner />
       <InstallReminderProvider />
+      <PerformanceIndicator />
       
       {/* Changelog Dialog - Shows after updates */}
       <ChangelogDialog

@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
+import { trackApi } from '@/lib/performanceMonitor';
 
 type Tenant = Tables<'tenants'>;
 type Collection = Tables<'collections'>;
@@ -18,26 +19,40 @@ export const useTenantData = (tenantId: string | undefined) => {
     queryFn: async () => {
       if (!tenantId) return null;
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      const startTime = performance.now();
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return null;
 
-      const { data: agent } = await supabase
-        .from('agents')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
+        const { data: agent } = await supabase
+          .from('agents')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-      if (!agent) return null;
+        if (!agent) return null;
 
-      const { data: tenant, error } = await supabase
-        .from('tenants')
-        .select('*')
-        .eq('id', tenantId)
-        .eq('agent_id', agent.id)
-        .maybeSingle();
+        const { data: tenant, error } = await supabase
+          .from('tenants')
+          .select('*')
+          .eq('id', tenantId)
+          .eq('agent_id', agent.id)
+          .maybeSingle();
 
-      if (error) throw error;
-      return tenant;
+        const duration = performance.now() - startTime;
+        trackApi('Get Tenant Detail', duration, { tenantId });
+
+        if (error) throw error;
+        return tenant;
+      } catch (error) {
+        const duration = performance.now() - startTime;
+        trackApi('Get Tenant Detail', duration, { 
+          tenantId, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        });
+        throw error;
+      }
     },
     enabled: !!tenantId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -61,26 +76,43 @@ export const useCollectionsData = (tenantId: string | undefined) => {
     queryFn: async () => {
       if (!tenantId) return [];
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
+      const startTime = performance.now();
 
-      const { data: agent } = await supabase
-        .from('agents')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
 
-      if (!agent) return [];
+        const { data: agent } = await supabase
+          .from('agents')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-      const { data: collections, error } = await supabase
-        .from('collections')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .eq('agent_id', agent.id)
-        .order('collection_date', { ascending: false });
+        if (!agent) return [];
 
-      if (error) throw error;
-      return collections || [];
+        const { data: collections, error } = await supabase
+          .from('collections')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .eq('agent_id', agent.id)
+          .order('collection_date', { ascending: false });
+
+        const duration = performance.now() - startTime;
+        trackApi('Get Tenant Collections', duration, { 
+          tenantId, 
+          count: collections?.length || 0 
+        });
+
+        if (error) throw error;
+        return collections || [];
+      } catch (error) {
+        const duration = performance.now() - startTime;
+        trackApi('Get Tenant Collections', duration, { 
+          tenantId, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        });
+        throw error;
+      }
     },
     enabled: !!tenantId,
     staleTime: 2 * 60 * 1000, // 2 minutes
