@@ -6,8 +6,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, UserPlus, DollarSign, Edit, Trash2, Clock, Filter, X, CalendarIcon, ChevronDown } from "lucide-react";
+import { Activity, UserPlus, DollarSign, Edit, Trash2, Clock, Filter, X, CalendarIcon, ChevronDown, Search } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { registerSyncCallback } from "@/hooks/useRealtimeSubscription";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,7 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
   const [agentFilter, setAgentFilter] = useState<string>("all");
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [availableAgents, setAvailableAgents] = useState<Array<{ id: string; name: string }>>([]);
 
   const fetchRecentActivities = async () => {
@@ -177,6 +179,26 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
   useEffect(() => {
     let filtered = [...activities];
 
+    // Filter by text search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(activity => {
+        // Search in agent name
+        if (activity.agentName.toLowerCase().includes(query)) return true;
+        
+        // Search in description
+        if (activity.description.toLowerCase().includes(query)) return true;
+        
+        // Search in tenant name if available
+        if (activity.metadata?.tenantName?.toLowerCase().includes(query)) return true;
+        
+        // Search in payment amount if available
+        if (activity.metadata?.amount && activity.metadata.amount.toString().includes(query)) return true;
+        
+        return false;
+      });
+    }
+
     // Filter by activity type
     if (activityTypeFilter !== "all") {
       filtered = filtered.filter(activity => activity.type === activityTypeFilter);
@@ -203,20 +225,22 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
     }
 
     setFilteredActivities(filtered);
-  }, [activities, activityTypeFilter, agentFilter, startDate, endDate]);
+  }, [activities, activityTypeFilter, agentFilter, startDate, endDate, searchQuery]);
 
   const clearFilters = () => {
     setActivityTypeFilter("all");
     setAgentFilter("all");
     setStartDate(undefined);
     setEndDate(undefined);
+    setSearchQuery("");
   };
 
   const hasActiveFilters = 
     activityTypeFilter !== "all" || 
     agentFilter !== "all" || 
     startDate !== undefined || 
-    endDate !== undefined;
+    endDate !== undefined ||
+    searchQuery.trim() !== "";
 
   useEffect(() => {
     fetchRecentActivities();
@@ -318,6 +342,28 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
         <CardDescription>Real-time stream of agent activities</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search activities (tenant name, amount, description...)"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+          {searchQuery && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+              onClick={() => setSearchQuery("")}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+
         {/* Filter Controls */}
         <Collapsible open={showFilters} onOpenChange={setShowFilters}>
           <div className="flex items-center justify-between">
@@ -329,6 +375,7 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
                   {hasActiveFilters && (
                     <Badge variant="secondary" className="h-5 text-xs">
                       {[
+                        searchQuery.trim() && "Search",
                         activityTypeFilter !== "all" && "Type",
                         agentFilter !== "all" && "Agent",
                         startDate && "Start",
