@@ -15,7 +15,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Search, CheckCircle, XCircle, Clock, Filter, X, ChevronLeft, ChevronRight, CalendarIcon, User, History } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { useRealtimeAllCollections } from "@/hooks/useRealtimeSubscription";
+import { useRealtimeAllCollections, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
 
 interface VerificationRecord {
   id: string;
@@ -220,6 +220,18 @@ const VerificationHistory = () => {
 
   useEffect(() => {
     fetchVerifications();
+
+    // Listen for real-time updates and refetch
+    const unregisterCallback = registerSyncCallback((table) => {
+      if (table === 'collections') {
+        console.log(`Real-time update detected on ${table}, refreshing verification history`);
+        fetchVerifications();
+      }
+    });
+
+    return () => {
+      unregisterCallback();
+    };
   }, [currentPage, statusFilter, paymentMethodFilter, searchQuery, startDate, endDate]);
 
   const clearFilters = () => {

@@ -16,6 +16,7 @@ import { ArrowLeft, User, Phone, DollarSign, Calendar, Edit, Save, Trash2, Home,
 import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { haptics } from "@/utils/haptics";
+import { useRealtimeAllTenants, useRealtimeAllCollections, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
 
 interface TenantData {
   id: string;
@@ -93,6 +94,10 @@ const ManagerTenantDetail = () => {
     startDate: "",
     dueDate: "",
   });
+
+  // Enable real-time updates
+  useRealtimeAllTenants();
+  useRealtimeAllCollections();
 
   const fetchTenantData = async () => {
     try {
@@ -189,6 +194,18 @@ const ManagerTenantDetail = () => {
   useEffect(() => {
     fetchTenantData();
     fetchAvailableAgents();
+
+    // Listen for real-time updates and refetch
+    const unregisterCallback = registerSyncCallback((table) => {
+      if (table === 'tenants' || table === 'collections') {
+        console.log(`Real-time update detected on ${table}, refreshing tenant details`);
+        fetchTenantData();
+      }
+    });
+
+    return () => {
+      unregisterCallback();
+    };
   }, [tenantId]);
 
   const fetchAvailableAgents = async () => {
