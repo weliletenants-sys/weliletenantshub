@@ -9,9 +9,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, User, Phone, DollarSign, TrendingUp, Users, Calendar, Award } from "lucide-react";
+import { ArrowLeft, User, Phone, DollarSign, TrendingUp, Users, Calendar, Award, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useRealtimeAgents, useRealtimeAllTenants, useRealtimeAllCollections, useRealtimeProfiles, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface AgentData {
   id: string;
@@ -60,6 +71,7 @@ const ManagerAgentDetail = () => {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Enable real-time updates
   useRealtimeAgents();
@@ -139,6 +151,40 @@ const ManagerAgentDetail = () => {
     };
   }, [agentId]);
 
+  const handleDeleteAgent = async () => {
+    if (!agent) return;
+
+    // Check if agent has tenants
+    if (tenants.length > 0) {
+      toast.error("Cannot delete agent with active tenants", {
+        description: "Please reassign or remove all tenants before deleting this agent."
+      });
+      return;
+    }
+
+    setDeleteLoading(true);
+    
+    try {
+      // Delete agent record (this will also trigger cascade deletion of related records)
+      const { error: deleteError } = await supabase
+        .from("agents")
+        .delete()
+        .eq("id", agentId);
+
+      if (deleteError) throw deleteError;
+
+      toast.success("Agent deleted successfully");
+      navigate("/manager/agents");
+    } catch (error: any) {
+      console.error("Error deleting agent:", error);
+      toast.error("Failed to delete agent", {
+        description: error.message
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <ManagerLayout currentPage="/manager/agents">
@@ -181,9 +227,49 @@ const ManagerAgentDetail = () => {
             <h1 className="text-3xl font-bold">{agent.profiles?.full_name || 'Unknown Agent'}</h1>
             <p className="text-muted-foreground">Agent Performance & Details</p>
           </div>
-          <Badge variant={agent.active_tenants > 0 ? "default" : "secondary"}>
-            {agent.active_tenants > 0 ? "Active" : "Inactive"}
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Badge variant={agent.active_tenants > 0 ? "default" : "secondary"}>
+              {agent.active_tenants > 0 ? "Active" : "Inactive"}
+            </Badge>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  disabled={deleteLoading}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Agent
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Agent?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {tenants.length > 0 ? (
+                      <span className="text-destructive font-medium">
+                        This agent has {tenants.length} tenant(s). Please reassign or remove all tenants before deleting.
+                      </span>
+                    ) : (
+                      <>
+                        This will permanently delete <span className="font-semibold">{agent.profiles?.full_name}</span> and all associated data. This action cannot be undone.
+                      </>
+                    )}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteAgent}
+                    disabled={tenants.length > 0 || deleteLoading}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deleteLoading ? "Deleting..." : "Delete Agent"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
 
         {/* Performance Metrics Cards */}
