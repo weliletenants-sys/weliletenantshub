@@ -416,15 +416,16 @@ export const NotificationsPanel = () => {
         return (
           <span
             key={index}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary/10 text-primary cursor-pointer hover:bg-primary/20 transition-colors font-semibold"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 hover:scale-105 transition-all font-semibold underline decoration-2 underline-offset-2 decoration-primary/60 hover:decoration-primary shadow-sm hover:shadow-md"
             onClick={(e) => {
               e.stopPropagation();
               navigate(tenantRoute);
               setOpen(false);
             }}
           >
-            <AlertCircle className="h-3 w-3" />
+            <AlertCircle className="h-3.5 w-3.5 animate-pulse" />
             {tenantName}
+            <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
           </span>
         );
       }
