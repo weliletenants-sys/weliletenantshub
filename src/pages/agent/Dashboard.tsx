@@ -9,8 +9,9 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X } from "lucide-react";
+import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X, Reply, Send } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
@@ -35,6 +36,9 @@ const AgentDashboard = () => {
   const [managerNotifications, setManagerNotifications] = useState<any[]>([]);
   const [dismissedNotifications, setDismissedNotifications] = useState<string[]>([]);
   const [previousNotificationCount, setPreviousNotificationCount] = useState(0);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState<string>("");
+  const [sendingReply, setSendingReply] = useState(false);
   
   // Ref for auto-scroll to manager messages
   const managerMessagesRef = useRef<HTMLDivElement>(null);
@@ -346,6 +350,50 @@ const AgentDashboard = () => {
     }
   };
 
+  const handleSendReply = async (notificationId: string, originalSenderId: string, originalTitle: string) => {
+    if (!replyText.trim()) {
+      toast.error("Reply cannot be empty");
+      return;
+    }
+
+    try {
+      setSendingReply(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Send reply as a new notification to the manager
+      const { error } = await supabase
+        .from("notifications")
+        .insert({
+          sender_id: user.id,
+          recipient_id: originalSenderId,
+          title: `Re: ${originalTitle}`,
+          message: replyText,
+          priority: "normal",
+          read: false
+        });
+
+      if (error) throw error;
+
+      haptics.success();
+      toast.success("Reply sent to manager!");
+      setReplyText("");
+      setReplyingTo(null);
+
+      // Mark original notification as read
+      await supabase
+        .from("notifications")
+        .update({ read: true })
+        .eq("id", notificationId);
+
+    } catch (error) {
+      console.error("Error sending reply:", error);
+      toast.error("Failed to send reply");
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
   const portfolioPercentage = agentData ? (agentData.portfolio_value / agentData.portfolio_limit) * 100 : 0;
   const tenantsToMotorcycle = Math.max(0, 50 - (agentData?.active_tenants || 0));
 
@@ -412,7 +460,7 @@ const AgentDashboard = () => {
                           <p className="text-lg whitespace-pre-wrap mb-4 leading-relaxed">
                             {notification.message}
                           </p>
-                          <div className="flex items-center gap-3 flex-wrap">
+                          <div className="flex items-center gap-3 flex-wrap mb-4">
                             <Badge variant="outline" className="text-base font-bold px-4 py-1.5">
                               👤 {notification.profiles?.full_name || "Manager"}
                             </Badge>
@@ -437,6 +485,55 @@ const AgentDashboard = () => {
                               </Badge>
                             )}
                           </div>
+
+                          {/* Reply Section */}
+                          {replyingTo === notification.id ? (
+                            <div className="space-y-3 pt-3 border-t-2 border-primary/20">
+                              <Textarea
+                                placeholder="Type your reply..."
+                                value={replyText}
+                                onChange={(e) => setReplyText(e.target.value)}
+                                className="min-h-[100px] text-base"
+                                disabled={sendingReply}
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSendReply(notification.id, notification.sender_id, notification.title)}
+                                  disabled={sendingReply || !replyText.trim()}
+                                  className="flex-1 font-bold"
+                                >
+                                  <Send className="h-4 w-4 mr-2" />
+                                  {sendingReply ? "Sending..." : "Send Reply"}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setReplyingTo(null);
+                                    setReplyText("");
+                                  }}
+                                  disabled={sendingReply}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="mt-2 font-semibold"
+                              onClick={() => {
+                                setReplyingTo(notification.id);
+                                setReplyText("");
+                                haptics.light();
+                              }}
+                            >
+                              <Reply className="h-4 w-4 mr-2" />
+                              Reply to Manager
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </CardContent>
