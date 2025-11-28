@@ -84,7 +84,9 @@ const AgentDashboard = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      channel.unsubscribe().then(() => {
+        supabase.removeChannel(channel).catch(console.error);
+      });
     };
   }, []);
 
@@ -104,8 +106,11 @@ const AgentDashboard = () => {
   const fetchAgentData = async () => {
     try {
       setIsLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.error("Auth error:", userError);
+        return;
+      }
 
       const { data: agent, error } = await supabase
         .from("agents")
@@ -273,8 +278,8 @@ const AgentDashboard = () => {
 
   const fetchManagerNotifications = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) return;
 
       const { data, error } = await supabase
         .from("notifications")

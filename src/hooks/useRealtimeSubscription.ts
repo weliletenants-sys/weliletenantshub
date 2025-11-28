@@ -70,8 +70,10 @@ export const useRealtimeTenants = (agentId: string | null | undefined) => {
       });
 
     return () => {
-      supabase.removeChannel(channel).catch((error) => {
-        console.error('Error removing tenants channel:', error);
+      channel.unsubscribe().then(() => {
+        supabase.removeChannel(channel).catch((error) => {
+          console.error('Error removing tenants channel:', error);
+        });
       });
     };
   }, [agentId, queryClient]);
@@ -117,8 +119,10 @@ export const useRealtimeCollections = (tenantId: string | undefined) => {
       });
 
     return () => {
-      supabase.removeChannel(channel).catch((error) => {
-        console.error('Error removing collections channel:', error);
+      channel.unsubscribe().then(() => {
+        supabase.removeChannel(channel).catch((error) => {
+          console.error('Error removing collections channel:', error);
+        });
       });
     };
   }, [tenantId, queryClient]);
@@ -159,7 +163,9 @@ export const useRealtimeAllTenants = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      channel.unsubscribe().then(() => {
+        supabase.removeChannel(channel).catch(console.error);
+      });
     };
   }, [queryClient]);
 };
@@ -194,7 +200,9 @@ export const useRealtimeAllCollections = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      channel.unsubscribe().then(() => {
+        supabase.removeChannel(channel).catch(console.error);
+      });
     };
   }, [queryClient]);
 };
@@ -234,7 +242,9 @@ export const useRealtimeAgents = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      channel.unsubscribe().then(() => {
+        supabase.removeChannel(channel).catch(console.error);
+      });
     };
   }, [queryClient]);
 };
@@ -275,7 +285,9 @@ export const useRealtimeProfiles = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      channel.unsubscribe().then(() => {
+        supabase.removeChannel(channel).catch(console.error);
+      });
     };
   }, [queryClient]);
 };
@@ -310,7 +322,9 @@ export const useRealtimeNotifications = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      channel.unsubscribe().then(() => {
+        supabase.removeChannel(channel).catch(console.error);
+      });
     };
   }, [queryClient]);
 };
