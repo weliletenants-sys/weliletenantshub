@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import AgentLayout from "@/components/AgentLayout";
 import { TenantListSkeleton } from "@/components/TenantDetailSkeleton";
+import { VirtualizedList } from "@/components/VirtualizedList";
 import { ContentTransition, StaggeredList } from "@/components/ContentTransition";
 import { RefreshIndicator } from "@/components/RefreshIndicator";
 import { RealtimeSyncIndicator } from "@/components/RealtimeSyncIndicator";
@@ -109,19 +110,12 @@ const AgentTenants = () => {
 
   const renderTenantTable = (tenantList: any[]) => (
     <div className="overflow-x-auto -mx-2 sm:mx-0">
-      <Table>
-        <TableHeader>
-          <TableRow className="h-12">
-            <TableHead className="font-semibold">Name</TableHead>
-            <TableHead className="font-semibold">Phone</TableHead>
-            <TableHead className="font-semibold">Rent</TableHead>
-            <TableHead className="font-semibold">Status</TableHead>
-            <TableHead className="font-semibold">{activeTab === "overdue" ? "Overdue" : "Days"}</TableHead>
-            <TableHead className="font-semibold text-right">Balance</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {tenantList.map((tenant) => (
+      {tenantList.length > 20 ? (
+        <VirtualizedList
+          items={tenantList}
+          itemHeight={72}
+          height="calc(100vh - 400px)"
+          renderItem={(tenant) => (
             <TenantRow
               key={tenant.id}
               tenant={tenant}
@@ -129,9 +123,34 @@ const AgentTenants = () => {
               observeTenantRow={observeTenantRow}
               getStatusBadge={getStatusBadge}
             />
-          ))}
-        </TableBody>
-      </Table>
+          )}
+          className="border rounded-lg"
+        />
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow className="h-12">
+              <TableHead className="font-semibold">Name</TableHead>
+              <TableHead className="font-semibold">Phone</TableHead>
+              <TableHead className="font-semibold">Rent</TableHead>
+              <TableHead className="font-semibold">Status</TableHead>
+              <TableHead className="font-semibold">{activeTab === "overdue" ? "Overdue" : "Days"}</TableHead>
+              <TableHead className="font-semibold text-right">Balance</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tenantList.map((tenant) => (
+              <TenantRow
+                key={tenant.id}
+                tenant={tenant}
+                activeTab={activeTab}
+                observeTenantRow={observeTenantRow}
+                getStatusBadge={getStatusBadge}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </div>
   );
 

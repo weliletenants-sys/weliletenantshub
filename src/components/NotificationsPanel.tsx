@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { VirtualizedList } from "@/components/VirtualizedList";
 import { CalendarIcon, Search, XCircle, Send, ChevronDown, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format, formatDistanceToNow, isToday, isYesterday, isThisWeek } from "date-fns";
@@ -1168,8 +1169,23 @@ export const NotificationsPanel = () => {
                             </Badge>
                           </div>
                         </CollapsibleTrigger>
-                        <CollapsibleContent className="space-y-3 mt-3">
-                          {groupedNotifications.today.map(renderNotificationCard)}
+                        <CollapsibleContent className="mt-3">
+                          {groupedNotifications.today.length > 10 ? (
+                            <VirtualizedList
+                              items={groupedNotifications.today}
+                              itemHeight={180}
+                              height="500px"
+                              renderItem={(notification) => (
+                                <div className="mb-3">
+                                  {renderNotificationCard(notification)}
+                                </div>
+                              )}
+                            />
+                          ) : (
+                            <div className="space-y-3">
+                              {groupedNotifications.today.map(renderNotificationCard)}
+                            </div>
+                          )}
                         </CollapsibleContent>
                       </Collapsible>
                     )}
@@ -1193,8 +1209,23 @@ export const NotificationsPanel = () => {
                             </Badge>
                           </div>
                         </CollapsibleTrigger>
-                        <CollapsibleContent className="space-y-3 mt-3">
-                          {groupedNotifications.yesterday.map(renderNotificationCard)}
+                        <CollapsibleContent className="mt-3">
+                          {groupedNotifications.yesterday.length > 10 ? (
+                            <VirtualizedList
+                              items={groupedNotifications.yesterday}
+                              itemHeight={180}
+                              height="500px"
+                              renderItem={(notification) => (
+                                <div className="mb-3">
+                                  {renderNotificationCard(notification)}
+                                </div>
+                              )}
+                            />
+                          ) : (
+                            <div className="space-y-3">
+                              {groupedNotifications.yesterday.map(renderNotificationCard)}
+                            </div>
+                          )}
                         </CollapsibleContent>
                       </Collapsible>
                     )}
@@ -1218,8 +1249,23 @@ export const NotificationsPanel = () => {
                             </Badge>
                           </div>
                         </CollapsibleTrigger>
-                        <CollapsibleContent className="space-y-3 mt-3">
-                          {groupedNotifications.thisWeek.map(renderNotificationCard)}
+                        <CollapsibleContent className="mt-3">
+                          {groupedNotifications.thisWeek.length > 10 ? (
+                            <VirtualizedList
+                              items={groupedNotifications.thisWeek}
+                              itemHeight={180}
+                              height="500px"
+                              renderItem={(notification) => (
+                                <div className="mb-3">
+                                  {renderNotificationCard(notification)}
+                                </div>
+                              )}
+                            />
+                          ) : (
+                            <div className="space-y-3">
+                              {groupedNotifications.thisWeek.map(renderNotificationCard)}
+                            </div>
+                          )}
                         </CollapsibleContent>
                       </Collapsible>
                     )}
@@ -1243,8 +1289,23 @@ export const NotificationsPanel = () => {
                             </Badge>
                           </div>
                         </CollapsibleTrigger>
-                        <CollapsibleContent className="space-y-3 mt-3">
-                          {groupedNotifications.older.map(renderNotificationCard)}
+                        <CollapsibleContent className="mt-3">
+                          {groupedNotifications.older.length > 10 ? (
+                            <VirtualizedList
+                              items={groupedNotifications.older}
+                              itemHeight={180}
+                              height="500px"
+                              renderItem={(notification) => (
+                                <div className="mb-3">
+                                  {renderNotificationCard(notification)}
+                                </div>
+                              )}
+                            />
+                          ) : (
+                            <div className="space-y-3">
+                              {groupedNotifications.older.map(renderNotificationCard)}
+                            </div>
+                          )}
                         </CollapsibleContent>
                       </Collapsible>
                     )}
