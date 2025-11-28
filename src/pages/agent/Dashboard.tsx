@@ -8,14 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 import QuickPaymentDialog from "@/components/QuickPaymentDialog";
 import { clearOldCaches, getCacheSize } from "@/lib/cacheManager";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
+import { format } from "date-fns";
 
 const AgentDashboard = () => {
   const navigate = useNavigate();
@@ -30,12 +32,15 @@ const AgentDashboard = () => {
   const [verifiedPayments, setVerifiedPayments] = useState(0);
   const [rejectedPayments, setRejectedPayments] = useState(0);
   const [paymentMethodBreakdown, setPaymentMethodBreakdown] = useState<any[]>([]);
+  const [managerNotifications, setManagerNotifications] = useState<any[]>([]);
+  const [dismissedNotifications, setDismissedNotifications] = useState<string[]>([]);
   
   // Service worker for caching
   useServiceWorker();
 
   useEffect(() => {
     fetchAgentData();
+    fetchManagerNotifications();
     
     // Initialize cache management
     const initCache = async () => {
@@ -49,6 +54,26 @@ const AgentDashboard = () => {
     };
     
     initCache();
+
+    // Set up realtime subscription for notifications
+    const channel = supabase
+      .channel("dashboard-notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+        },
+        () => {
+          fetchManagerNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Show overdue notification on dashboard load
@@ -230,7 +255,72 @@ const AgentDashboard = () => {
   const handleRefresh = async () => {
     haptics.refresh();
     await fetchAgentData();
+    await fetchManagerNotifications();
     toast.success("Dashboard refreshed");
+  };
+
+  const fetchManagerNotifications = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("notifications")
+        .select(`
+          *,
+          profiles!notifications_sender_id_fkey (
+            full_name
+          )
+        `)
+        .eq("recipient_id", user.id)
+        .eq("read", false)
+        .order("created_at", { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+
+      setManagerNotifications((data || []).filter(n => !dismissedNotifications.includes(n.id)));
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  };
+
+  const handleDismissNotification = async (notificationId: string) => {
+    setDismissedNotifications(prev => [...prev, notificationId]);
+    
+    try {
+      await supabase
+        .from("notifications")
+        .update({ read: true })
+        .eq("id", notificationId);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "urgent":
+        return "border-destructive bg-destructive/10";
+      case "high":
+        return "border-orange-500 bg-orange-50 dark:bg-orange-950";
+      case "low":
+        return "border-muted bg-muted/30";
+      default:
+        return "border-primary bg-primary/10";
+    }
+  };
+
+  const getPriorityIcon = (priority: string) => {
+    switch (priority) {
+      case "urgent":
+      case "high":
+        return "🔴";
+      case "low":
+        return "🔵";
+      default:
+        return "📩";
+    }
   };
 
   const portfolioPercentage = agentData ? (agentData.portfolio_value / agentData.portfolio_limit) * 100 : 0;
@@ -288,6 +378,80 @@ const AgentDashboard = () => {
             onOpenChange={setQuickPaymentOpen}
             onSuccess={fetchAgentData}
           />
+
+          {/* Manager Messages - Prominent Display */}
+          {managerNotifications.length > 0 && (
+            <Card className="border-2 border-primary bg-gradient-to-br from-primary/5 to-primary/10 shadow-lg hover:shadow-xl transition-all">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-primary text-lg">
+                  <MessageSquare className="h-5 w-5" />
+                  Messages from Manager ({managerNotifications.length})
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Important updates and communications
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {managerNotifications.map((notification) => (
+                  <Card
+                    key={notification.id}
+                    className={`relative ${getPriorityColor(notification.priority)} border-2 hover:shadow-md transition-shadow`}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 h-6 w-6"
+                      onClick={() => handleDismissNotification(notification.id)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                    <CardContent className="p-4 pr-10">
+                      <div className="flex items-start gap-2 mb-2">
+                        <span className="text-lg">{getPriorityIcon(notification.priority)}</span>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-base mb-1">{notification.title}</h4>
+                          <p className="text-sm whitespace-pre-wrap mb-2">
+                            {notification.message}
+                          </p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className="text-xs">
+                              {notification.profiles?.full_name || "Manager"}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(notification.created_at), "MMM d, h:mm a")}
+                            </span>
+                            {notification.priority !== "normal" && (
+                              <Badge className={
+                                notification.priority === "urgent" 
+                                  ? "bg-destructive"
+                                  : notification.priority === "high"
+                                  ? "bg-orange-500"
+                                  : "bg-muted"
+                              }>
+                                {notification.priority.toUpperCase()}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    // Open notifications panel - this will be handled by clicking the bell icon
+                    document.querySelector('[data-notification-trigger]')?.dispatchEvent(new Event('click'));
+                  }}
+                >
+                  <Bell className="h-4 w-4 mr-2" />
+                  View All Notifications
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Overdue Payment Notifications */}
           {overdueTenants.length > 0 && (
