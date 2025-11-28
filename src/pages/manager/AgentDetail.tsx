@@ -5,6 +5,8 @@ import { AgentDetailSkeleton } from "@/components/TenantDetailSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,6 +74,7 @@ const ManagerAgentDetail = () => {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   // Enable real-time updates
   useRealtimeAgents();
@@ -237,6 +240,7 @@ const ManagerAgentDetail = () => {
                   variant="destructive" 
                   size="sm"
                   disabled={deleteLoading}
+                  onClick={() => setDeleteConfirmText("")}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete Agent
@@ -245,23 +249,39 @@ const ManagerAgentDetail = () => {
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete Agent?</AlertDialogTitle>
-                  <AlertDialogDescription>
+                  <AlertDialogDescription className="space-y-4">
                     {tenants.length > 0 ? (
                       <span className="text-destructive font-medium">
                         This agent has {tenants.length} tenant(s). Please reassign or remove all tenants before deleting.
                       </span>
                     ) : (
                       <>
-                        This will permanently delete <span className="font-semibold">{agent.profiles?.full_name}</span> and all associated data. This action cannot be undone.
+                        <div>
+                          This will permanently delete <span className="font-semibold">{agent.profiles?.full_name}</span> and all associated data. This action cannot be undone.
+                        </div>
+                        <div className="space-y-2 pt-2">
+                          <Label htmlFor="delete-confirm" className="text-sm font-medium">
+                            Type <span className="font-bold text-destructive">{agent.profiles?.full_name}</span> to confirm deletion:
+                          </Label>
+                          <Input
+                            id="delete-confirm"
+                            type="text"
+                            value={deleteConfirmText}
+                            onChange={(e) => setDeleteConfirmText(e.target.value)}
+                            placeholder="Enter agent name"
+                            className="font-mono"
+                            disabled={deleteLoading}
+                          />
+                        </div>
                       </>
                     )}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel onClick={() => setDeleteConfirmText("")}>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDeleteAgent}
-                    disabled={tenants.length > 0 || deleteLoading}
+                    disabled={tenants.length > 0 || deleteLoading || deleteConfirmText !== agent.profiles?.full_name}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     {deleteLoading ? "Deleting..." : "Delete Agent"}
