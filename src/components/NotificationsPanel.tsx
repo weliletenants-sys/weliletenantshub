@@ -373,6 +373,28 @@ export const NotificationsPanel = () => {
     return unsubscribe;
   }, [queryClient]);
 
+  const [userRole, setUserRole] = useState<string>("");
+
+  // Fetch user role on mount
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      
+      if (profile) {
+        setUserRole(profile.role);
+      }
+    };
+    
+    fetchUserRole();
+  }, []);
+
   const parseMessageWithTenantTags = (message: string): string => {
     // Extract tenant names from tags for display
     return message.replace(/\[TENANT:[^\]]+:([^\]]+)\]/g, '$1');
@@ -386,13 +408,18 @@ export const NotificationsPanel = () => {
       const match = part.match(/\[TENANT:([^:]+):([^\]]+)\]/);
       if (match) {
         const [, tenantId, tenantName] = match;
+        // Route based on user role - agents go to agent routes, managers to manager routes
+        const tenantRoute = userRole === "agent" 
+          ? `/agent/tenants/${tenantId}` 
+          : `/manager/tenants/${tenantId}`;
+        
         return (
           <span
             key={index}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary/10 text-primary cursor-pointer hover:bg-primary/20 transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary/10 text-primary cursor-pointer hover:bg-primary/20 transition-colors font-semibold"
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/manager/tenants/${tenantId}`);
+              navigate(tenantRoute);
               setOpen(false);
             }}
           >
