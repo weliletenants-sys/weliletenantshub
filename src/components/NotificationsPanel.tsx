@@ -424,14 +424,18 @@ export const NotificationsPanel = () => {
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "urgent":
-        return "bg-destructive/10 text-destructive border-destructive/20";
+        return "bg-red-500 text-white border-red-600 font-semibold";
       case "high":
-        return "bg-orange-100 text-orange-700 border-orange-200";
+        return "bg-orange-500 text-white border-orange-600 font-semibold";
       case "low":
-        return "bg-muted text-muted-foreground border-muted";
+        return "bg-gray-400 text-white border-gray-500";
       default:
-        return "bg-primary/10 text-primary border-primary/20";
+        return "bg-blue-500 text-white border-blue-600";
     }
+  };
+
+  const getPriorityLabel = (priority: string) => {
+    return priority.charAt(0).toUpperCase() + priority.slice(1);
   };
 
   return (
@@ -584,13 +588,13 @@ export const NotificationsPanel = () => {
                   }}
                 >
                   <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
                         {getPriorityIcon(notification.priority)}
-                        <CardTitle className="text-base">{notification.title}</CardTitle>
+                        <CardTitle className="text-base truncate">{notification.title}</CardTitle>
                       </div>
-                      <Badge className={getPriorityColor(notification.priority)}>
-                        {notification.priority}
+                      <Badge className={`${getPriorityColor(notification.priority)} shrink-0 px-2 py-1`}>
+                        {getPriorityLabel(notification.priority)}
                       </Badge>
                     </div>
                     <CardDescription className="text-xs space-y-1">
