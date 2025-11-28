@@ -27,6 +27,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import { BulkMessageDialog } from "@/components/BulkMessageDialog";
 import { MessageSquare } from "lucide-react";
+import { PaymentBroadcastWidget } from "@/components/PaymentBroadcastWidget";
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -1359,6 +1360,9 @@ const ManagerDashboard = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* Payment Broadcast Widget */}
+          <PaymentBroadcastWidget />
 
           {/* Admin Access Card */}
         <Card className="bg-primary/10 border-primary/20">
