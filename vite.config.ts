@@ -10,11 +10,16 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  define: {
+    // Add build timestamp for version tracking
+    'import.meta.env.VITE_BUILD_TIME': JSON.stringify(Date.now().toString()),
+  },
   plugins: [
     react(),
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
+      injectRegister: 'auto',
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
       manifest: {
         name: "Welile Agent & Service Centre Portal",
@@ -76,8 +81,10 @@ export default defineConfig(({ mode }) => ({
         skipWaiting: true,
         clientsClaim: true,
         sourcemap: true,
-        // Cache versioning for automatic invalidation
+        // Immediate update strategy
         navigateFallback: null,
+        // Clear all caches on update
+        maximumFileSizeToCacheInBytes: 5000000, // 5MB
         runtimeCaching: [
           // Google Fonts - Cache first with long expiration
           {

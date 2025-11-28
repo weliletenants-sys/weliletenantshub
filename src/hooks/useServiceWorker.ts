@@ -28,11 +28,11 @@ export const useServiceWorker = () => {
       if (reg) {
         setRegistration(reg);
 
-        // Check for updates every 20 minutes
+        // Check for updates every 2 minutes (more aggressive)
         const intervalId = setInterval(() => {
           console.log('Checking for service worker updates...');
           reg.update();
-        }, 20 * 60 * 1000);
+        }, 2 * 60 * 1000);
 
         // Listen for updates
         reg.addEventListener('updatefound', () => {
@@ -41,19 +41,20 @@ export const useServiceWorker = () => {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                 setIsUpdateAvailable(true);
-                toast.info('App update available', {
-                  description: 'A new version is ready. Reload to update.',
-                  duration: 15000,
-                  action: {
-                    label: 'Update Now',
-                    onClick: () => {
-                      // Clear caches before reload
-                      clearOldCaches().then(() => {
-                        window.location.reload();
-                      });
-                    },
-                  },
+                
+                // Auto-update after 3 seconds
+                toast.success('🔄 Update Available', {
+                  description: 'New version detected. Updating in 3 seconds...',
+                  duration: 3000,
                 });
+                
+                setTimeout(() => {
+                  // Clear caches and force reload
+                  clearOldCaches().then(() => {
+                    newWorker.postMessage({ type: 'SKIP_WAITING' });
+                    window.location.reload();
+                  });
+                }, 3000);
               }
             });
           }
