@@ -10,6 +10,7 @@ import { clearOldCaches } from "@/lib/cacheManager";
 import SplashScreen from "@/components/SplashScreen";
 import { InstallReminderProvider } from "@/components/InstallReminderProvider";
 import { useRoutePrefetch } from "@/hooks/useRoutePrefetch";
+import { useVersionCheck } from "@/hooks/useVersionCheck";
 
 // Eagerly load critical pages
 import Index from "./pages/Index";
@@ -66,6 +67,9 @@ const App = () => {
     const hasShownSplash = sessionStorage.getItem('splashShown');
     return !hasShownSplash;
   });
+
+  // Version checking - ensures all devices run latest version
+  useVersionCheck();
 
   // Initialize cache cleanup and service worker on app start
   useEffect(() => {
