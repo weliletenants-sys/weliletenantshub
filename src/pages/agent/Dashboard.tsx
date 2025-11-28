@@ -608,14 +608,11 @@ const AgentDashboard = () => {
                 ))}
                 </>
               )}
-              <Button
+              <Button 
                 variant="default"
                 size="lg"
                 className="w-full text-lg font-extrabold shadow-xl py-6"
-                onClick={() => {
-                  // Open notifications panel - this will be handled by clicking the bell icon
-                  document.querySelector('[data-notification-trigger]')?.dispatchEvent(new Event('click'));
-                }}
+                onClick={() => navigate("/agent/notifications")}
               >
                 <Bell className="h-6 w-6 mr-3" />
                 View All Notifications

@@ -35,6 +35,7 @@ const AgentAIAssistant = lazy(() => import("./pages/agent/AIAssistant"));
 const AgentWeeklySummary = lazy(() => import("./pages/agent/WeeklySummary"));
 const AgentSettings = lazy(() => import("./pages/agent/Settings"));
 const AgentReceiptHistory = lazy(() => import("./pages/agent/ReceiptHistory"));
+const AgentNotifications = lazy(() => import("./pages/agent/Notifications"));
 const ManagerDashboard = lazy(() => import("./pages/manager/Dashboard"));
 const ManagerAgents = lazy(() => import("./pages/manager/Agents"));
 const ManagerAgentDetail = lazy(() => import("./pages/manager/AgentDetail"));
@@ -169,6 +170,11 @@ const AppContent = () => {
             <Route path="/agent/receipt-history" element={
               <ProtectedRoute requiredRole="agent">
                 <AgentReceiptHistory />
+              </ProtectedRoute>
+            } />
+            <Route path="/agent/notifications" element={
+              <ProtectedRoute requiredRole="agent">
+                <AgentNotifications />
               </ProtectedRoute>
             } />
             <Route path="/manager/dashboard" element={
