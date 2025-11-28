@@ -232,10 +232,12 @@ export type Database = {
           category: string
           created_at: string | null
           id: string
+          is_shared: boolean | null
           manager_id: string
           message: string
           name: string
           priority: string | null
+          shared_at: string | null
           title: string
           updated_at: string | null
         }
@@ -243,10 +245,12 @@ export type Database = {
           category: string
           created_at?: string | null
           id?: string
+          is_shared?: boolean | null
           manager_id: string
           message: string
           name: string
           priority?: string | null
+          shared_at?: string | null
           title: string
           updated_at?: string | null
         }
@@ -254,10 +258,12 @@ export type Database = {
           category?: string
           created_at?: string | null
           id?: string
+          is_shared?: boolean | null
           manager_id?: string
           message?: string
           name?: string
           priority?: string | null
+          shared_at?: string | null
           title?: string
           updated_at?: string | null
         }
