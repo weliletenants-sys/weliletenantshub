@@ -28,6 +28,7 @@ const AgentOfflineQueue = lazy(() => import("./pages/agent/OfflineQueue"));
 const AgentAIAssistant = lazy(() => import("./pages/agent/AIAssistant"));
 const AgentWeeklySummary = lazy(() => import("./pages/agent/WeeklySummary"));
 const AgentSettings = lazy(() => import("./pages/agent/Settings"));
+const AgentReceiptHistory = lazy(() => import("./pages/agent/ReceiptHistory"));
 const ManagerDashboard = lazy(() => import("./pages/manager/Dashboard"));
 const ManagerAgents = lazy(() => import("./pages/manager/Agents"));
 const ManagerAgentDetail = lazy(() => import("./pages/manager/AgentDetail"));
@@ -143,6 +144,11 @@ const App = () => {
               <Route path="/agent/settings" element={
                 <ProtectedRoute requiredRole="agent">
                   <AgentSettings />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/receipt-history" element={
+                <ProtectedRoute requiredRole="agent">
+                  <AgentReceiptHistory />
                 </ProtectedRoute>
               } />
               <Route path="/manager/dashboard" element={
