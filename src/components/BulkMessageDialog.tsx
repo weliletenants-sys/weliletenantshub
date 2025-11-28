@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Send, FileText, Pencil, Trash2 } from "lucide-react";
+import { MessageSquare, Send, FileText, Pencil, Trash2, Share2, Lock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { CustomTemplateDialog } from "./CustomTemplateDialog";
 import {
@@ -31,6 +31,8 @@ interface MessageTemplate {
   category: string;
   isCustom?: boolean;
   manager_id?: string;
+  is_shared?: boolean;
+  creator_name?: string;
 }
 
 const MESSAGE_TEMPLATES: MessageTemplate[] = [
@@ -117,22 +119,36 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
   const [allTemplates, setAllTemplates] = useState<MessageTemplate[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<MessageTemplate | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
 
   useEffect(() => {
     if (open) {
       fetchCustomTemplates();
+      getCurrentUserId();
     }
   }, [open]);
+
+  const getCurrentUserId = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) setCurrentUserId(user.id);
+  };
 
   const fetchCustomTemplates = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Fetch templates with creator information using joins
       const { data, error } = await supabase
         .from("custom_message_templates")
-        .select("*")
-        .eq("manager_id", user.id)
+        .select(`
+          *,
+          profiles:manager_id (
+            full_name,
+            phone_number
+          )
+        `)
+        .or(`manager_id.eq.${user.id},is_shared.eq.true`)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -146,6 +162,8 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
         category: t.category,
         isCustom: true,
         manager_id: t.manager_id,
+        is_shared: t.is_shared,
+        creator_name: t.profiles?.full_name || "Unknown",
       }));
 
       setCustomTemplates(customTemplatesFormatted);
@@ -173,6 +191,37 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
     } catch (error: any) {
       console.error("Error deleting template:", error);
       toast.error("Failed to delete template");
+    }
+  };
+
+  const handleToggleSharing = async (template: MessageTemplate) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || template.manager_id !== user.id) {
+        toast.error("You can only share your own templates");
+        return;
+      }
+
+      const newSharedState = !template.is_shared;
+      const { error } = await supabase
+        .from("custom_message_templates")
+        .update({ 
+          is_shared: newSharedState,
+          shared_at: newSharedState ? new Date().toISOString() : null
+        })
+        .eq("id", template.id);
+
+      if (error) throw error;
+
+      toast.success(
+        newSharedState 
+          ? "Template shared with other managers" 
+          : "Template is now private"
+      );
+      fetchCustomTemplates();
+    } catch (error: any) {
+      console.error("Error toggling template sharing:", error);
+      toast.error("Failed to update sharing settings");
     }
   };
 
@@ -328,16 +377,27 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
                         <CardContent className="p-4" onClick={() => handleTemplateSelect(template.id)}>
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <FileText className="h-4 w-4 text-primary" />
                                 <h5 className="font-medium">{template.name}</h5>
-                                {template.isCustom && (
+                                {template.isCustom && template.manager_id === currentUserId && (
                                   <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">You</span>
+                                )}
+                                {template.is_shared && (
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 flex items-center gap-1">
+                                    <Share2 className="h-3 w-3" />
+                                    Shared
+                                  </span>
                                 )}
                               </div>
                               <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                                 {template.title}
                               </p>
+                              {template.isCustom && template.creator_name && template.manager_id !== currentUserId && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Created by: {template.creator_name}
+                                </p>
+                              )}
                             </div>
                             <div className="flex items-center gap-1">
                               <div className={`text-xs px-2 py-1 rounded ${
@@ -348,19 +408,37 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
                               }`}>
                                 {template.priority}
                               </div>
-                              {template.isCustom && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setTemplateToDelete(template);
-                                    setDeleteDialogOpen(true);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
+                              {template.isCustom && template.manager_id === currentUserId && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleSharing(template);
+                                    }}
+                                    title={template.is_shared ? "Make private" : "Share with other managers"}
+                                  >
+                                    {template.is_shared ? (
+                                      <Lock className="h-4 w-4 text-muted-foreground" />
+                                    ) : (
+                                      <Share2 className="h-4 w-4 text-green-600" />
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setTemplateToDelete(template);
+                                      setDeleteDialogOpen(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </>
                               )}
                             </div>
                           </div>
