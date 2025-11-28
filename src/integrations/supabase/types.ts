@@ -329,6 +329,7 @@ export type Database = {
           created_at: string | null
           id: string
           message: string
+          parent_notification_id: string | null
           payment_data: Json | null
           priority: string | null
           read: boolean | null
@@ -342,6 +343,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           message: string
+          parent_notification_id?: string | null
           payment_data?: Json | null
           priority?: string | null
           read?: boolean | null
@@ -355,6 +357,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           message?: string
+          parent_notification_id?: string | null
           payment_data?: Json | null
           priority?: string | null
           read?: boolean | null
@@ -365,6 +368,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "notifications_parent_notification_id_fkey"
+            columns: ["parent_notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notifications_recipient_id_fkey"
             columns: ["recipient_id"]
@@ -561,6 +571,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_notification_thread: {
+        Args: { notification_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          is_reply: boolean
+          message: string
+          parent_notification_id: string
+          priority: string
+          read: boolean
+          read_at: string
+          recipient_id: string
+          sender_id: string
+          sender_name: string
+          title: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -11,7 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X, Reply, Send } from "lucide-react";
+import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X, Reply, Send, MessageCircle } from "lucide-react";
+import MessageThreadDialog from "@/components/MessageThreadDialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
@@ -39,6 +40,9 @@ const AgentDashboard = () => {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState<string>("");
   const [sendingReply, setSendingReply] = useState(false);
+  const [threadViewOpen, setThreadViewOpen] = useState(false);
+  const [selectedThreadId, setSelectedThreadId] = useState<string>("");
+  const [threadCounts, setThreadCounts] = useState<{ [key: string]: number }>({});
   
   // Ref for auto-scroll to manager messages
   const managerMessagesRef = useRef<HTMLDivElement>(null);
@@ -282,12 +286,25 @@ const AgentDashboard = () => {
         `)
         .eq("recipient_id", user.id)
         .eq("read", false)
+        .is("parent_notification_id", null)
         .order("created_at", { ascending: false })
         .limit(10);
 
       if (error) throw error;
 
       const filteredData = (data || []).filter(n => !dismissedNotifications.includes(n.id));
+      
+      // Fetch reply counts for each notification
+      const counts: { [key: string]: number } = {};
+      for (const notification of filteredData) {
+        const { count } = await supabase
+          .from("notifications")
+          .select("*", { count: 'exact', head: true })
+          .eq("parent_notification_id", notification.id);
+        counts[notification.id] = count || 0;
+      }
+      setThreadCounts(counts);
+      
       const newCount = filteredData.length;
       
       // Auto-scroll to manager messages if new notifications arrived
@@ -370,7 +387,8 @@ const AgentDashboard = () => {
           title: `Re: ${originalTitle}`,
           message: replyText,
           priority: "normal",
-          read: false
+          read: false,
+          parent_notification_id: notificationId
         });
 
       if (error) throw error;
@@ -460,6 +478,24 @@ const AgentDashboard = () => {
                           <p className="text-lg whitespace-pre-wrap mb-4 leading-relaxed">
                             {notification.message}
                           </p>
+                          
+                          {/* Thread indicator */}
+                          {threadCounts[notification.id] > 0 && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="mb-3 font-semibold"
+                              onClick={() => {
+                                setSelectedThreadId(notification.id);
+                                setThreadViewOpen(true);
+                                haptics.light();
+                              }}
+                            >
+                              <MessageCircle className="h-4 w-4 mr-2" />
+                              View Conversation ({threadCounts[notification.id] + 1} message{threadCounts[notification.id] > 0 ? 's' : ''})
+                            </Button>
+                          )}
+                          
                           <div className="flex items-center gap-3 flex-wrap mb-4">
                             <Badge variant="outline" className="text-base font-bold px-4 py-1.5">
                               👤 {notification.profiles?.full_name || "Manager"}
@@ -520,19 +556,36 @@ const AgentDashboard = () => {
                               </div>
                             </div>
                           ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="mt-2 font-semibold"
-                              onClick={() => {
-                                setReplyingTo(notification.id);
-                                setReplyText("");
-                                haptics.light();
-                              }}
-                            >
-                              <Reply className="h-4 w-4 mr-2" />
-                              Reply to Manager
-                            </Button>
+                            <div className="flex gap-2 mt-2">
+                              {threadCounts[notification.id] > 0 ? (
+                                <Button
+                                  size="sm"
+                                  className="flex-1 font-semibold"
+                                  onClick={() => {
+                                    setSelectedThreadId(notification.id);
+                                    setThreadViewOpen(true);
+                                    haptics.light();
+                                  }}
+                                >
+                                  <MessageCircle className="h-4 w-4 mr-2" />
+                                  View & Reply
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 font-semibold"
+                                  onClick={() => {
+                                    setReplyingTo(notification.id);
+                                    setReplyText("");
+                                    haptics.light();
+                                  }}
+                                >
+                                  <Reply className="h-4 w-4 mr-2" />
+                                  Reply to Manager
+                                </Button>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -871,6 +924,23 @@ const AgentDashboard = () => {
       </div>
         </ContentTransition>
       </PullToRefresh>
+
+      {quickPaymentOpen && (
+        <QuickPaymentDialog
+          open={quickPaymentOpen}
+          onOpenChange={setQuickPaymentOpen}
+        />
+      )}
+
+      <MessageThreadDialog
+        open={threadViewOpen}
+        onOpenChange={setThreadViewOpen}
+        notificationId={selectedThreadId}
+        onReplySent={() => {
+          fetchManagerNotifications();
+          fetchAgentData();
+        }}
+      />
     </AgentLayout>
   );
 };
