@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { useOptimisticPayment } from "@/hooks/useOptimisticPayment";
 import { useQueryClient } from "@tanstack/react-query";
 import PaymentReceipt from "./PaymentReceipt";
@@ -21,6 +21,7 @@ interface Notification {
   message: string;
   priority: "low" | "normal" | "high" | "urgent";
   read: boolean;
+  read_at: string | null;
   created_at: string;
   payment_data?: {
     tenant_id: string;
@@ -403,8 +404,23 @@ export const NotificationsPanel = () => {
                         {notification.priority}
                       </Badge>
                     </div>
-                    <CardDescription className="text-xs">
-                      From: {notification.profiles?.full_name || "System"} • {format(new Date(notification.created_at), "MMM d, h:mm a")}
+                    <CardDescription className="text-xs space-y-1">
+                      <div>From: {notification.profiles?.full_name || "System"} • {format(new Date(notification.created_at), "MMM d, h:mm a")}</div>
+                      {notification.read && notification.read_at && (
+                        <div className="flex items-center gap-1 text-green-600 font-medium">
+                          <Check className="h-3 w-3" />
+                          Read {formatDistanceToNow(new Date(notification.read_at), { addSuffix: true })} 
+                          <span className="text-muted-foreground font-normal">
+                            ({format(new Date(notification.read_at), "MMM d, h:mm a")})
+                          </span>
+                        </div>
+                      )}
+                      {!notification.read && (
+                        <div className="flex items-center gap-1 text-orange-500 font-medium">
+                          <AlertCircle className="h-3 w-3" />
+                          Unread
+                        </div>
+                      )}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="pb-4">
