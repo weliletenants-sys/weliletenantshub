@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import PullToRefresh from "react-simple-pull-to-refresh";
 import ManagerLayout from "@/components/ManagerLayout";
 import { ManagerDashboardSkeleton } from "@/components/TenantDetailSkeleton";
+import { ContentTransition } from "@/components/ContentTransition";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus } from "lucide-react";
@@ -701,11 +702,15 @@ const ManagerDashboard = () => {
   return (
     <ManagerLayout currentPage="/manager/dashboard">
       <PullToRefresh onRefresh={handleRefresh} pullingContent="">
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold">Manager Dashboard</h1>
-            <p className="text-muted-foreground">Service Centre Overview</p>
-          </div>
+        <ContentTransition
+          loading={isLoading}
+          skeleton={<ManagerDashboardSkeleton />}
+        >
+          <div className="space-y-6 animate-reveal">
+            <div>
+              <h1 className="text-3xl font-bold">Manager Dashboard</h1>
+              <p className="text-muted-foreground">Service Centre Overview</p>
+            </div>
 
           {/* Quick Search Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1395,6 +1400,7 @@ const ManagerDashboard = () => {
           </Card>
         </div>
       </div>
+        </ContentTransition>
       </PullToRefresh>
 
       {/* Tenant Search Dialog */}
