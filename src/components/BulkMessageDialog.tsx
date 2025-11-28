@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Send, FileText, Trash2, Share2, Lock, Tag, Code2 } from "lucide-react";
+import { MessageSquare, Send, FileText, Trash2, Share2, Lock, Tag, Code2, Eye } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { CustomTemplateDialog } from "./CustomTemplateDialog";
 import {
@@ -130,6 +130,11 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<string>("");
   const [showVariableHelper, setShowVariableHelper] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewAgentId, setPreviewAgentId] = useState<string>("");
+  const [previewMessage, setPreviewMessage] = useState<string>("");
+  const [availableAgents, setAvailableAgents] = useState<Array<{ id: string; name: string }>>([]);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   // Available template variables
   const TEMPLATE_VARIABLES = [
@@ -146,8 +151,16 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
       fetchCustomTemplates();
       getCurrentUserId();
       fetchTenants();
+      fetchAvailableAgents();
     }
   }, [open]);
+
+  // Update preview when message or preview agent changes
+  useEffect(() => {
+    if (showPreview && previewAgentId && message) {
+      updatePreview();
+    }
+  }, [message, previewAgentId, showPreview]);
 
   const getCurrentUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -178,6 +191,67 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
       setTenants(formattedTenants);
     } catch (error) {
       console.error("Error fetching tenants:", error);
+    }
+  };
+
+  const fetchAvailableAgents = async () => {
+    try {
+      let agentIds: string[] = [];
+
+      if (sendToAll) {
+        const { data: allAgents, error } = await supabase
+          .from("agents")
+          .select(`
+            id,
+            profiles:user_id(full_name)
+          `);
+        
+        if (error) throw error;
+        
+        setAvailableAgents(
+          (allAgents || []).map((a: any) => ({
+            id: a.id,
+            name: a.profiles?.full_name || "Unknown Agent"
+          }))
+        );
+      } else if (selectedAgentIds.length > 0) {
+        const { data: agents, error } = await supabase
+          .from("agents")
+          .select(`
+            id,
+            profiles:user_id(full_name)
+          `)
+          .in("id", selectedAgentIds);
+        
+        if (error) throw error;
+        
+        setAvailableAgents(
+          (agents || []).map((a: any) => ({
+            id: a.id,
+            name: a.profiles?.full_name || "Unknown Agent"
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching available agents:", error);
+    }
+  };
+
+  const updatePreview = async () => {
+    if (!previewAgentId || !message) {
+      setPreviewMessage("");
+      return;
+    }
+
+    setLoadingPreview(true);
+    try {
+      const processed = await replaceVariablesForAgent(message, previewAgentId);
+      setPreviewMessage(processed);
+    } catch (error) {
+      console.error("Error generating preview:", error);
+      setPreviewMessage(message);
+    } finally {
+      setLoadingPreview(false);
     }
   };
 
@@ -356,6 +430,9 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
     setShowTemplates(true);
     setSelectedTenantId("");
     setShowVariableHelper(false);
+    setShowPreview(false);
+    setPreviewAgentId("");
+    setPreviewMessage("");
   };
 
   const handleSend = async () => {
@@ -712,6 +789,79 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
                     {message.length}/1000 characters
                   </p>
                 </div>
+
+                {/* Message Preview Section */}
+                {message && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Message Preview</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setShowPreview(!showPreview);
+                          if (!showPreview && availableAgents.length > 0 && !previewAgentId) {
+                            setPreviewAgentId(availableAgents[0].id);
+                          }
+                        }}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        {showPreview ? "Hide" : "Show"} Preview
+                      </Button>
+                    </div>
+
+                    {showPreview && (
+                      <Card className="bg-muted/50">
+                        <CardContent className="p-4 space-y-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="preview-agent" className="text-xs">
+                              Preview as Agent:
+                            </Label>
+                            <Select value={previewAgentId} onValueChange={setPreviewAgentId}>
+                              <SelectTrigger id="preview-agent">
+                                <SelectValue placeholder="Select an agent to preview..." />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-[200px]">
+                                {availableAgents.map((agent) => (
+                                  <SelectItem key={agent.id} value={agent.id}>
+                                    {agent.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {previewAgentId && (
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">
+                                How this message will appear:
+                              </Label>
+                              <div className="bg-background rounded-md p-4 border border-border">
+                                {loadingPreview ? (
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                                    Generating preview...
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <div className="text-sm font-semibold">{title || "Subject"}</div>
+                                    <div className="text-sm whitespace-pre-wrap">
+                                      {previewMessage || message}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Variables and tenant tags will be replaced with actual data when sent
+                              </p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
