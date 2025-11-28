@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { User, Phone, Shield, Loader2, MapPin, Lock, Eye, EyeOff } from "lucide-react";
+import { User, Phone, Shield, Loader2, MapPin, Lock, Eye, EyeOff, RefreshCw, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useVersionCheck } from "@/hooks/useVersionCheck";
 
 const ManagerSettings = () => {
   const navigate = useNavigate();
@@ -33,6 +34,10 @@ const ManagerSettings = () => {
     newPassword: '',
     confirmPassword: '',
   });
+  
+  // Version checking for manual updates
+  const { isChecking, checkVersion, currentVersion } = useVersionCheck();
+  const [manualCheckLoading, setManualCheckLoading] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -166,6 +171,26 @@ const ManagerSettings = () => {
       toast.error('Failed to change password');
     } finally {
       setChangingPassword(false);
+    }
+  };
+
+  const handleManualUpdateCheck = async () => {
+    setManualCheckLoading(true);
+    try {
+      await checkVersion();
+      
+      // If no update was triggered, show success message
+      setTimeout(() => {
+        if (!isChecking) {
+          toast.success('✅ You\'re up to date!', {
+            description: 'You have the latest version of the app.',
+          });
+        }
+        setManualCheckLoading(false);
+      }, 1500);
+    } catch (error) {
+      toast.error('Failed to check for updates');
+      setManualCheckLoading(false);
     }
   };
 
@@ -396,6 +421,55 @@ const ManagerSettings = () => {
                 <Badge variant="outline">Phone</Badge>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5" />
+              App Updates
+            </CardTitle>
+            <CardDescription>Check for the latest version and updates</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
+              <div className="space-y-1">
+                <p className="font-medium text-sm flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  Current Version
+                </p>
+                <p className="text-xs text-muted-foreground font-mono">
+                  v{currentVersion.slice(0, 10)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  App automatically checks for updates every 2 minutes
+                </p>
+              </div>
+            </div>
+
+            <Button 
+              onClick={handleManualUpdateCheck}
+              disabled={manualCheckLoading || isChecking}
+              className="w-full"
+              variant="outline"
+            >
+              {manualCheckLoading || isChecking ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Checking for updates...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Check for Updates Now
+                </>
+              )}
+            </Button>
+            
+            <p className="text-xs text-muted-foreground text-center">
+              If an update is available, the app will automatically reload with the latest version
+            </p>
           </CardContent>
         </Card>
       </div>
