@@ -9,6 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon, Search, XCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format, formatDistanceToNow } from "date-fns";
 import { useOptimisticPayment } from "@/hooks/useOptimisticPayment";
@@ -55,6 +59,9 @@ export const NotificationsPanel = () => {
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
   const [filterType, setFilterType] = useState<"all" | "payment" | "message" | "system">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const observerTarget = useRef<HTMLDivElement>(null);
   const [receiptData, setReceiptData] = useState<{
     paymentData: {
@@ -142,14 +149,57 @@ export const NotificationsPanel = () => {
     }
   }, [open]);
 
-  // Filter notifications based on selected type
+  // Filter notifications based on selected type, search query, and date range
   const filteredNotifications = notifications.filter(notification => {
-    if (filterType === "all") return true;
-    if (filterType === "payment") return notification.payment_data !== null;
-    if (filterType === "message") return notification.payment_data === null && notification.parent_notification_id === null;
-    if (filterType === "system") return notification.sender_id === notification.recipient_id; // System messages
+    // Type filter
+    if (filterType === "all") {
+      // Continue to other filters
+    } else if (filterType === "payment" && notification.payment_data === null) {
+      return false;
+    } else if (filterType === "message" && (notification.payment_data !== null || notification.parent_notification_id !== null)) {
+      return false;
+    } else if (filterType === "system" && notification.sender_id !== notification.recipient_id) {
+      return false;
+    }
+    
+    // Search query filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const matchesTitle = notification.title.toLowerCase().includes(query);
+      const matchesMessage = notification.message.toLowerCase().includes(query);
+      const matchesSender = notification.profiles?.full_name?.toLowerCase().includes(query);
+      
+      if (!matchesTitle && !matchesMessage && !matchesSender) {
+        return false;
+      }
+    }
+    
+    // Date range filter
+    const notificationDate = new Date(notification.created_at);
+    if (dateFrom) {
+      const fromDate = new Date(dateFrom);
+      fromDate.setHours(0, 0, 0, 0);
+      if (notificationDate < fromDate) {
+        return false;
+      }
+    }
+    if (dateTo) {
+      const toDate = new Date(dateTo);
+      toDate.setHours(23, 59, 59, 999);
+      if (notificationDate > toDate) {
+        return false;
+      }
+    }
+    
     return true;
   });
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setDateFrom(undefined);
+    setDateTo(undefined);
+    setFilterType("all");
+  };
   
   // Infinite scroll observer
   useEffect(() => {
@@ -413,6 +463,73 @@ export const NotificationsPanel = () => {
           <SheetDescription>
             {unreadCount > 0 ? `You have ${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}` : 'No new notifications'}
           </SheetDescription>
+          
+          {/* Search and Filters */}
+          <div className="space-y-3 pt-4">
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search notifications..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-9"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <XCircle className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            
+            {/* Date Range Filters */}
+            <div className="flex gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex-1 justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateFrom}
+                    onSelect={setDateFrom}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex-1 justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateTo ? format(dateTo, "MMM d, yyyy") : "To date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateTo}
+                    onSelect={setDateTo}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              
+              {(searchQuery || dateFrom || dateTo || filterType !== "all") && (
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
           
           {/* Filter Tabs */}
           <Tabs value={filterType} onValueChange={(value) => setFilterType(value as typeof filterType)} className="w-full pt-4">
