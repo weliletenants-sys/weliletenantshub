@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -49,6 +49,9 @@ export const NotificationsPanel = () => {
   const [threadDialogOpen, setThreadDialogOpen] = useState(false);
   const [selectedNotificationId, setSelectedNotificationId] = useState<string | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
+  const observerTarget = useRef<HTMLDivElement>(null);
   const [receiptData, setReceiptData] = useState<{
     paymentData: {
       amount: number;
@@ -74,10 +77,14 @@ export const NotificationsPanel = () => {
   // Enable realtime subscription for notifications
   useRealtimeNotifications();
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (pageNum = 0, append = false) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      const pageSize = 20;
+      const from = pageNum * pageSize;
+      const to = from + pageSize - 1;
 
       const { data, error } = await supabase
         .from("notifications")
@@ -89,12 +96,24 @@ export const NotificationsPanel = () => {
         `)
         .eq("recipient_id", user.id)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .range(from, to);
 
       if (error) throw error;
 
-      setNotifications((data || []) as unknown as Notification[]);
-      setUnreadCount((data || []).filter(n => !n.read).length);
+      const newData = (data || []) as unknown as Notification[];
+      
+      if (append) {
+        setNotifications(prev => [...prev, ...newData]);
+      } else {
+        setNotifications(newData);
+      }
+      
+      setHasMore(newData.length === pageSize);
+      
+      // Update unread count only on initial load
+      if (!append) {
+        setUnreadCount(newData.filter(n => !n.read).length);
+      }
     } catch (error: any) {
       console.error("Error fetching notifications:", error);
     } finally {
@@ -102,9 +121,45 @@ export const NotificationsPanel = () => {
     }
   };
 
+  const loadMore = useCallback(() => {
+    if (!loading && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchNotifications(nextPage, true);
+    }
+  }, [page, loading, hasMore]);
+
   useEffect(() => {
-    fetchNotifications();
-  }, []);
+    if (open) {
+      setPage(0);
+      setNotifications([]);
+      setHasMore(true);
+      fetchNotifications(0, false);
+    }
+  }, [open]);
+  
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMore, loading, loadMore]);
   
   // Refetch when notifications are invalidated by realtime subscription
   useEffect(() => {
@@ -332,8 +387,8 @@ export const NotificationsPanel = () => {
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-lg">
-        <SheetHeader>
+      <SheetContent className="w-full max-w-full sm:max-w-full p-0 flex flex-col h-full">
+        <SheetHeader className="p-6 pb-4 border-b">
           <SheetTitle className="flex items-center justify-between">
             <span>Notifications</span>
             {unreadCount > 0 && (
@@ -347,7 +402,7 @@ export const NotificationsPanel = () => {
           </SheetDescription>
         </SheetHeader>
 
-        <ScrollArea className="h-[calc(100vh-8rem)] mt-4">
+        <ScrollArea className="flex-1 p-6">
           {loading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
@@ -367,7 +422,7 @@ export const NotificationsPanel = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 pb-4">
               {notifications.map((notification) => (
                 <Card 
                   key={notification.id}
@@ -488,6 +543,13 @@ export const NotificationsPanel = () => {
                   </CardContent>
                 </Card>
               ))}
+              
+              {/* Infinite scroll trigger */}
+              <div ref={observerTarget} className="h-4 flex items-center justify-center">
+                {loading && hasMore && (
+                  <div className="text-sm text-muted-foreground">Loading more...</div>
+                )}
+              </div>
             </div>
           )}
         </ScrollArea>
