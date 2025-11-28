@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Bell, X, AlertCircle, Info, AlertTriangle, Zap } from "lucide-react";
@@ -23,6 +24,7 @@ interface Notification {
 }
 
 export const NotificationsPanel = () => {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -76,8 +78,13 @@ export const NotificationsPanel = () => {
           // Show toast for new notifications
           if (payload.eventType === "INSERT") {
             const newNotification = payload.new as Notification;
+            // Parse tenant tags and show clickable notification
+            const parsedMessage = parseMessageWithTenantTags(newNotification.message);
+            
             toast.info(newNotification.title, {
-              description: newNotification.message.slice(0, 100) + (newNotification.message.length > 100 ? "..." : "")
+              description: parsedMessage.length > 100 
+                ? parsedMessage.slice(0, 100) + "..." 
+                : parsedMessage
             });
           }
         }
@@ -89,6 +96,38 @@ export const NotificationsPanel = () => {
     };
   }, []);
 
+  const parseMessageWithTenantTags = (message: string): string => {
+    // Extract tenant names from tags for display
+    return message.replace(/\[TENANT:[^\]]+:([^\]]+)\]/g, '$1');
+  };
+
+  const renderMessageWithClickableTags = (message: string) => {
+    // Parse [TENANT:id:name] tags and make them clickable
+    const parts = message.split(/(\[TENANT:[^\]]+\])/g);
+    
+    return parts.map((part, index) => {
+      const match = part.match(/\[TENANT:([^:]+):([^\]]+)\]/);
+      if (match) {
+        const [, tenantId, tenantName] = match;
+        return (
+          <span
+            key={index}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary/10 text-primary cursor-pointer hover:bg-primary/20 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/manager/tenants/${tenantId}`);
+              setOpen(false);
+            }}
+          >
+            <AlertCircle className="h-3 w-3" />
+            {tenantName}
+          </span>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
   const markAsRead = async (notificationId: string) => {
     try {
       const { error } = await supabase
@@ -98,10 +137,7 @@ export const NotificationsPanel = () => {
 
       if (error) throw error;
 
-      setNotifications(prev =>
-        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      fetchNotifications();
     } catch (error: any) {
       console.error("Error marking notification as read:", error);
     }
@@ -120,9 +156,8 @@ export const NotificationsPanel = () => {
 
       if (error) throw error;
 
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      setUnreadCount(0);
       toast.success("All notifications marked as read");
+      fetchNotifications();
     } catch (error: any) {
       console.error("Error marking all as read:", error);
       toast.error("Failed to mark all as read");
@@ -134,24 +169,24 @@ export const NotificationsPanel = () => {
       case "urgent":
         return <Zap className="h-4 w-4 text-destructive" />;
       case "high":
-        return <AlertCircle className="h-4 w-4 text-orange-600" />;
+        return <AlertTriangle className="h-4 w-4 text-orange-500" />;
       case "low":
         return <Info className="h-4 w-4 text-muted-foreground" />;
       default:
-        return <AlertTriangle className="h-4 w-4 text-primary" />;
+        return <Bell className="h-4 w-4 text-primary" />;
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "urgent":
-        return "border-destructive bg-destructive/5";
+        return "bg-destructive/10 text-destructive border-destructive/20";
       case "high":
-        return "border-orange-600 bg-orange-50";
+        return "bg-orange-100 text-orange-700 border-orange-200";
       case "low":
-        return "border-muted";
+        return "bg-muted text-muted-foreground border-muted";
       default:
-        return "border-primary/20 bg-primary/5";
+        return "bg-primary/10 text-primary border-primary/20";
     }
   };
 
@@ -170,97 +205,75 @@ export const NotificationsPanel = () => {
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-md">
+      <SheetContent className="w-full sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <Bell className="h-5 w-5" />
-            Notifications
+          <SheetTitle className="flex items-center justify-between">
+            <span>Notifications</span>
+            {unreadCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={markAllAsRead}>
+                Mark all as read
+              </Button>
+            )}
           </SheetTitle>
           <SheetDescription>
-            {unreadCount > 0 ? (
-              <span>You have {unreadCount} unread message{unreadCount !== 1 ? "s" : ""}</span>
-            ) : (
-              <span>You're all caught up!</span>
-            )}
+            {unreadCount > 0 ? `You have ${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}` : 'No new notifications'}
           </SheetDescription>
         </SheetHeader>
 
-        {unreadCount > 0 && (
-          <div className="mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={markAllAsRead}
-              className="w-full"
-            >
-              Mark all as read
-            </Button>
-          </div>
-        )}
-
-        <ScrollArea className="h-[calc(100vh-180px)] mt-4">
-          <div className="space-y-3">
-            {loading ? (
-              <p className="text-center text-muted-foreground py-8">Loading...</p>
-            ) : notifications.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <Bell className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-muted-foreground">No notifications yet</p>
-                </CardContent>
-              </Card>
-            ) : (
-              notifications.map((notification) => (
-                <Card
-                  key={notification.id}
-                  className={`${!notification.read ? "border-primary shadow-sm" : "border-muted"} ${getPriorityColor(notification.priority)} transition-all`}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2 flex-1">
-                        {getPriorityIcon(notification.priority)}
-                        <div className="flex-1">
-                          <CardTitle className="text-base flex items-center gap-2">
-                            {notification.title}
-                            {!notification.read && (
-                              <Badge variant="default" className="text-xs">New</Badge>
-                            )}
-                          </CardTitle>
-                          <CardDescription className="text-xs">
-                            From: {notification.profiles?.full_name || "System"} • 
-                            {" "}{format(new Date(notification.created_at), "MMM d, h:mm a")}
-                          </CardDescription>
-                        </div>
-                      </div>
-                      {!notification.read && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => markAsRead(notification.id)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm whitespace-pre-wrap">{notification.message}</p>
-                    {!notification.read && (
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="mt-2 p-0 h-auto"
-                        onClick={() => markAsRead(notification.id)}
-                      >
-                        Mark as read
-                      </Button>
-                    )}
+        <ScrollArea className="h-[calc(100vh-8rem)] mt-4">
+          {loading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardContent className="p-4">
+                    <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                    <div className="h-3 bg-muted rounded w-full"></div>
                   </CardContent>
                 </Card>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          ) : notifications.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <Bell className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">No notifications yet</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {notifications.map((notification) => (
+                <Card 
+                  key={notification.id}
+                  className={`${!notification.read ? 'border-primary/50 bg-primary/5' : ''} cursor-pointer hover:shadow-md transition-shadow`}
+                  onClick={() => {
+                    if (!notification.read) {
+                      markAsRead(notification.id);
+                    }
+                  }}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        {getPriorityIcon(notification.priority)}
+                        <CardTitle className="text-base">{notification.title}</CardTitle>
+                      </div>
+                      <Badge className={getPriorityColor(notification.priority)}>
+                        {notification.priority}
+                      </Badge>
+                    </div>
+                    <CardDescription className="text-xs">
+                      From: {notification.profiles?.full_name || "System"} • {format(new Date(notification.created_at), "MMM d, h:mm a")}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pb-4">
+                    <p className="text-sm whitespace-pre-wrap">
+                      {renderMessageWithClickableTags(notification.message)}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </ScrollArea>
       </SheetContent>
     </Sheet>

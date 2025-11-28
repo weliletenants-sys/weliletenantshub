@@ -25,6 +25,8 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
+import { BulkMessageDialog } from "@/components/BulkMessageDialog";
+import { MessageSquare } from "lucide-react";
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -712,6 +714,24 @@ const ManagerDashboard = () => {
               <h1 className="text-3xl font-bold">Manager Dashboard</h1>
               <p className="text-muted-foreground">Service Centre Overview</p>
             </div>
+
+          {/* Broadcast Messaging Feature */}
+          <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    Broadcast Messages
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Send announcements and updates to all agents. Tag specific tenants for attention.
+                  </p>
+                </div>
+                <BulkMessageDialog sendToAll={true} />
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Quick Search Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

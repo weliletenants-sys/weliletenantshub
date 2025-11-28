@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Send, FileText, Pencil, Trash2, Share2, Lock } from "lucide-react";
+import { MessageSquare, Send, FileText, Trash2, Share2, Lock, Tag } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { CustomTemplateDialog } from "./CustomTemplateDialog";
 import {
@@ -103,11 +103,18 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
 ];
 
 interface BulkMessageDialogProps {
-  selectedAgentIds: string[];
-  agentNames: string[];
+  selectedAgentIds?: string[];
+  agentNames?: string[];
+  sendToAll?: boolean;
 }
 
-export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageDialogProps) => {
+interface Tenant {
+  id: string;
+  tenant_name: string;
+  agent_name: string;
+}
+
+export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], sendToAll = false }: BulkMessageDialogProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
@@ -120,11 +127,14 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<MessageTemplate | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [selectedTenantId, setSelectedTenantId] = useState<string>("");
 
   useEffect(() => {
     if (open) {
       fetchCustomTemplates();
       getCurrentUserId();
+      fetchTenants();
     }
   }, [open]);
 
@@ -133,12 +143,38 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
     if (user) setCurrentUserId(user.id);
   };
 
+  const fetchTenants = async () => {
+    try {
+      const { data: tenantsData, error } = await supabase
+        .from("tenants")
+        .select(`
+          id,
+          tenant_name,
+          agents!inner(
+            profiles!inner(full_name)
+          )
+        `)
+        .order("tenant_name");
+
+      if (error) throw error;
+
+      const formattedTenants = (tenantsData || []).map((t: any) => ({
+        id: t.id,
+        tenant_name: t.tenant_name,
+        agent_name: t.agents?.profiles?.full_name || "Unknown Agent"
+      }));
+
+      setTenants(formattedTenants);
+    } catch (error) {
+      console.error("Error fetching tenants:", error);
+    }
+  };
+
   const fetchCustomTemplates = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch templates with creator information using joins
       const { data, error } = await supabase
         .from("custom_message_templates")
         .select(`
@@ -239,12 +275,27 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
     }
   };
 
+  const insertTenantTag = () => {
+    if (!selectedTenantId) {
+      toast.error("Please select a tenant first");
+      return;
+    }
+    
+    const tenant = tenants.find(t => t.id === selectedTenantId);
+    if (!tenant) return;
+    
+    const tag = `[TENANT:${tenant.id}:${tenant.tenant_name}]`;
+    setMessage(prev => prev + " " + tag);
+    toast.success("Tenant tag inserted");
+  };
+
   const resetForm = () => {
     setTitle("");
     setMessage("");
     setPriority("normal");
     setSelectedTemplate("");
     setShowTemplates(true);
+    setSelectedTenantId("");
   };
 
   const handleSend = async () => {
@@ -253,31 +304,37 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
       return;
     }
 
-    if (selectedAgentIds.length === 0) {
-      toast.error("No agents selected");
-      return;
-    }
-
     setSending(true);
 
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Get agent user IDs from agent IDs
-      const { data: agents, error: agentsError } = await supabase
-        .from("agents")
-        .select("user_id")
-        .in("id", selectedAgentIds);
+      let recipientUserIds: string[] = [];
 
-      if (agentsError) throw agentsError;
-      if (!agents || agents.length === 0) throw new Error("No agents found");
+      if (sendToAll) {
+        const { data: allAgents, error: agentsError } = await supabase
+          .from("agents")
+          .select("user_id");
+        
+        if (agentsError) throw agentsError;
+        recipientUserIds = allAgents?.map(a => a.user_id) || [];
+      } else {
+        if (selectedAgentIds.length === 0) {
+          toast.error("No agents selected");
+          return;
+        }
 
-      const recipientIds = agents.map(a => a.user_id);
+        const { data: agents, error: agentsError } = await supabase
+          .from("agents")
+          .select("user_id")
+          .in("id", selectedAgentIds);
 
-      // Create notification records for each agent
-      const notifications = recipientIds.map(recipientId => ({
+        if (agentsError) throw agentsError;
+        recipientUserIds = agents?.map(a => a.user_id) || [];
+      }
+
+      const notifications = recipientUserIds.map(recipientId => ({
         sender_id: user.id,
         recipient_id: recipientId,
         title,
@@ -291,11 +348,11 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
 
       if (insertError) throw insertError;
 
-      toast.success(`Message sent to ${selectedAgentIds.length} agent(s)`, {
+      const count = sendToAll ? recipientUserIds.length : selectedAgentIds.length;
+      toast.success(`Message sent to ${count} agent(s)`, {
         description: `"${title}" was delivered successfully`
       });
 
-      // Reset form
       resetForm();
       setOpen(false);
     } catch (error: any) {
@@ -309,242 +366,271 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button 
-          variant="default" 
-          size="sm"
-          disabled={selectedAgentIds.length === 0}
-        >
-          <MessageSquare className="h-4 w-4 mr-2" />
-          Send Message
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Send Message to Agents</DialogTitle>
-          <DialogDescription>
-            Send an in-app message to {selectedAgentIds.length} selected agent(s):
-            <div className="mt-2 text-sm font-medium">
-              {agentNames.slice(0, 3).join(", ")}
-              {agentNames.length > 3 && ` and ${agentNames.length - 3} more`}
-            </div>
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-4 py-4">
-          {/* Template Selection */}
-          {showTemplates ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold">Choose a Template</Label>
-                <div className="flex items-center gap-2">
-                  <CustomTemplateDialog onTemplateSaved={fetchCustomTemplates} />
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button 
+            variant="default" 
+            size="sm"
+            disabled={!sendToAll && selectedAgentIds.length === 0}
+          >
+            <MessageSquare className="h-4 w-4 mr-2" />
+            {sendToAll ? "Message All Agents" : `Send Message${selectedAgentIds.length > 0 ? ` (${selectedAgentIds.length})` : ""}`}
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Send Message to Agents</DialogTitle>
+            <DialogDescription>
+              {sendToAll 
+                ? "Send a message to all agents in the system"
+                : `Send an in-app message to ${selectedAgentIds.length} selected agent(s): ${agentNames.slice(0, 3).join(", ")}${agentNames.length > 3 ? ` and ${agentNames.length - 3} more` : ""}`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {showTemplates ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold">Choose a Template</Label>
+                  <div className="flex items-center gap-2">
+                    <CustomTemplateDialog onTemplateSaved={fetchCustomTemplates} />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowTemplates(false)}
+                    >
+                      Start from scratch
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2">
+                  {allTemplates.reduce((acc, template) => {
+                    const categoryExists = acc.find((item: any) => item.category === template.category);
+                    if (!categoryExists) {
+                      const categoryTemplates = allTemplates.filter(t => t.category === template.category);
+                      acc.push({
+                        category: template.category,
+                        templates: categoryTemplates
+                      });
+                    }
+                    return acc;
+                  }, [] as any[]).map((group) => (
+                    <div key={group.category} className="space-y-2">
+                      <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        {group.category}
+                        {group.templates.some((t: MessageTemplate) => t.isCustom) && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">Custom</span>
+                        )}
+                      </h4>
+                      {group.templates.map((template: MessageTemplate) => (
+                        <Card
+                          key={template.id}
+                          className="cursor-pointer hover:bg-muted/50 transition-colors border-2 relative group"
+                        >
+                          <CardContent className="p-4" onClick={() => handleTemplateSelect(template.id)}>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <FileText className="h-4 w-4 text-primary" />
+                                  <h5 className="font-medium">{template.name}</h5>
+                                  {template.isCustom && template.manager_id === currentUserId && (
+                                    <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">You</span>
+                                  )}
+                                  {template.is_shared && (
+                                    <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 flex items-center gap-1">
+                                      <Share2 className="h-3 w-3" />
+                                      Shared
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                  {template.title}
+                                </p>
+                                {template.isCustom && template.creator_name && template.manager_id !== currentUserId && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Created by: {template.creator_name}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <div className={`text-xs px-2 py-1 rounded ${
+                                  template.priority === "urgent" ? "bg-destructive/10 text-destructive" :
+                                  template.priority === "high" ? "bg-orange-100 text-orange-700" :
+                                  template.priority === "low" ? "bg-muted text-muted-foreground" :
+                                  "bg-primary/10 text-primary"
+                                }`}>
+                                  {template.priority}
+                                </div>
+                                {template.isCustom && template.manager_id === currentUserId && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleSharing(template);
+                                      }}
+                                      title={template.is_shared ? "Make private" : "Share with other managers"}
+                                    >
+                                      {template.is_shared ? (
+                                        <Lock className="h-4 w-4 text-muted-foreground" />
+                                      ) : (
+                                        <Share2 className="h-4 w-4 text-green-600" />
+                                      )}
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setTemplateToDelete(template);
+                                        setDeleteDialogOpen(true);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold">
+                    {selectedTemplate ? "Customize Message" : "Compose Message"}
+                  </Label>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setShowTemplates(false)}
+                    onClick={() => {
+                      resetForm();
+                      setShowTemplates(true);
+                    }}
                   >
-                    Start from scratch
+                    <FileText className="h-4 w-4 mr-2" />
+                    Use Template
                   </Button>
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2">
-                {allTemplates.reduce((acc, template) => {
-                  const categoryExists = acc.find((item: any) => item.category === template.category);
-                  if (!categoryExists) {
-                    const categoryTemplates = allTemplates.filter(t => t.category === template.category);
-                    acc.push({
-                      category: template.category,
-                      templates: categoryTemplates
-                    });
-                  }
-                  return acc;
-                }, [] as any[]).map((group) => (
-                  <div key={group.category} className="space-y-2">
-                    <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      {group.category}
-                      {group.templates.some((t: MessageTemplate) => t.isCustom) && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">Custom</span>
-                      )}
-                    </h4>
-                    {group.templates.map((template: MessageTemplate) => (
-                      <Card
-                        key={template.id}
-                        className="cursor-pointer hover:bg-muted/50 transition-colors border-2 relative group"
-                      >
-                        <CardContent className="p-4" onClick={() => handleTemplateSelect(template.id)}>
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <FileText className="h-4 w-4 text-primary" />
-                                <h5 className="font-medium">{template.name}</h5>
-                                {template.isCustom && template.manager_id === currentUserId && (
-                                  <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">You</span>
-                                )}
-                                {template.is_shared && (
-                                  <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 flex items-center gap-1">
-                                    <Share2 className="h-3 w-3" />
-                                    Shared
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                                {template.title}
-                              </p>
-                              {template.isCustom && template.creator_name && template.manager_id !== currentUserId && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Created by: {template.creator_name}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <div className={`text-xs px-2 py-1 rounded ${
-                                template.priority === "urgent" ? "bg-destructive/10 text-destructive" :
-                                template.priority === "high" ? "bg-orange-100 text-orange-700" :
-                                template.priority === "low" ? "bg-muted text-muted-foreground" :
-                                "bg-primary/10 text-primary"
-                              }`}>
-                                {template.priority}
-                              </div>
-                              {template.isCustom && template.manager_id === currentUserId && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleToggleSharing(template);
-                                    }}
-                                    title={template.is_shared ? "Make private" : "Share with other managers"}
-                                  >
-                                    {template.is_shared ? (
-                                      <Lock className="h-4 w-4 text-muted-foreground" />
-                                    ) : (
-                                      <Share2 className="h-4 w-4 text-green-600" />
-                                    )}
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setTemplateToDelete(template);
-                                      setDeleteDialogOpen(true);
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                <div className="space-y-2">
+                  <Label htmlFor="priority">Priority</Label>
+                  <Select value={priority} onValueChange={(value: any) => setPriority(value)}>
+                    <SelectTrigger id="priority">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="title">Subject</Label>
+                  <Input
+                    id="title"
+                    placeholder="e.g., Important Update"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    maxLength={100}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {title.length}/100 characters
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="tenant">Tag Tenant (Optional)</Label>
+                  <div className="flex gap-2">
+                    <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a tenant to tag..." />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[200px]">
+                        {tenants.map((tenant) => (
+                          <SelectItem key={tenant.id} value={tenant.id}>
+                            {tenant.tenant_name} (Agent: {tenant.agent_name})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={insertTenantTag}
+                      disabled={!selectedTenantId}
+                    >
+                      <Tag className="h-4 w-4 mr-2" />
+                      Insert Tag
+                    </Button>
                   </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between">
-                <Label className="text-base font-semibold">
-                  {selectedTemplate ? "Customize Message" : "Compose Message"}
-                </Label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    resetForm();
-                    setShowTemplates(true);
-                  }}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Use Template
-                </Button>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="priority">Priority</Label>
-                <Select value={priority} onValueChange={(value: any) => setPriority(value)}>
-                  <SelectTrigger id="priority">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="normal">Normal</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                  <p className="text-xs text-muted-foreground">
+                    Insert a clickable tenant tag into your message
+                  </p>
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="title">Subject</Label>
-                <Input
-                  id="title"
-                  placeholder="e.g., Important Update"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  maxLength={100}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {title.length}/100 characters
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="message">Message</Label>
-                <Textarea
-                  id="message"
-                  placeholder="Type your message here..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  rows={8}
-                  maxLength={1000}
-                  className="resize-none"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {message.length}/1000 characters
-                </p>
-              </div>
-            </>
-          )}
-        </div>
-
-        {!showTemplates && (
-          <div className="flex justify-end gap-2 pt-2 border-t">
-            <Button
-              variant="outline"
-              onClick={() => {
-                resetForm();
-                setOpen(false);
-              }}
-              disabled={sending}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSend}
-              disabled={sending || !title.trim() || !message.trim()}
-            >
-              {sending ? (
-                <>Sending...</>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Send to {selectedAgentIds.length} Agent{selectedAgentIds.length !== 1 ? "s" : ""}
-                </>
-              )}
-            </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="message">Message</Label>
+                  <Textarea
+                    id="message"
+                    placeholder="Type your message here... Use the tenant selector above to insert clickable tenant tags."
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={8}
+                    maxLength={1000}
+                    className="resize-none"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {message.length}/1000 characters
+                  </p>
+                </div>
+              </>
+            )}
           </div>
-        )}
-      </DialogContent>
 
-      {/* Delete Confirmation Dialog */}
+          {!showTemplates && (
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  resetForm();
+                  setOpen(false);
+                }}
+                disabled={sending}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSend}
+                disabled={sending || !title.trim() || !message.trim()}
+              >
+                {sending ? (
+                  <>Sending...</>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    {sendToAll ? "Send to All Agents" : `Send to ${selectedAgentIds.length} Agent${selectedAgentIds.length !== 1 ? "s" : ""}`}
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -564,6 +650,6 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Dialog>
+    </>
   );
-};
+}
