@@ -227,6 +227,50 @@ export type Database = {
           },
         ]
       }
+      custom_message_templates: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          manager_id: string
+          message: string
+          name: string
+          priority: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: string
+          manager_id: string
+          message: string
+          name: string
+          priority?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          manager_id?: string
+          message?: string
+          name?: string
+          priority?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_message_templates_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string | null
