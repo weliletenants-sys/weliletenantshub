@@ -277,6 +277,53 @@ export type Database = {
           },
         ]
       }
+      message_drafts: {
+        Row: {
+          created_at: string
+          draft_name: string
+          id: string
+          manager_id: string
+          message: string
+          priority: string
+          selected_agent_ids: string[] | null
+          send_to_all: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          draft_name: string
+          id?: string
+          manager_id: string
+          message?: string
+          priority?: string
+          selected_agent_ids?: string[] | null
+          send_to_all?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          draft_name?: string
+          id?: string
+          manager_id?: string
+          message?: string
+          priority?: string
+          selected_agent_ids?: string[] | null
+          send_to_all?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_drafts_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string | null
