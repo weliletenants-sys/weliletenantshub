@@ -2,7 +2,86 @@
 
 ## Overview
 
-This document outlines the comprehensive real-time synchronization system that ensures managers see every agent activity instantly across all manager dashboard pages.
+This document outlines the comprehensive real-time synchronization system that ensures managers see every agent activity instantly across all manager dashboard pages, including the new live activity feed component.
+
+## Live Activity Feed
+
+### Overview
+The Live Activity Feed is a real-time component that displays a continuous stream of agent activities on the manager dashboard. It provides instant visibility into all agent actions across the platform.
+
+### Location
+Displayed prominently on the Manager Dashboard (`/manager/dashboard`), positioned after the summary statistics cards.
+
+### Features
+
+**Activity Types Tracked:**
+- **Tenant additions** - When agents add new tenants to the system
+- **Tenant updates** - When agents modify tenant information
+- **Tenant deletions** - When agents or managers remove tenants
+- **Payment recordings** - When agents record rent payments
+- **Profile updates** - When agents update their profile information
+
+**Visual Design:**
+- Real-time "Live" badge with pulsing green indicator
+- Scrollable feed showing up to 20 most recent activities
+- Color-coded icons for different activity types
+- Relative timestamps (e.g., "2 minutes ago")
+- Agent names prominently displayed
+- Activity descriptions with relevant details (tenant names, payment amounts)
+
+**Real-Time Updates:**
+The activity feed automatically updates when:
+- Any agent adds, edits, or deletes a tenant
+- Any agent records a payment
+- Any profile is updated
+- Audit log entries are created
+
+### Component: `ActivityFeed`
+
+**Location:** `src/components/ActivityFeed.tsx`
+
+**Props:**
+- `maxItems?: number` - Maximum number of activities to display (default: 15)
+- `className?: string` - Additional CSS classes for styling
+
+**Implementation:**
+```typescript
+<ActivityFeed maxItems={20} className="lg:col-span-2" />
+```
+
+**Data Sources:**
+1. **Audit Logs** - Fetches from `audit_logs` table for tenant and profile changes
+2. **Collections** - Fetches from `collections` table for payment recordings
+3. **Real-Time Subscriptions** - Uses `registerSyncCallback` to listen for table changes
+
+**Activity Icons:**
+- 🟢 Green UserPlus icon - Tenant added
+- 🔵 Blue Edit icon - Tenant updated
+- 🔴 Red Trash icon - Tenant deleted
+- 💜 Purple DollarSign icon - Payment recorded
+- ⚪ Gray Edit icon - Profile updated
+
+### Integration with Real-Time System
+
+The activity feed integrates seamlessly with the existing real-time infrastructure:
+
+```typescript
+useEffect(() => {
+  fetchRecentActivities();
+
+  // Listen for real-time updates
+  const unregisterCallback = registerSyncCallback((table) => {
+    if (table === 'tenants' || table === 'collections' || table === 'profiles') {
+      console.log(`Real-time update detected on ${table}, refreshing activity feed`);
+      fetchRecentActivities();
+    }
+  });
+
+  return () => {
+    unregisterCallback();
+  };
+}, []);
+```
 
 ## Real-Time Infrastructure
 
@@ -28,6 +107,12 @@ All hooks are defined in `src/hooks/useRealtimeSubscription.ts`.
 - `useRealtimeAgents()`
 
 **What updates in real-time:**
+- **Live Activity Feed** - Real-time stream of recent agent actions (NEW)
+  - Tenant additions with agent names
+  - Payment recordings with amounts and tenant names
+  - Tenant updates and deletions
+  - Profile modifications
+  - Auto-refreshes when new activities occur
 - Total agents count
 - Total tenants count
 - Pending verifications count
@@ -38,6 +123,7 @@ All hooks are defined in `src/hooks/useRealtimeSubscription.ts`.
 - Payment method breakdown charts
 
 **Visual feedback:**
+- **Activity Feed** - Live badge with pulsing indicator, scrollable feed with icons
 - Toast notifications for portfolio value changes
 - Toast notifications for new tenants added
 - Toast notifications for pending verifications
@@ -294,10 +380,14 @@ If real-time updates are not working:
 
 ## Future Enhancements
 
-Potential improvements to the real-time system:
+Potential improvements to the real-time system and activity feed:
 
+- **Activity filtering** - Filter activity feed by activity type or agent
+- **Activity search** - Search through historical activities
+- **Activity export** - Export activity history to CSV/PDF
+- **Activity notifications** - Desktop/mobile push notifications for critical activities
 - **Presence indicators** - Show which managers/agents are currently online
 - **Conflict resolution** - Handle simultaneous edits from multiple users
 - **Sound notifications** - Optional audio alerts for critical events
-- **Activity feed** - Dedicated stream showing all recent agent activities
 - **Real-time charts** - Live updating visualization of metrics
+- **Activity details modal** - Click activities to see full details and related records

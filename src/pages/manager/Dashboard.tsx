@@ -4,6 +4,7 @@ import PullToRefresh from "react-simple-pull-to-refresh";
 import ManagerLayout from "@/components/ManagerLayout";
 import { ManagerDashboardSkeleton } from "@/components/TenantDetailSkeleton";
 import { ContentTransition } from "@/components/ContentTransition";
+import { ActivityFeed } from "@/components/ActivityFeed";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus } from "lucide-react";
@@ -846,6 +847,9 @@ const ManagerDashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Live Activity Feed */}
+        <ActivityFeed maxItems={20} className="lg:col-span-2" />
 
         {/* Payment Verification Stats */}
         <Card>
