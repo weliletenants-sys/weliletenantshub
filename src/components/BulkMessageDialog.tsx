@@ -602,13 +602,10 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Get tenant and agent info
+      // Get tenant info
       const { data: tenantData, error: tenantError } = await supabase
         .from("tenants")
-        .select(`
-          *,
-          agents!inner(id, user_id, profiles!inner(full_name))
-        `)
+        .select("*")
         .eq("id", paymentTenantId)
         .single();
 
@@ -617,12 +614,23 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
       const tenant = tenantData as any;
       const paymentAmountNum = parseFloat(paymentAmount);
 
-      // Create payment notification for the agent
-      const paymentNotification = {
+      // Get ALL agents to send payment notification to everyone
+      const { data: allAgents, error: agentsError } = await supabase
+        .from("agents")
+        .select("user_id");
+
+      if (agentsError) throw agentsError;
+
+      if (!allAgents || allAgents.length === 0) {
+        throw new Error("No agents found");
+      }
+
+      // Create payment notifications for ALL agents
+      const paymentNotifications = allAgents.map(agent => ({
         sender_id: user.id,
-        recipient_id: tenant.agents.user_id,
-        title: "Payment Entry",
-        message: `Payment recorded for tenant ${tenant.tenant_name}. Amount: UGX ${paymentAmountNum.toLocaleString()}. Please review and apply to tenant account.`,
+        recipient_id: agent.user_id,
+        title: "Payment Entry - ALL AGENTS",
+        message: `Payment recorded for tenant ${tenant.tenant_name}. Amount: UGX ${paymentAmountNum.toLocaleString()}. Method: ${paymentMethod}. Please review.`,
         priority: "high",
         payment_data: {
           tenant_id: tenant.id,
@@ -632,16 +640,16 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
           payment_date: paymentDate,
           applied: false
         }
-      };
+      }));
 
       const { error: insertError } = await supabase
         .from("notifications")
-        .insert(paymentNotification);
+        .insert(paymentNotifications);
 
       if (insertError) throw insertError;
 
-      toast.success("Payment notification sent to agent", {
-        description: `Agent will be notified to apply UGX ${paymentAmountNum.toLocaleString()} to ${tenant.tenant_name}'s account`
+      toast.success(`Payment notification sent to ALL ${allAgents.length} agents`, {
+        description: `UGX ${paymentAmountNum.toLocaleString()} payment for ${tenant.tenant_name} broadcast to all agents`
       });
 
       resetForm();
