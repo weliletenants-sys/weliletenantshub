@@ -69,6 +69,7 @@ export const NotificationsPanel = () => {
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [quickReplyText, setQuickReplyText] = useState<Record<string, string>>({});
   const [sendingReply, setSendingReply] = useState<string | null>(null);
+  const [tenantStatuses, setTenantStatuses] = useState<Record<string, { status: string; outstanding_balance: number }>>({});
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     today: false,
     yesterday: false,
@@ -378,24 +379,107 @@ export const NotificationsPanel = () => {
   const [userRole, setUserRole] = useState<string>("");
 
   // Fetch user role on mount
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-      
-      if (profile) {
-        setUserRole(profile.role);
-      }
-    };
+  const fetchUserRole = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
     
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    
+    if (profile) {
+      setUserRole(profile.role);
+    }
+  };
+
+  useEffect(() => {
     fetchUserRole();
   }, []);
+
+  useEffect(() => {
+    fetchUserRole();
+  }, []);
+
+  // Fetch tenant status for a given tenant ID
+  const fetchTenantStatus = async (tenantId: string) => {
+    if (tenantStatuses[tenantId]) return; // Already fetched
+    
+    try {
+      const { data, error } = await supabase
+        .from("tenants")
+        .select("status, outstanding_balance")
+        .eq("id", tenantId)
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
+        setTenantStatuses(prev => ({
+          ...prev,
+          [tenantId]: {
+            status: data.status || "pending",
+            outstanding_balance: data.outstanding_balance || 0
+          }
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching tenant status:", error);
+    }
+  };
+
+  // Extract tenant IDs from notifications and fetch their statuses
+  useEffect(() => {
+    if (notifications.length > 0) {
+      const tenantIds = new Set<string>();
+      
+      notifications.forEach(notification => {
+        // Extract tenant IDs from payment data
+        if (notification.payment_data?.tenant_id) {
+          tenantIds.add(notification.payment_data.tenant_id);
+        }
+        
+        // Extract tenant IDs from message tags [TENANT:id:name]
+        const matches = notification.message.matchAll(/\[TENANT:([^:]+):[^\]]+\]/g);
+        for (const match of matches) {
+          tenantIds.add(match[1]);
+        }
+      });
+      
+      // Fetch status for each tenant
+      tenantIds.forEach(tenantId => {
+        fetchTenantStatus(tenantId);
+      });
+    }
+  }, [notifications]);
+
+  // Helper function to render status badge
+  const getStatusBadge = (tenantId: string) => {
+    const tenantStatus = tenantStatuses[tenantId];
+    if (!tenantStatus) return null;
+    
+    const { status, outstanding_balance } = tenantStatus;
+    
+    // Determine if overdue (outstanding balance > 0 and status is verified)
+    const isOverdue = outstanding_balance > 0 && status === "verified";
+    const displayStatus = isOverdue ? "overdue" : status;
+    
+    const statusConfig = {
+      verified: { label: "Active", className: "bg-green-100 text-green-700 border-green-300" },
+      overdue: { label: "Overdue", className: "bg-red-100 text-red-700 border-red-300" },
+      pending: { label: "Pending", className: "bg-yellow-100 text-yellow-700 border-yellow-300" },
+      rejected: { label: "Rejected", className: "bg-gray-100 text-gray-700 border-gray-300" }
+    };
+    
+    const config = statusConfig[displayStatus as keyof typeof statusConfig] || statusConfig.pending;
+    
+    return (
+      <Badge className={`${config.className} text-[10px] px-1.5 py-0 h-4 font-semibold`}>
+        {config.label}
+      </Badge>
+    );
+  };
 
   const parseMessageWithTenantTags = (message: string): string => {
     // Extract tenant names from tags for display
@@ -419,18 +503,21 @@ export const NotificationsPanel = () => {
           <TooltipProvider key={index}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 hover:scale-105 transition-all font-semibold underline decoration-2 underline-offset-2 decoration-primary/60 hover:decoration-primary shadow-sm hover:shadow-md"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    haptics.light();
-                    navigate(tenantRoute);
-                    setOpen(false);
-                  }}
-                >
-                  <AlertCircle className="h-3.5 w-3.5 animate-pulse" />
-                  {tenantName}
-                  <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 hover:scale-105 transition-all font-semibold underline decoration-2 underline-offset-2 decoration-primary/60 hover:decoration-primary shadow-sm hover:shadow-md"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      haptics.light();
+                      navigate(tenantRoute);
+                      setOpen(false);
+                    }}
+                  >
+                    <AlertCircle className="h-3.5 w-3.5 animate-pulse" />
+                    {tenantName}
+                    <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
+                  </span>
+                  {getStatusBadge(tenantId)}
                 </span>
               </TooltipTrigger>
               <TooltipContent>
@@ -766,17 +853,20 @@ export const NotificationsPanel = () => {
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          haptics.light();
-                          navigate(`/agent/tenants/${notification.payment_data!.tenant_id}`);
-                          setOpen(false);
-                        }}
-                        className="block w-full text-left font-semibold text-primary hover:text-primary/80 underline decoration-2 underline-offset-2 transition-colors cursor-pointer"
-                      >
-                        {notification.payment_data.tenant_name}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            haptics.light();
+                            navigate(`/agent/tenants/${notification.payment_data!.tenant_id}`);
+                            setOpen(false);
+                          }}
+                          className="block text-left font-semibold text-primary hover:text-primary/80 underline decoration-2 underline-offset-2 transition-colors cursor-pointer"
+                        >
+                          {notification.payment_data.tenant_name}
+                        </button>
+                        {getStatusBadge(notification.payment_data.tenant_id)}
+                      </div>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>Tap to view tenant details</p>
