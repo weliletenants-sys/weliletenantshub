@@ -11,6 +11,17 @@ The Live Activity Feed is a real-time component that provides managers with inst
 - **No Manual Refresh Required** - Powered by Supabase Realtime subscriptions
 - **Live Indicator** - Pulsing green badge shows the feed is actively connected
 
+### Text Search
+- **Search across all activities** - Find activities by typing keywords
+- **Searches across:**
+  - Agent names (e.g., "John")
+  - Tenant names (e.g., "Sarah")
+  - Payment amounts (e.g., "50000")
+  - Activity descriptions (e.g., "recorded payment")
+- **Real-time results** - Filters as you type
+- **Clear button** - Quickly reset search with one click
+- **Combines with filters** - Use search alongside activity type, agent, and date filters
+
 ### Advanced Filtering
 
 **Filter by Activity Type:**
@@ -171,7 +182,18 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 <ActivityFeed maxItems={20} className="lg:col-span-2" />
 ```
 
-### Filter Usage Guide
+### Search and Filter Usage Guide
+
+**Using Search:**
+1. Type keywords in the search bar at the top of the activity feed
+2. Search works across:
+   - Agent names (e.g., type "John" to find all John's activities)
+   - Tenant names (e.g., type "Sarah" to find activities involving Sarah)
+   - Payment amounts (e.g., type "50000" to find payments of that amount)
+   - Descriptions (e.g., type "recorded" to find payment recordings)
+3. Results filter in real-time as you type
+4. Click the X button in the search bar to clear search
+5. Search combines with other filters for precise results
 
 **Quick Filtering:**
 1. Click the "Filters" button to expand the filter panel
@@ -181,25 +203,33 @@ import { ActivityFeed } from "@/components/ActivityFeed";
    - **Date Range**: Pick start and/or end dates for time-based filtering
 3. Results update automatically as you adjust filters
 4. Active filter count shown in badge next to "Filters" button
-5. Click "Clear All Filters" to reset
+5. Click "Clear All Filters" to reset all search and filters
 
-**Common Filter Scenarios:**
+**Common Search and Filter Scenarios:**
 
-**Scenario 1: View Today's Payments**
+**Scenario 1: Find All Activities for a Specific Tenant**
+- Search: Type tenant name (e.g., "Sarah")
+- Activity Type: "All Types"
+
+**Scenario 2: View Today's Payments**
 - Activity Type: "Payment Recorded"
 - Start Date: Today
 - End Date: Today
 
-**Scenario 2: Track Specific Agent's Work**
+**Scenario 3: Track Specific Agent's Work**
 - Agent: Select agent name
 - Activity Type: "All Types"
 - Date Range: Last 7 days
 
-**Scenario 3: Monitor Recent Tenant Changes**
+**Scenario 4: Find Large Payments**
+- Search: Type payment amount (e.g., "100000")
+- Activity Type: "Payment Recorded"
+
+**Scenario 5: Monitor Recent Tenant Changes**
 - Activity Type: "Tenant Added" or "Tenant Updated"
 - Date Range: Last 24 hours
 
-**Scenario 4: Audit Trail for Deletions**
+**Scenario 6: Audit Trail for Deletions**
 - Activity Type: "Tenant Deleted"
 - Date Range: Custom range
 
@@ -234,6 +264,18 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 8. **Update Profile** - Change agent profile information
 9. **Check Feed** - Manager dashboard should instantly show "Agent updated their profile"
 
+**Search Testing:**
+1. **Search by Tenant Name** - Type a tenant name in the search bar
+   - Verify only activities involving that tenant are shown
+2. **Search by Agent Name** - Type an agent name
+   - Verify only that agent's activities are shown
+3. **Search by Amount** - Type a payment amount (e.g., "50000")
+   - Verify only activities with that amount are shown
+4. **Clear Search** - Click X button in search bar
+   - Verify all activities are shown again
+5. **Combine Search and Filters** - Type search query and apply filters
+   - Verify results match both search and filter criteria
+
 **Filter Testing:**
 1. **Open Filters** - Click "Filters" button to expand filter panel
 2. **Filter by Type** - Select "Payment Recorded" from activity type dropdown
@@ -245,8 +287,8 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 5. **Combine Filters** - Apply multiple filters simultaneously
    - Verify results match all filter criteria
 6. **Clear Filters** - Click "Clear All Filters" button
-   - Verify all activities are shown again
-7. **Empty State** - Apply filters that match no activities
+   - Verify all activities and search are cleared
+7. **Empty State** - Apply filters/search that match no activities
    - Verify appropriate "No activities match your filters" message
    - Verify "Clear Filters" button appears in empty state
 
@@ -291,10 +333,11 @@ Planned improvements for the activity feed:
    - Future: Save filter presets
    - Future: Multi-select for activity types
 
-2. **Activity Search**
-   - Full-text search across all activities
-   - Search by tenant name, agent name, or amount
-   - Search highlighting in results
+2. **Activity Search** ✅ **IMPLEMENTED**
+   - ✅ Full-text search across all activities
+   - ✅ Search by tenant name, agent name, or amount
+   - Future: Search highlighting in results
+   - Future: Search suggestions/autocomplete
 
 3. **Activity Details**
    - Click activity to see full details
