@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { clearOldCaches } from "@/lib/cacheManager";
 import SplashScreen from "@/components/SplashScreen";
 import { InstallReminderProvider } from "@/components/InstallReminderProvider";
+import { useRoutePrefetch } from "@/hooks/useRoutePrefetch";
 
 // Eagerly load critical pages
 import Index from "./pages/Index";
@@ -68,6 +69,9 @@ const App = () => {
   useEffect(() => {
     clearOldCaches();
   }, []);
+
+  // Prefetch likely next routes based on user role
+  useRoutePrefetch();
 
   const handleSplashComplete = () => {
     sessionStorage.setItem('splashShown', 'true');
