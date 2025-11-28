@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Bell, X, AlertCircle, Info, AlertTriangle, Zap, Check } from "lucide-react";
+import { Bell, X, AlertCircle, Info, AlertTriangle, Zap, Check, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -412,6 +412,26 @@ export const NotificationsPanel = () => {
                       {renderMessageWithClickableTags(notification.message)}
                     </p>
                     
+                    {/* Reply Button */}
+                    <div className="mt-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedNotificationId(notification.id);
+                          setThreadDialogOpen(true);
+                          if (!notification.read) {
+                            markAsRead(notification.id);
+                          }
+                        }}
+                        className="w-full"
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Reply to Message
+                      </Button>
+                    </div>
+                    
                     {/* Payment data display */}
                     {notification.payment_data && (
                       <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border space-y-2">
@@ -473,6 +493,19 @@ export const NotificationsPanel = () => {
         </ScrollArea>
       </SheetContent>
     </Sheet>
+
+    {/* Message Thread Dialog */}
+    {selectedNotificationId && (
+      <MessageThreadDialog
+        open={threadDialogOpen}
+        onOpenChange={setThreadDialogOpen}
+        notificationId={selectedNotificationId}
+        onReplySent={() => {
+          fetchNotifications();
+          toast.success("Reply sent successfully");
+        }}
+      />
+    )}
 
     {/* Payment Receipt Dialog */}
     <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
