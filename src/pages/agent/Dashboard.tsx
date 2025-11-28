@@ -437,27 +437,36 @@ const AgentDashboard = () => {
             </div>
 
           {/* Manager Messages - ULTRA PROMINENT DISPLAY */}
-          {managerNotifications.length > 0 && (
-            <Card 
-              ref={managerMessagesRef}
-              className="border-[6px] border-primary bg-gradient-to-br from-primary/30 via-primary/20 to-primary/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] animate-pulse-slow scroll-mt-4 sticky top-0 z-10 backdrop-blur-sm"
-            >
-              <CardHeader className="pb-6 bg-gradient-to-r from-primary/20 to-primary/10 rounded-t-lg border-b-4 border-primary/40">
-                <CardTitle className="flex items-center gap-4 text-primary text-3xl font-extrabold">
-                  <div className="relative">
-                    <MessageSquare className="h-12 w-12 animate-bounce drop-shadow-lg" />
+          <Card 
+            ref={managerMessagesRef}
+            className="border-[6px] border-primary bg-gradient-to-br from-primary/30 via-primary/20 to-primary/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] animate-pulse-slow scroll-mt-4 sticky top-0 z-10 backdrop-blur-sm"
+          >
+            <CardHeader className="pb-6 bg-gradient-to-r from-primary/20 to-primary/10 rounded-t-lg border-b-4 border-primary/40">
+              <CardTitle className="flex items-center gap-4 text-primary text-3xl font-extrabold">
+                <div className="relative">
+                  <MessageSquare className="h-12 w-12 animate-bounce drop-shadow-lg" />
+                  {managerNotifications.length > 0 && (
                     <div className="absolute -top-2 -right-2 h-7 w-7 bg-destructive rounded-full flex items-center justify-center animate-pulse shadow-lg">
                       <span className="text-xs font-bold text-white">{managerNotifications.length}</span>
                     </div>
-                  </div>
-                  Manager Messages
-                </CardTitle>
-                <CardDescription className="text-base font-bold mt-2">
-                  📢 Important updates from your manager - Read now!
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-5 pt-6 pb-6">
-                {managerNotifications.map((notification) => (
+                  )}
+                </div>
+                Manager Messages
+              </CardTitle>
+              <CardDescription className="text-base font-bold mt-2">
+                📢 Important updates from your manager {managerNotifications.length > 0 ? '- Read now!' : '- No new messages'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5 pt-6 pb-6">
+              {managerNotifications.length === 0 ? (
+                <div className="text-center py-8">
+                  <MessageSquare className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <p className="text-xl font-semibold text-muted-foreground mb-2">No Messages Yet</p>
+                  <p className="text-sm text-muted-foreground">You'll see manager messages here when they arrive</p>
+                </div>
+              ) : (
+                <>
+                  {managerNotifications.map((notification) => (
                   <Card
                     key={notification.id}
                     className={`relative ${getPriorityColor(notification.priority)} border-[4px] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] hover:shadow-[0_15px_50px_-10px_rgba(0,0,0,0.3)] transition-all hover:scale-[1.02]`}
@@ -592,21 +601,22 @@ const AgentDashboard = () => {
                     </CardContent>
                   </Card>
                 ))}
-                <Button
-                  variant="default"
-                  size="lg"
-                  className="w-full text-lg font-extrabold shadow-xl py-6"
-                  onClick={() => {
-                    // Open notifications panel - this will be handled by clicking the bell icon
-                    document.querySelector('[data-notification-trigger]')?.dispatchEvent(new Event('click'));
-                  }}
-                >
-                  <Bell className="h-6 w-6 mr-3" />
-                  View All Notifications
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+                </>
+              )}
+              <Button
+                variant="default"
+                size="lg"
+                className="w-full text-lg font-extrabold shadow-xl py-6"
+                onClick={() => {
+                  // Open notifications panel - this will be handled by clicking the bell icon
+                  document.querySelector('[data-notification-trigger]')?.dispatchEvent(new Event('click'));
+                }}
+              >
+                <Bell className="h-6 w-6 mr-3" />
+                View All Notifications
+              </Button>
+            </CardContent>
+          </Card>
 
           {/* Quick Action Buttons */}
           <div className="grid grid-cols-2 gap-3">
