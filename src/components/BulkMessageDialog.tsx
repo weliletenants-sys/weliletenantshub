@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MessageSquare, Send, FileText, Trash2, Share2, Lock, Tag, Code2, Eye, Save, FolderOpen } from "lucide-react";
@@ -152,6 +153,8 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
   const [showDrafts, setShowDrafts] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState("");
 
   // Available template variables
   const TEMPLATE_VARIABLES = [
@@ -561,11 +564,18 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
     setPreviewMessage("");
     setCurrentDraftId(null);
     setShowDrafts(false);
+    setSaveAsTemplate(false);
+    setTemplateName("");
   };
 
   const handleSend = async () => {
     if (!title.trim() || !message.trim()) {
       toast.error("Please fill in all fields");
+      return;
+    }
+
+    if (saveAsTemplate && !templateName.trim()) {
+      toast.error("Please provide a name for the template");
       return;
     }
 
@@ -621,10 +631,38 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
 
       if (insertError) throw insertError;
 
-      const count = sendToAll ? agentIds.length : selectedAgentIds.length;
-      toast.success(`Message sent to ${count} agent(s)`, {
-        description: `"${title}" was delivered successfully`
-      });
+      // Save as template if requested
+      if (saveAsTemplate) {
+        const { error: templateError } = await supabase
+          .from("custom_message_templates")
+          .insert({
+            manager_id: user.id,
+            name: templateName,
+            title: title,
+            message: message,
+            category: "custom",
+            priority: priority,
+            is_shared: true,
+            shared_at: new Date().toISOString(),
+          });
+
+        if (templateError) {
+          console.error("Error saving template:", templateError);
+          toast.error("Message sent but failed to save as template");
+        } else {
+          toast.success(`Message sent and saved as template "${templateName}"`);
+        }
+      } else {
+        const count = sendToAll ? agentIds.length : selectedAgentIds.length;
+        toast.success(`Message sent to ${count} agent(s)`, {
+          description: `"${title}" was delivered successfully`
+        });
+      }
+
+      // Delete draft if we were editing one
+      if (currentDraftId) {
+        await supabase.from("message_drafts").delete().eq("id", currentDraftId);
+      }
 
       resetForm();
       setOpen(false);
@@ -1069,45 +1107,78 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
           </div>
 
           {!showTemplates && (
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  resetForm();
-                  setOpen(false);
-                }}
-                disabled={sending || savingDraft}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="outline"
-                onClick={saveDraft}
-                disabled={sending || savingDraft || (!title.trim() && !message.trim())}
-              >
-                {savingDraft ? (
-                  <>Saving...</>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    {currentDraftId ? "Update Draft" : "Save as Draft"}
-                  </>
+            <>
+              <div className="space-y-3 pt-4 border-t">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="saveAsTemplate"
+                    checked={saveAsTemplate}
+                    onCheckedChange={(checked) => setSaveAsTemplate(checked as boolean)}
+                  />
+                  <label
+                    htmlFor="saveAsTemplate"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Save this message as a reusable template
+                  </label>
+                </div>
+
+                {saveAsTemplate && (
+                  <div className="space-y-2 pl-6">
+                    <Label htmlFor="templateName">Template Name</Label>
+                    <Input
+                      id="templateName"
+                      placeholder="e.g., Weekly Performance Update"
+                      value={templateName}
+                      onChange={(e) => setTemplateName(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Give your template a descriptive name to easily find it later
+                    </p>
+                  </div>
                 )}
-              </Button>
-              <Button
-                onClick={handleSend}
-                disabled={sending || savingDraft || !title.trim() || !message.trim()}
-              >
-                {sending ? (
-                  <>Sending...</>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4 mr-2" />
-                    {sendToAll ? "Send to All Agents" : `Send to ${selectedAgentIds.length} Agent${selectedAgentIds.length !== 1 ? "s" : ""}`}
-                  </>
-                )}
-              </Button>
-            </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    resetForm();
+                    setOpen(false);
+                  }}
+                  disabled={sending || savingDraft}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={saveDraft}
+                  disabled={sending || savingDraft || (!title.trim() && !message.trim())}
+                >
+                  {savingDraft ? (
+                    <>Saving...</>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {currentDraftId ? "Update Draft" : "Save as Draft"}
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={handleSend}
+                  disabled={sending || savingDraft || !title.trim() || !message.trim()}
+                >
+                  {sending ? (
+                    <>Sending...</>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      {sendToAll ? "Send to All Agents" : `Send to ${selectedAgentIds.length} Agent${selectedAgentIds.length !== 1 ? "s" : ""}`}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
