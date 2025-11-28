@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ManagerLayout from "@/components/ManagerLayout";
+import { AgentsListSkeleton } from "@/components/TenantDetailSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -410,6 +411,14 @@ const ManagerAgents = () => {
     ? agents.reduce((sum, agent) => sum + Number(agent.collection_rate || 0), 0) / agents.length
     : 0;
   const totalEarnings = agents.reduce((sum, agent) => sum + Number(agent.monthly_earnings || 0), 0);
+
+  if (loading) {
+    return (
+      <ManagerLayout currentPage="/manager/agents">
+        <AgentsListSkeleton />
+      </ManagerLayout>
+    );
+  }
 
   return (
     <ManagerLayout currentPage="/manager/agents">
