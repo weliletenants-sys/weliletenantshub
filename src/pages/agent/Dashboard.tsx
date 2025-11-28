@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import PullToRefresh from "react-simple-pull-to-refresh";
 import AgentLayout from "@/components/AgentLayout";
@@ -34,6 +34,10 @@ const AgentDashboard = () => {
   const [paymentMethodBreakdown, setPaymentMethodBreakdown] = useState<any[]>([]);
   const [managerNotifications, setManagerNotifications] = useState<any[]>([]);
   const [dismissedNotifications, setDismissedNotifications] = useState<string[]>([]);
+  const [previousNotificationCount, setPreviousNotificationCount] = useState(0);
+  
+  // Ref for auto-scroll to manager messages
+  const managerMessagesRef = useRef<HTMLDivElement>(null);
   
   // Service worker for caching
   useServiceWorker();
@@ -279,7 +283,26 @@ const AgentDashboard = () => {
 
       if (error) throw error;
 
-      setManagerNotifications((data || []).filter(n => !dismissedNotifications.includes(n.id)));
+      const filteredData = (data || []).filter(n => !dismissedNotifications.includes(n.id));
+      const newCount = filteredData.length;
+      
+      // Auto-scroll to manager messages if new notifications arrived
+      if (newCount > previousNotificationCount && previousNotificationCount > 0 && !isLoading) {
+        setTimeout(() => {
+          managerMessagesRef.current?.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+          haptics.success(); // Haptic feedback for new message
+          toast.success("📬 New message from manager!", {
+            description: "Scroll up to view",
+            duration: 3000,
+          });
+        }, 300);
+      }
+      
+      setPreviousNotificationCount(newCount);
+      setManagerNotifications(filteredData);
     } catch (error) {
       console.error("Error fetching notifications:", error);
     }
@@ -349,7 +372,10 @@ const AgentDashboard = () => {
 
           {/* Manager Messages - HIGHLY PROMINENT DISPLAY */}
           {managerNotifications.length > 0 && (
-            <Card className="border-4 border-primary bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 shadow-2xl animate-pulse-slow">
+            <Card 
+              ref={managerMessagesRef}
+              className="border-4 border-primary bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 shadow-2xl animate-pulse-slow scroll-mt-4"
+            >
               <CardHeader className="pb-4 bg-primary/10 rounded-t-lg border-b-2 border-primary/30">
                 <CardTitle className="flex items-center gap-3 text-primary text-2xl font-bold">
                   <div className="relative">
