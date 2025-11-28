@@ -7,8 +7,20 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Send, FileText } from "lucide-react";
+import { MessageSquare, Send, FileText, Pencil, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { CustomTemplateDialog } from "./CustomTemplateDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useEffect } from "react";
 
 interface MessageTemplate {
   id: string;
@@ -17,6 +29,8 @@ interface MessageTemplate {
   message: string;
   priority: "low" | "normal" | "high" | "urgent";
   category: string;
+  isCustom?: boolean;
+  manager_id?: string;
 }
 
 const MESSAGE_TEMPLATES: MessageTemplate[] = [
@@ -99,9 +113,71 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
   const [sending, setSending] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [showTemplates, setShowTemplates] = useState(true);
+  const [customTemplates, setCustomTemplates] = useState<MessageTemplate[]>([]);
+  const [allTemplates, setAllTemplates] = useState<MessageTemplate[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<MessageTemplate | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      fetchCustomTemplates();
+    }
+  }, [open]);
+
+  const fetchCustomTemplates = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("custom_message_templates")
+        .select("*")
+        .eq("manager_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const customTemplatesFormatted: MessageTemplate[] = (data || []).map(t => ({
+        id: t.id,
+        name: t.name,
+        title: t.title,
+        message: t.message,
+        priority: t.priority as "low" | "normal" | "high" | "urgent",
+        category: t.category,
+        isCustom: true,
+        manager_id: t.manager_id,
+      }));
+
+      setCustomTemplates(customTemplatesFormatted);
+      setAllTemplates([...MESSAGE_TEMPLATES, ...customTemplatesFormatted]);
+    } catch (error: any) {
+      console.error("Error fetching custom templates:", error);
+    }
+  };
+
+  const handleDeleteTemplate = async () => {
+    if (!templateToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("custom_message_templates")
+        .delete()
+        .eq("id", templateToDelete.id);
+
+      if (error) throw error;
+
+      toast.success("Template deleted successfully");
+      fetchCustomTemplates();
+      setDeleteDialogOpen(false);
+      setTemplateToDelete(null);
+    } catch (error: any) {
+      console.error("Error deleting template:", error);
+      toast.error("Failed to delete template");
+    }
+  };
 
   const handleTemplateSelect = (templateId: string) => {
-    const template = MESSAGE_TEMPLATES.find(t => t.id === templateId);
+    const template = allTemplates.find(t => t.id === templateId);
     if (template) {
       setTitle(template.title);
       setMessage(template.message);
@@ -213,20 +289,23 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-semibold">Choose a Template</Label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowTemplates(false)}
-                >
-                  Start from scratch
-                </Button>
+                <div className="flex items-center gap-2">
+                  <CustomTemplateDialog onTemplateSaved={fetchCustomTemplates} />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowTemplates(false)}
+                  >
+                    Start from scratch
+                  </Button>
+                </div>
               </div>
               
               <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2">
-                {MESSAGE_TEMPLATES.reduce((acc, template) => {
+                {allTemplates.reduce((acc, template) => {
                   const categoryExists = acc.find((item: any) => item.category === template.category);
                   if (!categoryExists) {
-                    const categoryTemplates = MESSAGE_TEMPLATES.filter(t => t.category === template.category);
+                    const categoryTemplates = allTemplates.filter(t => t.category === template.category);
                     acc.push({
                       category: template.category,
                       templates: categoryTemplates
@@ -235,31 +314,54 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
                   return acc;
                 }, [] as any[]).map((group) => (
                   <div key={group.category} className="space-y-2">
-                    <h4 className="text-sm font-medium text-muted-foreground">{group.category}</h4>
+                    <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      {group.category}
+                      {group.templates.some((t: MessageTemplate) => t.isCustom) && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">Custom</span>
+                      )}
+                    </h4>
                     {group.templates.map((template: MessageTemplate) => (
                       <Card
                         key={template.id}
-                        className="cursor-pointer hover:bg-muted/50 transition-colors border-2"
-                        onClick={() => handleTemplateSelect(template.id)}
+                        className="cursor-pointer hover:bg-muted/50 transition-colors border-2 relative group"
                       >
-                        <CardContent className="p-4">
+                        <CardContent className="p-4" onClick={() => handleTemplateSelect(template.id)}>
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <FileText className="h-4 w-4 text-primary" />
                                 <h5 className="font-medium">{template.name}</h5>
+                                {template.isCustom && (
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">You</span>
+                                )}
                               </div>
                               <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                                 {template.title}
                               </p>
                             </div>
-                            <div className={`text-xs px-2 py-1 rounded ${
-                              template.priority === "urgent" ? "bg-destructive/10 text-destructive" :
-                              template.priority === "high" ? "bg-orange-100 text-orange-700" :
-                              template.priority === "low" ? "bg-muted text-muted-foreground" :
-                              "bg-primary/10 text-primary"
-                            }`}>
-                              {template.priority}
+                            <div className="flex items-center gap-1">
+                              <div className={`text-xs px-2 py-1 rounded ${
+                                template.priority === "urgent" ? "bg-destructive/10 text-destructive" :
+                                template.priority === "high" ? "bg-orange-100 text-orange-700" :
+                                template.priority === "low" ? "bg-muted text-muted-foreground" :
+                                "bg-primary/10 text-primary"
+                              }`}>
+                                {template.priority}
+                              </div>
+                              {template.isCustom && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTemplateToDelete(template);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </CardContent>
@@ -363,6 +465,27 @@ export const BulkMessageDialog = ({ selectedAgentIds, agentNames }: BulkMessageD
           </div>
         )}
       </DialogContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{templateToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setTemplateToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTemplate}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 };
