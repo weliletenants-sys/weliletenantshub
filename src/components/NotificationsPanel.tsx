@@ -23,6 +23,7 @@ import PaymentReceipt from "./PaymentReceipt";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeSubscription";
 import MessageThreadDialog from "./MessageThreadDialog";
 import { useNotificationAlerts } from "@/hooks/useNotificationAlerts";
+import { haptics } from "@/utils/haptics";
 
 interface Notification {
   id: string;
@@ -419,6 +420,7 @@ export const NotificationsPanel = () => {
             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary/15 text-primary cursor-pointer hover:bg-primary/25 hover:scale-105 transition-all font-semibold underline decoration-2 underline-offset-2 decoration-primary/60 hover:decoration-primary shadow-sm hover:shadow-md"
             onClick={(e) => {
               e.stopPropagation();
+              haptics.light();
               navigate(tenantRoute);
               setOpen(false);
             }}
@@ -755,6 +757,7 @@ export const NotificationsPanel = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
+                    haptics.light();
                     navigate(`/agent/tenants/${notification.payment_data!.tenant_id}`);
                     setOpen(false);
                   }}
