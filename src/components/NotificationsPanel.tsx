@@ -10,9 +10,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Search, XCircle } from "lucide-react";
+import { CalendarIcon, Search, XCircle, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format, formatDistanceToNow } from "date-fns";
 import { useOptimisticPayment } from "@/hooks/useOptimisticPayment";
@@ -62,6 +63,8 @@ export const NotificationsPanel = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [quickReplyText, setQuickReplyText] = useState<Record<string, string>>({});
+  const [sendingReply, setSendingReply] = useState<string | null>(null);
   const observerTarget = useRef<HTMLDivElement>(null);
   const [receiptData, setReceiptData] = useState<{
     paymentData: {
@@ -199,6 +202,56 @@ export const NotificationsPanel = () => {
     setDateFrom(undefined);
     setDateTo(undefined);
     setFilterType("all");
+  };
+
+  const handleQuickReply = async (notificationId: string, recipientId: string) => {
+    const replyText = quickReplyText[notificationId]?.trim();
+    
+    if (!replyText) {
+      toast.error("Reply message cannot be empty");
+      return;
+    }
+
+    if (replyText.length > 1000) {
+      toast.error("Reply message is too long (max 1000 characters)");
+      return;
+    }
+
+    setSendingReply(notificationId);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Create reply notification
+      const { error } = await supabase
+        .from("notifications")
+        .insert({
+          sender_id: user.id,
+          recipient_id: recipientId,
+          title: "Re: Message",
+          message: replyText,
+          priority: "normal",
+          parent_notification_id: notificationId,
+        });
+
+      if (error) throw error;
+
+      // Clear the input
+      setQuickReplyText(prev => {
+        const updated = { ...prev };
+        delete updated[notificationId];
+        return updated;
+      });
+
+      toast.success("Reply sent successfully");
+      fetchNotifications(0, false);
+    } catch (error: any) {
+      console.error("Error sending quick reply:", error);
+      toast.error("Failed to send reply");
+    } finally {
+      setSendingReply(null);
+    }
   };
   
   // Infinite scroll observer
@@ -621,25 +674,90 @@ export const NotificationsPanel = () => {
                       {renderMessageWithClickableTags(notification.message)}
                     </p>
                     
-                    {/* Reply Button */}
-                    <div className="mt-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedNotificationId(notification.id);
-                          setThreadDialogOpen(true);
-                          if (!notification.read) {
-                            markAsRead(notification.id);
-                          }
-                        }}
-                        className="w-full"
-                      >
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Reply to Message
-                      </Button>
-                    </div>
+                    {/* Quick Reply Section - Only for messages from managers */}
+                    {!notification.payment_data && notification.sender_id !== notification.recipient_id && (
+                      <div className="mt-3 space-y-2">
+                        <div className="flex gap-2">
+                          <Textarea
+                            placeholder="Type your reply..."
+                            value={quickReplyText[notification.id] || ""}
+                            onChange={(e) => setQuickReplyText(prev => ({
+                              ...prev,
+                              [notification.id]: e.target.value
+                            }))}
+                            className="min-h-[60px] resize-none"
+                            maxLength={1000}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                e.preventDefault();
+                                handleQuickReply(notification.id, notification.sender_id);
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">
+                            {quickReplyText[notification.id]?.length || 0}/1000 • Press Ctrl+Enter to send
+                          </span>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedNotificationId(notification.id);
+                                setThreadDialogOpen(true);
+                                if (!notification.read) {
+                                  markAsRead(notification.id);
+                                }
+                              }}
+                            >
+                              <MessageSquare className="h-4 w-4 mr-2" />
+                              View Thread
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleQuickReply(notification.id, notification.sender_id);
+                              }}
+                              disabled={sendingReply === notification.id || !quickReplyText[notification.id]?.trim()}
+                            >
+                              {sendingReply === notification.id ? (
+                                "Sending..."
+                              ) : (
+                                <>
+                                  <Send className="h-4 w-4 mr-2" />
+                                  Send Reply
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Original Reply Button - For payment notifications or when quick reply is not shown */}
+                    {notification.payment_data && (
+                      <div className="mt-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedNotificationId(notification.id);
+                            setThreadDialogOpen(true);
+                            if (!notification.read) {
+                              markAsRead(notification.id);
+                            }
+                          }}
+                          className="w-full"
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          Reply to Message
+                        </Button>
+                      </div>
+                    )}
                     
                     {/* Payment data display */}
                     {notification.payment_data && (
