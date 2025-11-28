@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 const CURRENT_VERSION = import.meta.env.VITE_BUILD_TIME || Date.now().toString();
 const VERSION_CHECK_INTERVAL = 2 * 60 * 1000; // Check every 2 minutes
 const VERSION_STORAGE_KEY = 'app_version';
+const LAST_SEEN_VERSION_KEY = 'last_seen_version';
+const CHANGELOG_SHOWN_KEY = 'changelog_shown_for_version';
 
 /**
  * Hook to check for new app versions and force updates
@@ -13,6 +15,8 @@ const VERSION_STORAGE_KEY = 'app_version';
 export const useVersionCheck = () => {
   const [isChecking, setIsChecking] = useState(false);
   const [updateRequired, setUpdateRequired] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
+  const [newVersion, setNewVersion] = useState<string | null>(null);
 
   const checkVersion = async () => {
     try {
@@ -69,7 +73,7 @@ export const useVersionCheck = () => {
     }
   };
 
-  const forceUpdate = async (newVersion?: string) => {
+  const forceUpdate = async (newVersionId?: string) => {
     try {
       // Clear all caches
       if ('caches' in window) {
@@ -81,8 +85,10 @@ export const useVersionCheck = () => {
       }
 
       // Update stored version
-      if (newVersion) {
-        localStorage.setItem(VERSION_STORAGE_KEY, newVersion);
+      if (newVersionId) {
+        localStorage.setItem(VERSION_STORAGE_KEY, newVersionId);
+        // Mark that we should show changelog after reload
+        localStorage.setItem('show_changelog_on_load', 'true');
       }
 
       // Force reload with cache bypass
@@ -93,6 +99,18 @@ export const useVersionCheck = () => {
       window.location.reload();
     }
   };
+
+  // Check if we should show changelog on load (after update)
+  useEffect(() => {
+    const shouldShowChangelog = localStorage.getItem('show_changelog_on_load');
+    if (shouldShowChangelog === 'true') {
+      localStorage.removeItem('show_changelog_on_load');
+      // Show changelog after a short delay to let the app load
+      setTimeout(() => {
+        setShowChangelog(true);
+      }, 1000);
+    }
+  }, []);
 
   useEffect(() => {
     // Initial version check on mount
@@ -128,5 +146,8 @@ export const useVersionCheck = () => {
     checkVersion,
     forceUpdate,
     currentVersion: CURRENT_VERSION,
+    showChangelog,
+    setShowChangelog,
+    newVersion,
   };
 };
