@@ -331,6 +331,7 @@ export type Database = {
           message: string
           priority: string | null
           read: boolean | null
+          read_at: string | null
           recipient_id: string
           sender_id: string
           title: string
@@ -342,6 +343,7 @@ export type Database = {
           message: string
           priority?: string | null
           read?: boolean | null
+          read_at?: string | null
           recipient_id: string
           sender_id: string
           title: string
@@ -353,6 +355,7 @@ export type Database = {
           message?: string
           priority?: string | null
           read?: boolean | null
+          read_at?: string | null
           recipient_id?: string
           sender_id?: string
           title?: string
