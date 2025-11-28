@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Send, FileText, Trash2, Share2, Lock, Tag, Code2, Eye } from "lucide-react";
+import { MessageSquare, Send, FileText, Trash2, Share2, Lock, Tag, Code2, Eye, Save, FolderOpen } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { CustomTemplateDialog } from "./CustomTemplateDialog";
 import {
@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useEffect } from "react";
+import { format } from "date-fns";
 
 interface MessageTemplate {
   id: string;
@@ -114,6 +115,18 @@ interface Tenant {
   agent_name: string;
 }
 
+interface MessageDraft {
+  id: string;
+  draft_name: string;
+  title: string;
+  message: string;
+  priority: "low" | "normal" | "high" | "urgent";
+  send_to_all: boolean;
+  selected_agent_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], sendToAll = false }: BulkMessageDialogProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -135,6 +148,10 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
   const [previewMessage, setPreviewMessage] = useState<string>("");
   const [availableAgents, setAvailableAgents] = useState<Array<{ id: string; name: string }>>([]);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [drafts, setDrafts] = useState<MessageDraft[]>([]);
+  const [showDrafts, setShowDrafts] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
 
   // Available template variables
   const TEMPLATE_VARIABLES = [
@@ -152,6 +169,7 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
       getCurrentUserId();
       fetchTenants();
       fetchAvailableAgents();
+      fetchDrafts();
     }
   }, [open]);
 
@@ -252,6 +270,114 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
       setPreviewMessage(message);
     } finally {
       setLoadingPreview(false);
+    }
+  };
+
+  const fetchDrafts = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("message_drafts")
+        .select("*")
+        .eq("manager_id", user.id)
+        .order("updated_at", { ascending: false });
+
+      if (error) throw error;
+
+      setDrafts((data || []) as MessageDraft[]);
+    } catch (error) {
+      console.error("Error fetching drafts:", error);
+    }
+  };
+
+  const saveDraft = async () => {
+    if (!title.trim() && !message.trim()) {
+      toast.error("Cannot save empty draft");
+      return;
+    }
+
+    const draftName = prompt("Enter a name for this draft:", currentDraftId ? drafts.find(d => d.id === currentDraftId)?.draft_name : `Draft - ${new Date().toLocaleDateString()}`);
+    
+    if (!draftName || !draftName.trim()) {
+      toast.error("Draft name is required");
+      return;
+    }
+
+    setSavingDraft(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const draftData = {
+        manager_id: user.id,
+        draft_name: draftName.trim(),
+        title,
+        message,
+        priority,
+        send_to_all: sendToAll,
+        selected_agent_ids: selectedAgentIds,
+      };
+
+      if (currentDraftId) {
+        // Update existing draft
+        const { error } = await supabase
+          .from("message_drafts")
+          .update(draftData)
+          .eq("id", currentDraftId);
+
+        if (error) throw error;
+        toast.success("Draft updated successfully");
+      } else {
+        // Create new draft
+        const { error } = await supabase
+          .from("message_drafts")
+          .insert(draftData);
+
+        if (error) throw error;
+        toast.success("Draft saved successfully");
+      }
+
+      await fetchDrafts();
+    } catch (error: any) {
+      console.error("Error saving draft:", error);
+      toast.error("Failed to save draft");
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const loadDraft = (draft: MessageDraft) => {
+    setTitle(draft.title);
+    setMessage(draft.message);
+    setPriority(draft.priority);
+    setCurrentDraftId(draft.id);
+    setShowDrafts(false);
+    setShowTemplates(false);
+    toast.success(`Loaded draft: ${draft.draft_name}`);
+  };
+
+  const deleteDraft = async (draftId: string) => {
+    if (!confirm("Are you sure you want to delete this draft?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("message_drafts")
+        .delete()
+        .eq("id", draftId);
+
+      if (error) throw error;
+
+      toast.success("Draft deleted");
+      await fetchDrafts();
+      
+      if (currentDraftId === draftId) {
+        setCurrentDraftId(null);
+      }
+    } catch (error) {
+      console.error("Error deleting draft:", error);
+      toast.error("Failed to delete draft");
     }
   };
 
@@ -433,6 +559,8 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
     setShowPreview(false);
     setPreviewAgentId("");
     setPreviewMessage("");
+    setCurrentDraftId(null);
+    setShowDrafts(false);
   };
 
   const handleSend = async () => {
@@ -538,8 +666,16 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
             {showTemplates ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-base font-semibold">Choose a Template</Label>
+                  <Label className="text-base font-semibold">Choose a Template or Draft</Label>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowDrafts(!showDrafts)}
+                    >
+                      <FolderOpen className="h-4 w-4 mr-2" />
+                      {showDrafts ? "Show Templates" : `Drafts (${drafts.length})`}
+                    </Button>
                     <CustomTemplateDialog onTemplateSaved={fetchCustomTemplates} />
                     <Button
                       variant="ghost"
@@ -551,7 +687,72 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2">
+                {showDrafts ? (
+                  // Show Drafts
+                  <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2">
+                    {drafts.length === 0 ? (
+                      <Card>
+                        <CardContent className="p-6 text-center">
+                          <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                          <p className="text-muted-foreground">No saved drafts</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Save incomplete messages as drafts to continue later
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      drafts.map((draft) => (
+                        <Card
+                          key={draft.id}
+                          className="cursor-pointer hover:bg-muted/50 transition-colors border-2 relative group"
+                        >
+                          <CardContent className="p-4" onClick={() => loadDraft(draft)}>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <FolderOpen className="h-4 w-4 text-primary" />
+                                  <h5 className="font-medium">{draft.draft_name}</h5>
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                                    Draft
+                                  </span>
+                                </div>
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                  {draft.title || "Untitled"}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Updated: {format(new Date(draft.updated_at), "MMM d, h:mm a")}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <div className={`text-xs px-2 py-1 rounded ${
+                                  draft.priority === "urgent" ? "bg-destructive/10 text-destructive" :
+                                  draft.priority === "high" ? "bg-orange-100 text-orange-700" :
+                                  draft.priority === "low" ? "bg-muted text-muted-foreground" :
+                                  "bg-primary/10 text-primary"
+                                }`}>
+                                  {draft.priority}
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteDraft(draft.id);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                ) : (
+                  // Show Templates
+                  <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2">
                   {allTemplates.reduce((acc, template) => {
                     const categoryExists = acc.find((item: any) => item.category === template.category);
                     if (!categoryExists) {
@@ -648,7 +849,8 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
                       ))}
                     </div>
                   ))}
-                </div>
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -874,13 +1076,27 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
                   resetForm();
                   setOpen(false);
                 }}
-                disabled={sending}
+                disabled={sending || savingDraft}
               >
                 Cancel
               </Button>
               <Button
+                variant="outline"
+                onClick={saveDraft}
+                disabled={sending || savingDraft || (!title.trim() && !message.trim())}
+              >
+                {savingDraft ? (
+                  <>Saving...</>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    {currentDraftId ? "Update Draft" : "Save as Draft"}
+                  </>
+                )}
+              </Button>
+              <Button
                 onClick={handleSend}
-                disabled={sending || !title.trim() || !message.trim()}
+                disabled={sending || savingDraft || !title.trim() || !message.trim()}
               >
                 {sending ? (
                   <>Sending...</>
