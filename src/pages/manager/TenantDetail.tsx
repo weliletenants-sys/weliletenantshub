@@ -76,6 +76,7 @@ const ManagerTenantDetail = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [availableAgents, setAvailableAgents] = useState<any[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
@@ -634,7 +635,11 @@ const ManagerTenantDetail = () => {
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="lg">
+                    <Button 
+                      variant="destructive" 
+                      size="lg"
+                      onClick={() => setDeleteConfirmText("")}
+                    >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete
                     </Button>
@@ -642,15 +647,31 @@ const ManagerTenantDetail = () => {
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete Tenant</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to delete this tenant? This action cannot be undone and will also delete all payment records.
+                      <AlertDialogDescription className="space-y-4">
+                        <div>
+                          Are you sure you want to delete this tenant? This action cannot be undone and will also delete all payment records.
+                        </div>
+                        <div className="space-y-2 pt-2">
+                          <Label htmlFor="delete-confirm-tenant" className="text-sm font-medium">
+                            Type <span className="font-bold text-destructive">{tenant.tenant_name}</span> to confirm deletion:
+                          </Label>
+                          <Input
+                            id="delete-confirm-tenant"
+                            type="text"
+                            value={deleteConfirmText}
+                            onChange={(e) => setDeleteConfirmText(e.target.value)}
+                            placeholder="Enter tenant name"
+                            className="font-mono"
+                            disabled={isDeleting}
+                          />
+                        </div>
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel onClick={() => setDeleteConfirmText("")}>Cancel</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={handleDelete}
-                        disabled={isDeleting}
+                        disabled={isDeleting || deleteConfirmText !== tenant.tenant_name}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
                         {isDeleting ? "Deleting..." : "Delete Tenant"}
