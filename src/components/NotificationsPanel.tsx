@@ -159,50 +159,64 @@ export const NotificationsPanel = () => {
     }
   }, [open]);
 
-  // Filter notifications based on selected type, search query, and date range
-  const filteredNotifications = notifications.filter(notification => {
-    // Type filter
-    if (filterType === "all") {
-      // Continue to other filters
-    } else if (filterType === "payment" && notification.payment_data === null) {
-      return false;
-    } else if (filterType === "message" && (notification.payment_data !== null || notification.parent_notification_id !== null)) {
-      return false;
-    } else if (filterType === "system" && notification.sender_id !== notification.recipient_id) {
-      return false;
-    }
-    
-    // Search query filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      const matchesTitle = notification.title.toLowerCase().includes(query);
-      const matchesMessage = notification.message.toLowerCase().includes(query);
-      const matchesSender = notification.profiles?.full_name?.toLowerCase().includes(query);
+  // Filter and sort notifications - payment notifications first (priority)
+  const filteredNotifications = notifications
+    .filter(notification => {
+      // Type filter
+      if (filterType === "all") {
+        // Continue to other filters
+      } else if (filterType === "payment" && notification.payment_data === null) {
+        return false;
+      } else if (filterType === "message" && (notification.payment_data !== null || notification.parent_notification_id !== null)) {
+        return false;
+      } else if (filterType === "system" && notification.sender_id !== notification.recipient_id) {
+        return false;
+      }
       
-      if (!matchesTitle && !matchesMessage && !matchesSender) {
-        return false;
+      // Search query filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchesTitle = notification.title.toLowerCase().includes(query);
+        const matchesMessage = notification.message.toLowerCase().includes(query);
+        const matchesSender = notification.profiles?.full_name?.toLowerCase().includes(query);
+        const matchesTenant = notification.payment_data?.tenant_name?.toLowerCase().includes(query);
+        
+        if (!matchesTitle && !matchesMessage && !matchesSender && !matchesTenant) {
+          return false;
+        }
       }
-    }
-    
-    // Date range filter
-    const notificationDate = new Date(notification.created_at);
-    if (dateFrom) {
-      const fromDate = new Date(dateFrom);
-      fromDate.setHours(0, 0, 0, 0);
-      if (notificationDate < fromDate) {
-        return false;
+      
+      // Date range filter
+      const notificationDate = new Date(notification.created_at);
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        if (notificationDate < fromDate) {
+          return false;
+        }
       }
-    }
-    if (dateTo) {
-      const toDate = new Date(dateTo);
-      toDate.setHours(23, 59, 59, 999);
-      if (notificationDate > toDate) {
-        return false;
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        if (notificationDate > toDate) {
+          return false;
+        }
       }
-    }
-    
-    return true;
-  });
+      
+      return true;
+    })
+    .sort((a, b) => {
+      // Sort payment notifications first (priority)
+      const aIsPayment = a.payment_data !== null ? 1 : 0;
+      const bIsPayment = b.payment_data !== null ? 1 : 0;
+      
+      if (aIsPayment !== bIsPayment) {
+        return bIsPayment - aIsPayment; // Payment notifications first
+      }
+      
+      // Then sort by date (newest first)
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -660,33 +674,46 @@ export const NotificationsPanel = () => {
           </div>
         )}
         
-        {/* Payment data display */}
+        {/* Payment data display - PRIORITY */}
         {notification.payment_data && (
-          <div className="mt-3 p-3 rounded-lg bg-muted/50 border border-border space-y-2">
+          <div className="mt-3 p-3 rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-2 border-green-200 dark:border-green-800 space-y-2 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground">Payment Details</span>
-              {notification.payment_data.applied && (
-                <Badge className="bg-green-100 text-green-700 border-green-200">
-                  <Check className="h-3 w-3 mr-1" />
-                  Applied
+              <div className="flex items-center gap-2">
+                <Badge className="bg-green-500 text-white border-green-600 font-semibold">
+                  PRIORITY PAYMENT
                 </Badge>
-              )}
+                {notification.payment_data.applied && (
+                  <Badge className="bg-green-100 text-green-700 border-green-200">
+                    <Check className="h-3 w-3 mr-1" />
+                    Applied
+                  </Badge>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
-                <span className="text-muted-foreground">Tenant:</span>
-                <p className="font-medium">{notification.payment_data.tenant_name}</p>
+                <span className="text-muted-foreground text-xs">Tenant:</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/agent/tenants/${notification.payment_data!.tenant_id}`);
+                    setOpen(false);
+                  }}
+                  className="block w-full text-left font-semibold text-primary hover:text-primary/80 underline decoration-2 underline-offset-2 transition-colors cursor-pointer"
+                >
+                  {notification.payment_data.tenant_name}
+                </button>
               </div>
               <div>
-                <span className="text-muted-foreground">Amount:</span>
-                <p className="font-medium">UGX {notification.payment_data.amount.toLocaleString()}</p>
+                <span className="text-muted-foreground text-xs">Amount:</span>
+                <p className="font-bold text-green-700 dark:text-green-400">UGX {notification.payment_data.amount.toLocaleString()}</p>
               </div>
               <div>
-                <span className="text-muted-foreground">Method:</span>
+                <span className="text-muted-foreground text-xs">Method:</span>
                 <p className="font-medium capitalize">{notification.payment_data.payment_method}</p>
               </div>
               <div>
-                <span className="text-muted-foreground">Date:</span>
+                <span className="text-muted-foreground text-xs">Date:</span>
                 <p className="font-medium">{format(new Date(notification.payment_data.payment_date), "MMM d, yyyy")}</p>
               </div>
             </div>
