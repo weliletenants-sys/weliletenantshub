@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Send, FileText, Trash2, Share2, Lock, Tag, Code2, Eye, Save, FolderOpen } from "lucide-react";
+import { MessageSquare, Send, FileText, Trash2, Share2, Lock, Tag, Code2, Eye, Save, FolderOpen, DollarSign } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { CustomTemplateDialog } from "./CustomTemplateDialog";
 import {
@@ -155,6 +155,13 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [saveAsTemplate, setSaveAsTemplate] = useState(false);
   const [templateName, setTemplateName] = useState("");
+  
+  // Payment entry mode
+  const [paymentMode, setPaymentMode] = useState(false);
+  const [paymentTenantId, setPaymentTenantId] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "mtn" | "airtel">("cash");
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Available template variables
   const TEMPLATE_VARIABLES = [
@@ -566,9 +573,84 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
     setShowDrafts(false);
     setSaveAsTemplate(false);
     setTemplateName("");
+    setPaymentMode(false);
+    setPaymentTenantId("");
+    setPaymentAmount("");
+    setPaymentMethod("cash");
+    setPaymentDate(new Date().toISOString().split('T')[0]);
+  };
+
+  const handleSendPayment = async () => {
+    if (!paymentTenantId || !paymentAmount || parseFloat(paymentAmount) <= 0) {
+      toast.error("Please fill in all payment details");
+      return;
+    }
+
+    setSending(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Get tenant and agent info
+      const { data: tenantData, error: tenantError } = await supabase
+        .from("tenants")
+        .select(`
+          *,
+          agents!inner(id, user_id, profiles!inner(full_name))
+        `)
+        .eq("id", paymentTenantId)
+        .single();
+
+      if (tenantError) throw tenantError;
+
+      const tenant = tenantData as any;
+      const paymentAmountNum = parseFloat(paymentAmount);
+
+      // Create payment notification for the agent
+      const paymentNotification = {
+        sender_id: user.id,
+        recipient_id: tenant.agents.user_id,
+        title: "Payment Entry",
+        message: `Payment recorded for tenant ${tenant.tenant_name}. Amount: UGX ${paymentAmountNum.toLocaleString()}. Please review and apply to tenant account.`,
+        priority: "high",
+        payment_data: {
+          tenant_id: tenant.id,
+          tenant_name: tenant.tenant_name,
+          amount: paymentAmountNum,
+          payment_method: paymentMethod,
+          payment_date: paymentDate,
+          applied: false
+        }
+      };
+
+      const { error: insertError } = await supabase
+        .from("notifications")
+        .insert(paymentNotification);
+
+      if (insertError) throw insertError;
+
+      toast.success("Payment notification sent to agent", {
+        description: `Agent will be notified to apply UGX ${paymentAmountNum.toLocaleString()} to ${tenant.tenant_name}'s account`
+      });
+
+      resetForm();
+      setOpen(false);
+    } catch (error: any) {
+      console.error("Error sending payment notification:", error);
+      toast.error("Failed to send payment notification", {
+        description: error.message
+      });
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleSend = async () => {
+    if (paymentMode) {
+      return handleSendPayment();
+    }
+
     if (!title.trim() || !message.trim()) {
       toast.error("Please fill in all fields");
       return;
@@ -691,17 +773,128 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
         </DialogTrigger>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Send Message to Agents</DialogTitle>
+            <DialogTitle className="flex items-center justify-between">
+              <span>{paymentMode ? "Enter Tenant Payment" : "Send Message to Agents"}</span>
+              <div className="flex gap-2">
+                <Button
+                  variant={!paymentMode ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setPaymentMode(false);
+                    setShowTemplates(true);
+                  }}
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Message
+                </Button>
+                <Button
+                  variant={paymentMode ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setPaymentMode(true);
+                    setShowTemplates(false);
+                  }}
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Payment
+                </Button>
+              </div>
+            </DialogTitle>
             <DialogDescription>
-              {sendToAll 
-                ? "Send a message to all agents in the system"
-                : `Send an in-app message to ${selectedAgentIds.length} selected agent(s): ${agentNames.slice(0, 3).join(", ")}${agentNames.length > 3 ? ` and ${agentNames.length - 3} more` : ""}`
+              {paymentMode 
+                ? "Record a tenant payment and notify the agent to update their account"
+                : sendToAll 
+                  ? "Send a message to all agents in the system"
+                  : `Send an in-app message to ${selectedAgentIds.length} selected agent(s): ${agentNames.slice(0, 3).join(", ")}${agentNames.length > 3 ? ` and ${agentNames.length - 3} more` : ""}`
               }
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            {showTemplates ? (
+            {paymentMode ? (
+              // Payment Entry Form
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="payment-tenant">Select Tenant *</Label>
+                  <Select value={paymentTenantId} onValueChange={setPaymentTenantId}>
+                    <SelectTrigger id="payment-tenant">
+                      <SelectValue placeholder="Choose a tenant..." />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[200px]">
+                      {tenants.map((tenant) => (
+                        <SelectItem key={tenant.id} value={tenant.id}>
+                          {tenant.tenant_name} (Agent: {tenant.agent_name})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="payment-amount">Payment Amount (UGX) *</Label>
+                  <Input
+                    id="payment-amount"
+                    type="number"
+                    placeholder="e.g., 50000"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    min="0"
+                    step="1000"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="payment-method">Payment Method *</Label>
+                  <Select value={paymentMethod} onValueChange={(value: any) => setPaymentMethod(value)}>
+                    <SelectTrigger id="payment-method">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="mtn">MTN Mobile Money</SelectItem>
+                      <SelectItem value="airtel">Airtel Money</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="payment-date">Payment Date *</Label>
+                  <Input
+                    id="payment-date"
+                    type="date"
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                    max={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      resetForm();
+                      setOpen(false);
+                    }}
+                    disabled={sending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSend}
+                    disabled={sending || !paymentTenantId || !paymentAmount || parseFloat(paymentAmount) <= 0}
+                  >
+                    {sending ? (
+                      <>Sending...</>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Send Payment to Agent
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            ) : showTemplates ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label className="text-base font-semibold">Choose a Template or Draft</Label>

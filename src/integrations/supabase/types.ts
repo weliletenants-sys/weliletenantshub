@@ -329,6 +329,7 @@ export type Database = {
           created_at: string | null
           id: string
           message: string
+          payment_data: Json | null
           priority: string | null
           read: boolean | null
           read_at: string | null
@@ -341,6 +342,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           message: string
+          payment_data?: Json | null
           priority?: string | null
           read?: boolean | null
           read_at?: string | null
@@ -353,6 +355,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           message?: string
+          payment_data?: Json | null
           priority?: string | null
           read?: boolean | null
           read_at?: string | null
