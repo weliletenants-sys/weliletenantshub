@@ -485,16 +485,16 @@ export const AgentsListSkeleton = () => {
       <div className="flex items-center justify-between">
         <div className="space-y-2">
           <Skeleton className="h-8 w-48 animate-pulse" />
-          <Skeleton className="h-4 w-64 animate-pulse" />
+          <Skeleton className="h-4 w-64 animate-pulse" style={{ animationDelay: '0.1s' }} />
         </div>
-        <Skeleton className="h-10 w-32 rounded-lg animate-pulse" />
+        <Skeleton className="h-10 w-32 rounded-lg animate-pulse" style={{ animationDelay: '0.2s' }} />
       </div>
 
       {/* Search and Filters */}
       <div className="flex items-center gap-3">
         <Skeleton className="h-10 flex-1 rounded-lg animate-pulse" />
-        <Skeleton className="h-10 w-32 rounded-lg animate-pulse" />
-        <Skeleton className="h-10 w-10 rounded-lg animate-pulse" />
+        <Skeleton className="h-10 w-32 rounded-lg animate-pulse" style={{ animationDelay: '0.1s' }} />
+        <Skeleton className="h-10 w-10 rounded-lg animate-pulse" style={{ animationDelay: '0.2s' }} />
       </div>
 
       {/* Summary Stats */}
@@ -745,25 +745,25 @@ export const PortfolioBreakdownSkeleton = () => {
       <div className="flex items-center gap-4">
         <Skeleton className="h-10 w-10 rounded-lg animate-pulse" />
         <div className="flex-1 space-y-2">
-          <Skeleton className="h-8 w-56 animate-pulse" />
-          <Skeleton className="h-4 w-72 animate-pulse" />
+          <Skeleton className="h-8 w-56 animate-pulse" style={{ animationDelay: '0.05s' }} />
+          <Skeleton className="h-4 w-72 animate-pulse" style={{ animationDelay: '0.1s' }} />
         </div>
       </div>
 
       {/* Date Filter and Export */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <Skeleton className="h-10 w-32 rounded-lg animate-pulse" />
-          <Skeleton className="h-10 w-32 rounded-lg animate-pulse" />
-          <Skeleton className="h-10 w-32 rounded-lg animate-pulse" />
+          <Skeleton className="h-10 w-32 rounded-lg animate-pulse" style={{ animationDelay: '0.05s' }} />
+          <Skeleton className="h-10 w-32 rounded-lg animate-pulse" style={{ animationDelay: '0.1s' }} />
         </div>
-        <Skeleton className="h-10 w-40 rounded-lg animate-pulse" />
+        <Skeleton className="h-10 w-40 rounded-lg animate-pulse" style={{ animationDelay: '0.15s' }} />
       </div>
 
       {/* Portfolio Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[0, 1, 2].map((i) => (
-          <Card key={i} className="animate-pulse" style={{ animationDelay: `${i * 0.1}s` }}>
+          <Card key={i} className="animate-pulse" style={{ animationDelay: `${i * 0.08}s` }}>
             <CardHeader className="pb-2">
               <Skeleton className="h-3 w-32" />
             </CardHeader>
@@ -778,7 +778,7 @@ export const PortfolioBreakdownSkeleton = () => {
       {/* Agent Portfolio Breakdown */}
       <div className="space-y-4">
         {[1, 2, 3, 4].map((i) => (
-          <Card key={i} className="animate-pulse" style={{ animationDelay: `${i * 0.1}s` }}>
+          <Card key={i} className="animate-pulse" style={{ animationDelay: `${i * 0.08}s` }}>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 flex-1">
@@ -800,6 +800,225 @@ export const PortfolioBreakdownSkeleton = () => {
             </CardContent>
           </Card>
         ))}
+      </div>
+    </div>
+  );
+};
+
+export const NotificationsPanelSkeleton = () => {
+  return (
+    <div className="space-y-6 animate-fade-in p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-48 animate-pulse" />
+          <Skeleton className="h-4 w-64 animate-pulse" style={{ animationDelay: '0.05s' }} />
+        </div>
+        <Skeleton className="h-10 w-10 rounded-lg animate-pulse" />
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex gap-2 border-b pb-2">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-9 w-24 rounded-lg animate-pulse" style={{ animationDelay: `${i * 0.05}s` }} />
+        ))}
+      </div>
+
+      {/* Search */}
+      <Skeleton className="h-10 w-full rounded-lg animate-pulse" />
+
+      {/* Notification Cards */}
+      <div className="space-y-4">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <Card key={i} className="animate-pulse" style={{ animationDelay: `${i * 0.06}s` }}>
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 flex-1">
+                  <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                    </div>
+                    <Skeleton className="h-5 w-48" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                </div>
+                <Skeleton className="h-8 w-8 rounded-lg flex-shrink-0" />
+              </div>
+            </CardHeader>
+            {i % 2 === 0 && (
+              <CardContent className="pt-0 border-t">
+                <div className="flex items-center gap-2 mt-3">
+                  <Skeleton className="h-9 flex-1 rounded-lg" />
+                  <Skeleton className="h-9 w-20 rounded-lg" />
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export const SearchResultsSkeleton = () => {
+  return (
+    <div className="space-y-4 animate-fade-in">
+      {/* Results Header */}
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-5 w-40 animate-pulse" />
+        <Skeleton className="h-4 w-32 animate-pulse" style={{ animationDelay: '0.05s' }} />
+      </div>
+
+      {/* Result Cards */}
+      {[1, 2, 3, 4].map((i) => (
+        <Card key={i} className="animate-pulse hover:shadow-md transition-shadow cursor-pointer" style={{ animationDelay: `${i * 0.08}s` }}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 flex-1">
+                <Skeleton className="h-12 w-12 rounded-full flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-5 w-48" />
+                  <Skeleton className="h-4 w-32" />
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                </div>
+              </div>
+              <Skeleton className="h-9 w-24 rounded-lg flex-shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+};
+
+export const MessageThreadSkeleton = () => {
+  return (
+    <div className="space-y-4 animate-fade-in p-4">
+      {/* Thread Header */}
+      <div className="flex items-center gap-3 pb-4 border-b">
+        <Skeleton className="h-10 w-10 rounded-full animate-pulse" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-5 w-48 animate-pulse" />
+          <Skeleton className="h-3 w-32 animate-pulse" style={{ animationDelay: '0.05s' }} />
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="space-y-6">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className={`flex gap-3 ${i % 2 === 0 ? 'flex-row-reverse' : ''} animate-pulse`} style={{ animationDelay: `${i * 0.08}s` }}>
+            <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+            <div className={`flex-1 max-w-[75%] space-y-2 ${i % 2 === 0 ? 'items-end' : 'items-start'}`}>
+              <Skeleton className="h-3 w-24" />
+              <div className={`rounded-2xl p-4 space-y-2 ${i % 2 === 0 ? 'bg-primary/10' : 'bg-muted'}`}>
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+              <Skeleton className="h-3 w-20" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Reply Input */}
+      <div className="flex items-end gap-2 pt-4 border-t">
+        <Skeleton className="h-20 flex-1 rounded-lg animate-pulse" />
+        <Skeleton className="h-10 w-20 rounded-lg animate-pulse" />
+      </div>
+    </div>
+  );
+};
+
+export const SettingsSkeleton = () => {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-32 animate-pulse" />
+        <Skeleton className="h-4 w-56 animate-pulse" style={{ animationDelay: '0.05s' }} />
+      </div>
+
+      {/* Profile Section */}
+      <Card className="animate-pulse">
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-20 w-20 rounded-full" />
+            <Skeleton className="h-10 w-32 rounded-lg" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-10 w-full rounded-lg" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-10 w-full rounded-lg" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Preferences Section */}
+      <Card className="animate-pulse" style={{ animationDelay: '0.1s' }}>
+        <CardHeader>
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-4 w-72" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+              <Skeleton className="h-6 w-12 rounded-full" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Actions */}
+      <div className="flex gap-3">
+        <Skeleton className="h-10 flex-1 rounded-lg animate-pulse" />
+        <Skeleton className="h-10 w-32 rounded-lg animate-pulse" />
+      </div>
+    </div>
+  );
+};
+
+export const FormSkeleton = () => {
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Form Header */}
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-64 animate-pulse" />
+        <Skeleton className="h-4 w-96 animate-pulse" style={{ animationDelay: '0.05s' }} />
+      </div>
+
+      {/* Form Fields */}
+      <div className="space-y-4">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="space-y-2 animate-pulse" style={{ animationDelay: `${i * 0.06}s` }}>
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-10 w-full rounded-lg" />
+            {i === 3 && <Skeleton className="h-3 w-48" />}
+          </div>
+        ))}
+      </div>
+
+      {/* Form Actions */}
+      <div className="flex items-center gap-3 pt-4">
+        <Skeleton className="h-10 w-32 rounded-lg animate-pulse" />
+        <Skeleton className="h-10 flex-1 rounded-lg animate-pulse" />
       </div>
     </div>
   );

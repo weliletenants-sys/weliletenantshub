@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ManagerLayout from "@/components/ManagerLayout";
+import { SettingsSkeleton } from "@/components/TenantDetailSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -200,9 +201,7 @@ const ManagerSettings = () => {
   if (loading) {
     return (
       <ManagerLayout currentPage="/manager/settings">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
+        <SettingsSkeleton />
       </ManagerLayout>
     );
   }

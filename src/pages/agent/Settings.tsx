@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AgentLayout from "@/components/AgentLayout";
+import { SettingsSkeleton } from "@/components/TenantDetailSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -202,9 +203,7 @@ const AgentSettings = () => {
   if (loading) {
     return (
       <AgentLayout currentPage="/agent/settings">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
+        <SettingsSkeleton />
       </AgentLayout>
     );
   }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ManagerLayout from "@/components/ManagerLayout";
+import { PaymentVerificationsSkeleton } from "@/components/TenantDetailSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -293,6 +294,14 @@ const VerificationHistory = () => {
   const totalVerifiedAmount = verifications
     .filter((v) => v.status === "verified")
     .reduce((sum, v) => sum + Number(v.amount), 0);
+
+  if (loading) {
+    return (
+      <ManagerLayout currentPage="/manager/verification-history">
+        <PaymentVerificationsSkeleton />
+      </ManagerLayout>
+    );
+  }
 
   return (
     <ManagerLayout currentPage="/manager/verification-history">
