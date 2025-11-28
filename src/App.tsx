@@ -11,6 +11,8 @@ import SplashScreen from "@/components/SplashScreen";
 import { InstallReminderProvider } from "@/components/InstallReminderProvider";
 import { useRoutePrefetch } from "@/hooks/useRoutePrefetch";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
+import { ChangelogDialog } from "@/components/ChangelogDialog";
+import { changelog } from "@/data/changelog";
 
 // Eagerly load critical pages
 import Index from "./pages/Index";
@@ -69,7 +71,7 @@ const App = () => {
   });
 
   // Version checking - ensures all devices run latest version
-  useVersionCheck();
+  const { showChangelog, setShowChangelog } = useVersionCheck();
 
   // Initialize cache cleanup and service worker on app start
   useEffect(() => {
@@ -94,6 +96,15 @@ const App = () => {
         <Toaster />
         <Sonner />
         {!showSplash && <InstallReminderProvider />}
+        
+        {/* Changelog Dialog - Shows after updates */}
+        <ChangelogDialog
+          open={showChangelog}
+          onOpenChange={setShowChangelog}
+          entries={changelog.slice(0, 3)} // Show last 3 versions
+          isUpdate={true}
+        />
+        
         <BrowserRouter>
           <Suspense fallback={<PageLoader />}>
             <Routes>

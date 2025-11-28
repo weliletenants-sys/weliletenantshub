@@ -7,10 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { User, Phone, Shield, Loader2, MapPin, Lock, Eye, EyeOff, RefreshCw, CheckCircle } from "lucide-react";
+import { User, Phone, Shield, Loader2, MapPin, Lock, Eye, EyeOff, RefreshCw, CheckCircle, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
+import { ChangelogDialog } from "@/components/ChangelogDialog";
+import { changelog } from "@/data/changelog";
 
 const ManagerSettings = () => {
   const navigate = useNavigate();
@@ -38,6 +40,7 @@ const ManagerSettings = () => {
   // Version checking for manual updates
   const { isChecking, checkVersion, currentVersion } = useVersionCheck();
   const [manualCheckLoading, setManualCheckLoading] = useState(false);
+  const [showChangelogDialog, setShowChangelogDialog] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -206,6 +209,13 @@ const ManagerSettings = () => {
 
   return (
     <ManagerLayout currentPage="/manager/settings">
+      <ChangelogDialog
+        open={showChangelogDialog}
+        onOpenChange={setShowChangelogDialog}
+        entries={changelog}
+        isUpdate={false}
+      />
+      
       <div className="max-w-2xl space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Manager Settings</h1>
@@ -470,6 +480,17 @@ const ManagerSettings = () => {
             <p className="text-xs text-muted-foreground text-center">
               If an update is available, the app will automatically reload with the latest version
             </p>
+
+            <Separator className="my-4" />
+
+            <Button 
+              onClick={() => setShowChangelogDialog(true)}
+              variant="ghost"
+              className="w-full"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              View Release Notes
+            </Button>
           </CardContent>
         </Card>
       </div>
