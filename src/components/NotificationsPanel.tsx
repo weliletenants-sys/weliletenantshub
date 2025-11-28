@@ -13,6 +13,8 @@ import { format, formatDistanceToNow } from "date-fns";
 import { useOptimisticPayment } from "@/hooks/useOptimisticPayment";
 import { useQueryClient } from "@tanstack/react-query";
 import PaymentReceipt from "./PaymentReceipt";
+import { useRealtimeNotifications } from "@/hooks/useRealtimeSubscription";
+import MessageThreadDialog from "./MessageThreadDialog";
 
 interface Notification {
   id: string;
@@ -44,6 +46,8 @@ export const NotificationsPanel = () => {
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [applyingPayment, setApplyingPayment] = useState<string | null>(null);
+  const [threadDialogOpen, setThreadDialogOpen] = useState(false);
+  const [selectedNotificationId, setSelectedNotificationId] = useState<string | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<{
     paymentData: {
@@ -66,6 +70,9 @@ export const NotificationsPanel = () => {
   } | null>(null);
   
   const optimisticPayment = useOptimisticPayment();
+  
+  // Enable realtime subscription for notifications
+  useRealtimeNotifications();
 
   const fetchNotifications = async () => {
     try {
@@ -97,41 +104,18 @@ export const NotificationsPanel = () => {
 
   useEffect(() => {
     fetchNotifications();
-
-    // Set up realtime subscription
-    const channel = supabase
-      .channel("notifications")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "notifications",
-        },
-        (payload) => {
-          console.log("Notification change:", payload);
-          fetchNotifications();
-          
-          // Show toast for new notifications
-          if (payload.eventType === "INSERT") {
-            const newNotification = payload.new as Notification;
-            // Parse tenant tags and show clickable notification
-            const parsedMessage = parseMessageWithTenantTags(newNotification.message);
-            
-            toast.info(newNotification.title, {
-              description: parsedMessage.length > 100 
-                ? parsedMessage.slice(0, 100) + "..." 
-                : parsedMessage
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
+  
+  // Refetch when notifications are invalidated by realtime subscription
+  useEffect(() => {
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event?.query.queryKey[0] === 'notifications') {
+        fetchNotifications();
+      }
+    });
+    
+    return unsubscribe;
+  }, [queryClient]);
 
   const parseMessageWithTenantTags = (message: string): string => {
     // Extract tenant names from tags for display
