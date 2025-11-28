@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,6 +76,7 @@ const ManagerAgentDetail = () => {
   const [loading, setLoading] = useState(true);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteReason, setDeleteReason] = useState("");
 
   // Enable real-time updates
   useRealtimeAgents();
@@ -168,6 +170,33 @@ const ManagerAgentDetail = () => {
     setDeleteLoading(true);
     
     try {
+      // Get current user for audit log
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Create audit log entry before deletion
+      if (user) {
+        const { error: auditError } = await supabase
+          .from("audit_logs")
+          .insert({
+            user_id: user.id,
+            action: "DELETE",
+            table_name: "agents",
+            record_id: agentId!,
+            old_data: {
+              agent_name: agent.profiles?.full_name,
+              agent_phone: agent.profiles?.phone_number,
+              total_tenants: agent.total_tenants,
+              portfolio_value: agent.portfolio_value,
+              deletion_reason: deleteReason,
+            },
+            changed_fields: ["deleted"],
+          });
+
+        if (auditError) {
+          console.error("Error creating audit log:", auditError);
+        }
+      }
+
       // Delete agent record (this will also trigger cascade deletion of related records)
       const { error: deleteError } = await supabase
         .from("agents")
@@ -240,7 +269,10 @@ const ManagerAgentDetail = () => {
                   variant="destructive" 
                   size="sm"
                   disabled={deleteLoading}
-                  onClick={() => setDeleteConfirmText("")}
+                  onClick={() => {
+                    setDeleteConfirmText("");
+                    setDeleteReason("");
+                  }}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete Agent
@@ -258,6 +290,22 @@ const ManagerAgentDetail = () => {
                       <>
                         <div>
                           This will permanently delete <span className="font-semibold">{agent.profiles?.full_name}</span> and all associated data. This action cannot be undone.
+                        </div>
+                        <div className="space-y-2 pt-2">
+                          <Label htmlFor="delete-reason" className="text-sm font-medium text-destructive">
+                            Reason for deletion (required): *
+                          </Label>
+                          <Textarea
+                            id="delete-reason"
+                            value={deleteReason}
+                            onChange={(e) => setDeleteReason(e.target.value)}
+                            placeholder="Explain why you are deleting this agent..."
+                            className="min-h-[80px] resize-none"
+                            disabled={deleteLoading}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            This will be recorded in the audit log for accountability.
+                          </p>
                         </div>
                         <div className="space-y-2 pt-2">
                           <Label htmlFor="delete-confirm" className="text-sm font-medium">
@@ -278,10 +326,13 @@ const ManagerAgentDetail = () => {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setDeleteConfirmText("")}>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel onClick={() => {
+                    setDeleteConfirmText("");
+                    setDeleteReason("");
+                  }}>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDeleteAgent}
-                    disabled={tenants.length > 0 || deleteLoading || deleteConfirmText !== agent.profiles?.full_name}
+                    disabled={tenants.length > 0 || deleteLoading || deleteConfirmText !== agent.profiles?.full_name || deleteReason.trim().length < 10}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     {deleteLoading ? "Deleting..." : "Delete Agent"}

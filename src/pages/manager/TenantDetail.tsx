@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -77,6 +78,7 @@ const ManagerTenantDetail = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteReason, setDeleteReason] = useState("");
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [availableAgents, setAvailableAgents] = useState<any[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
@@ -288,6 +290,34 @@ const ManagerTenantDetail = () => {
 
     try {
       setIsDeleting(true);
+
+      // Get current user for audit log
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Create audit log entry before deletion
+      if (user) {
+        const { error: auditError } = await supabase
+          .from("audit_logs")
+          .insert({
+            user_id: user.id,
+            action: "DELETE",
+            table_name: "tenants",
+            record_id: tenantId!,
+            old_data: {
+              tenant_name: tenant.tenant_name,
+              tenant_phone: tenant.tenant_phone,
+              rent_amount: tenant.rent_amount,
+              outstanding_balance: tenant.outstanding_balance,
+              agent_name: tenant.agents?.profiles?.full_name,
+              deletion_reason: deleteReason,
+            },
+            changed_fields: ["deleted"],
+          });
+
+        if (auditError) {
+          console.error("Error creating audit log:", auditError);
+        }
+      }
 
       const { error } = await supabase
         .from("tenants")
@@ -638,7 +668,10 @@ const ManagerTenantDetail = () => {
                     <Button 
                       variant="destructive" 
                       size="lg"
-                      onClick={() => setDeleteConfirmText("")}
+                      onClick={() => {
+                        setDeleteConfirmText("");
+                        setDeleteReason("");
+                      }}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete
@@ -650,6 +683,22 @@ const ManagerTenantDetail = () => {
                       <AlertDialogDescription className="space-y-4">
                         <div>
                           Are you sure you want to delete this tenant? This action cannot be undone and will also delete all payment records.
+                        </div>
+                        <div className="space-y-2 pt-2">
+                          <Label htmlFor="delete-reason-tenant" className="text-sm font-medium text-destructive">
+                            Reason for deletion (required): *
+                          </Label>
+                          <Textarea
+                            id="delete-reason-tenant"
+                            value={deleteReason}
+                            onChange={(e) => setDeleteReason(e.target.value)}
+                            placeholder="Explain why you are deleting this tenant..."
+                            className="min-h-[80px] resize-none"
+                            disabled={isDeleting}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            This will be recorded in the audit log for accountability.
+                          </p>
                         </div>
                         <div className="space-y-2 pt-2">
                           <Label htmlFor="delete-confirm-tenant" className="text-sm font-medium">
@@ -668,10 +717,13 @@ const ManagerTenantDetail = () => {
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel onClick={() => setDeleteConfirmText("")}>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel onClick={() => {
+                        setDeleteConfirmText("");
+                        setDeleteReason("");
+                      }}>Cancel</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={handleDelete}
-                        disabled={isDeleting || deleteConfirmText !== tenant.tenant_name}
+                        disabled={isDeleting || deleteConfirmText !== tenant.tenant_name || deleteReason.trim().length < 10}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
                         {isDeleting ? "Deleting..." : "Delete Tenant"}
