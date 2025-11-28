@@ -12,6 +12,7 @@ import { useRipple } from "@/hooks/useRipple";
 import { useSwipeBack } from "@/hooks/useSwipeBack";
 import SwipeBackIndicator from "./SwipeBackIndicator";
 import BottomNavigation from "./BottomNavigation";
+import { NotificationsPanel } from "./NotificationsPanel";
 
 interface AgentLayoutProps {
   children: ReactNode;
@@ -69,6 +70,7 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
         <div className="flex items-center gap-4">
           <OfflineSyncIndicator />
           <CacheIndicator />
+          <NotificationsPanel />
           <Button variant="ghost" size="default" onClick={handleLogout}>
             <LogOut className="h-5 w-5 mr-2" />
             Logout

@@ -24,6 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { BulkMessageDialog } from "@/components/BulkMessageDialog";
 
 interface AgentWithDetails {
   id: string;
@@ -499,6 +500,12 @@ const ManagerAgents = () => {
     setSelectedAgents(new Set());
   };
 
+  const getSelectedAgentNames = () => {
+    return agents
+      .filter(a => selectedAgents.has(a.id))
+      .map(a => a.profiles?.full_name || "Unknown Agent");
+  };
+
   // Sort and filter portfolio breakdown based on selected options
   const sortedPortfolioBreakdown = [...agentPortfolioBreakdown]
     .filter((agent) => {
@@ -937,6 +944,10 @@ const ManagerAgents = () => {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
+                  <BulkMessageDialog 
+                    selectedAgentIds={Array.from(selectedAgents)}
+                    agentNames={getSelectedAgentNames()}
+                  />
                   <Button
                     variant="outline"
                     size="sm"
