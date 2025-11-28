@@ -8,9 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { useOptimisticPayment } from "@/hooks/useOptimisticPayment";
 import { useQueryClient } from "@tanstack/react-query";
+import PaymentReceipt from "./PaymentReceipt";
 
 interface Notification {
   id: string;
@@ -41,6 +43,26 @@ export const NotificationsPanel = () => {
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [applyingPayment, setApplyingPayment] = useState<string | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [receiptData, setReceiptData] = useState<{
+    paymentData: {
+      amount: number;
+      commission: number;
+      collectionDate: string;
+      paymentMethod: string;
+    };
+    tenantData: {
+      tenant_name: string;
+      tenant_phone: string;
+      rent_amount: number;
+      outstanding_balance: number;
+    };
+    agentData: {
+      agent_name: string;
+      agent_phone: string;
+    };
+    receiptNumber: string;
+  } | null>(null);
   
   const optimisticPayment = useOptimisticPayment();
 
@@ -189,10 +211,16 @@ export const NotificationsPanel = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Get agent ID
+      // Get agent data with profile
       const { data: agentData, error: agentError } = await supabase
         .from("agents")
-        .select("id")
+        .select(`
+          id,
+          profiles:user_id (
+            full_name,
+            phone_number
+          )
+        `)
         .eq("user_id", user.id)
         .single();
 
@@ -213,6 +241,15 @@ export const NotificationsPanel = () => {
         collectionDate: paymentData.payment_date,
       });
 
+      // Fetch updated tenant data for receipt
+      const { data: tenantData, error: tenantError } = await supabase
+        .from("tenants")
+        .select("tenant_name, tenant_phone, rent_amount, outstanding_balance")
+        .eq("id", paymentData.tenant_id)
+        .single();
+
+      if (tenantError) throw tenantError;
+
       // Mark payment as applied in notification
       const { error: updateError } = await supabase
         .from("notifications")
@@ -226,11 +263,38 @@ export const NotificationsPanel = () => {
 
       if (updateError) throw updateError;
 
+      // Generate receipt number (timestamp-based)
+      const receiptNumber = `MGR-${Date.now().toString().slice(-8)}`;
+
+      // Prepare receipt data
+      setReceiptData({
+        paymentData: {
+          amount: paymentData.amount,
+          commission: commission,
+          collectionDate: paymentData.payment_date,
+          paymentMethod: paymentData.payment_method,
+        },
+        tenantData: {
+          tenant_name: tenantData.tenant_name,
+          tenant_phone: tenantData.tenant_phone,
+          rent_amount: tenantData.rent_amount || 0,
+          outstanding_balance: tenantData.outstanding_balance || 0,
+        },
+        agentData: {
+          agent_name: (agentData as any).profiles?.full_name || "Agent",
+          agent_phone: (agentData as any).profiles?.phone_number || "",
+        },
+        receiptNumber,
+      });
+
       toast.success("Payment applied successfully", {
         description: `UGX ${paymentData.amount.toLocaleString()} recorded for ${paymentData.tenant_name}`
       });
 
       fetchNotifications();
+      
+      // Show receipt dialog
+      setShowReceipt(true);
     } catch (error: any) {
       console.error("Error applying payment:", error);
       toast.error("Failed to apply payment", {
@@ -268,6 +332,7 @@ export const NotificationsPanel = () => {
   };
 
   return (
+    <>
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
@@ -408,5 +473,23 @@ export const NotificationsPanel = () => {
         </ScrollArea>
       </SheetContent>
     </Sheet>
+
+    {/* Payment Receipt Dialog */}
+    <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Payment Receipt</DialogTitle>
+        </DialogHeader>
+        {receiptData && (
+          <PaymentReceipt
+            paymentData={receiptData.paymentData}
+            tenantData={receiptData.tenantData}
+            agentData={receiptData.agentData}
+            receiptNumber={receiptData.receiptNumber}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };
