@@ -34,20 +34,29 @@ export const useNotificationAlerts = (): NotificationAlert => {
   const audioContextRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
-    // Initialize audio context on first user interaction
+    let isCleanedUp = false;
+    
     const initAudio = () => {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (!audioContextRef.current && !isCleanedUp) {
+        try {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        } catch (error) {
+          console.error('Failed to initialize AudioContext:', error);
+        }
       }
     };
 
-    // Initialize on first click/touch
     document.addEventListener('click', initAudio, { once: true });
     document.addEventListener('touchstart', initAudio, { once: true });
 
     return () => {
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
+      isCleanedUp = true;
+      document.removeEventListener('click', initAudio);
+      document.removeEventListener('touchstart', initAudio);
+      
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(console.error);
+        audioContextRef.current = null;
       }
     };
   }, []);

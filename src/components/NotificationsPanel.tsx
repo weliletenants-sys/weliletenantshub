@@ -344,6 +344,8 @@ export const NotificationsPanel = () => {
   
   // Infinite scroll observer
   useEffect(() => {
+    if (!open) return;
+    
     const observer = new IntersectionObserver(
       entries => {
         if (entries[0].isIntersecting && hasMore && !loading) {
@@ -362,19 +364,25 @@ export const NotificationsPanel = () => {
       if (currentTarget) {
         observer.unobserve(currentTarget);
       }
+      observer.disconnect();
     };
-  }, [hasMore, loading, loadMore]);
+  }, [hasMore, loading, loadMore, open]);
   
   // Refetch when notifications are invalidated by realtime subscription
   useEffect(() => {
+    let isSubscribed = true;
+    
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-      if (event?.query.queryKey[0] === 'notifications') {
-        fetchNotifications();
+      if (event?.query.queryKey[0] === 'notifications' && isSubscribed && open) {
+        fetchNotifications(0, false);
       }
     });
     
-    return unsubscribe;
-  }, [queryClient]);
+    return () => {
+      isSubscribed = false;
+      unsubscribe();
+    };
+  }, [queryClient, open]);
 
   const [userRole, setUserRole] = useState<string>("");
 
@@ -431,28 +439,56 @@ export const NotificationsPanel = () => {
 
   // Extract tenant IDs from notifications and fetch their statuses
   useEffect(() => {
-    if (notifications.length > 0) {
+    let isMounted = true;
+    
+    const fetchStatuses = async () => {
+      if (notifications.length === 0 || !isMounted) return;
+      
       const tenantIds = new Set<string>();
       
       notifications.forEach(notification => {
-        // Extract tenant IDs from payment data
         if (notification.payment_data?.tenant_id) {
           tenantIds.add(notification.payment_data.tenant_id);
         }
         
-        // Extract tenant IDs from message tags [TENANT:id:name]
         const matches = notification.message.matchAll(/\[TENANT:([^:]+):[^\]]+\]/g);
         for (const match of matches) {
           tenantIds.add(match[1]);
         }
       });
       
-      // Fetch status for each tenant
-      tenantIds.forEach(tenantId => {
-        fetchTenantStatus(tenantId);
-      });
-    }
-  }, [notifications]);
+      // Batch fetch all tenant statuses at once
+      if (tenantIds.size > 0 && isMounted) {
+        try {
+          const { data, error } = await supabase
+            .from("tenants")
+            .select("id, status, outstanding_balance")
+            .in("id", Array.from(tenantIds));
+          
+          if (error) throw error;
+          
+          if (data && isMounted) {
+            const statusMap: Record<string, { status: string; outstanding_balance: number }> = {};
+            data.forEach(tenant => {
+              statusMap[tenant.id] = {
+                status: tenant.status || "pending",
+                outstanding_balance: tenant.outstanding_balance || 0
+              };
+            });
+            setTenantStatuses(prev => ({ ...prev, ...statusMap }));
+          }
+        } catch (error) {
+          console.error("Error fetching tenant statuses:", error);
+        }
+      }
+    };
+    
+    fetchStatuses();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [notifications.length]);
 
   // Helper function to render status badge
   const getStatusBadge = (tenantId: string) => {
