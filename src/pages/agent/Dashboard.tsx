@@ -370,66 +370,66 @@ const AgentDashboard = () => {
               <p className="text-sm text-muted-foreground">Your stats at a glance</p>
             </div>
 
-          {/* Manager Messages - HIGHLY PROMINENT DISPLAY */}
+          {/* Manager Messages - ULTRA PROMINENT DISPLAY */}
           {managerNotifications.length > 0 && (
             <Card 
               ref={managerMessagesRef}
-              className="border-4 border-primary bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 shadow-2xl animate-pulse-slow scroll-mt-4"
+              className="border-[6px] border-primary bg-gradient-to-br from-primary/30 via-primary/20 to-primary/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] animate-pulse-slow scroll-mt-4 sticky top-0 z-10 backdrop-blur-sm"
             >
-              <CardHeader className="pb-4 bg-primary/10 rounded-t-lg border-b-2 border-primary/30">
-                <CardTitle className="flex items-center gap-3 text-primary text-2xl font-bold">
+              <CardHeader className="pb-6 bg-gradient-to-r from-primary/20 to-primary/10 rounded-t-lg border-b-4 border-primary/40">
+                <CardTitle className="flex items-center gap-4 text-primary text-3xl font-extrabold">
                   <div className="relative">
-                    <MessageSquare className="h-8 w-8 animate-bounce" />
-                    <div className="absolute -top-1 -right-1 h-5 w-5 bg-destructive rounded-full flex items-center justify-center">
-                      <span className="text-[10px] font-bold text-white">{managerNotifications.length}</span>
+                    <MessageSquare className="h-12 w-12 animate-bounce drop-shadow-lg" />
+                    <div className="absolute -top-2 -right-2 h-7 w-7 bg-destructive rounded-full flex items-center justify-center animate-pulse shadow-lg">
+                      <span className="text-xs font-bold text-white">{managerNotifications.length}</span>
                     </div>
                   </div>
                   Manager Messages
                 </CardTitle>
-                <CardDescription className="text-sm font-medium">
+                <CardDescription className="text-base font-bold mt-2">
                   📢 Important updates from your manager - Read now!
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 pt-4">
+              <CardContent className="space-y-5 pt-6 pb-6">
                 {managerNotifications.map((notification) => (
                   <Card
                     key={notification.id}
-                    className={`relative ${getPriorityColor(notification.priority)} border-3 shadow-lg hover:shadow-xl transition-all hover:scale-[1.02]`}
+                    className={`relative ${getPriorityColor(notification.priority)} border-[4px] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] hover:shadow-[0_15px_50px_-10px_rgba(0,0,0,0.3)] transition-all hover:scale-[1.02]`}
                   >
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute top-3 right-3 h-8 w-8 z-10 hover:bg-destructive/20"
+                      className="absolute top-4 right-4 h-9 w-9 z-10 hover:bg-destructive/20"
                       onClick={() => handleDismissNotification(notification.id)}
                     >
-                      <X className="h-5 w-5" />
+                      <X className="h-6 w-6" />
                     </Button>
-                    <CardContent className="p-5 pr-12">
-                      <div className="flex items-start gap-3">
-                        <span className="text-3xl flex-shrink-0">{getPriorityIcon(notification.priority)}</span>
+                    <CardContent className="p-6 pr-14">
+                      <div className="flex items-start gap-4">
+                        <span className="text-4xl flex-shrink-0">{getPriorityIcon(notification.priority)}</span>
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-bold text-xl mb-2 leading-tight">{notification.title}</h4>
-                          <p className="text-base whitespace-pre-wrap mb-3 leading-relaxed">
+                          <h4 className="font-bold text-2xl mb-3 leading-tight">{notification.title}</h4>
+                          <p className="text-lg whitespace-pre-wrap mb-4 leading-relaxed">
                             {notification.message}
                           </p>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant="outline" className="text-sm font-semibold px-3 py-1">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <Badge variant="outline" className="text-base font-bold px-4 py-1.5">
                               👤 {notification.profiles?.full_name || "Manager"}
                             </Badge>
-                            <span className="text-sm text-muted-foreground font-medium">
+                            <span className="text-base text-muted-foreground font-semibold">
                               🕐 {format(new Date(notification.created_at), "MMM d, h:mm a")}
                             </span>
                             {notification.read_at && (
-                              <Badge variant="secondary" className="text-xs px-2 py-1">
+                              <Badge variant="secondary" className="text-sm px-3 py-1">
                                 ✓ Read {format(new Date(notification.read_at), "MMM d, h:mm a")}
                               </Badge>
                             )}
                             {notification.priority !== "normal" && (
-                              <Badge className={`text-sm font-bold px-3 py-1 ${
+                              <Badge className={`text-base font-extrabold px-4 py-1.5 ${
                                 notification.priority === "urgent" 
-                                  ? "bg-destructive animate-pulse"
+                                  ? "bg-destructive animate-pulse shadow-lg"
                                   : notification.priority === "high"
-                                  ? "bg-orange-500"
+                                  ? "bg-orange-500 shadow-md"
                                   : "bg-muted"
                               }`}>
                                 {notification.priority === "urgent" && "🚨 "}
@@ -445,13 +445,13 @@ const AgentDashboard = () => {
                 <Button
                   variant="default"
                   size="lg"
-                  className="w-full text-base font-bold shadow-lg"
+                  className="w-full text-lg font-extrabold shadow-xl py-6"
                   onClick={() => {
                     // Open notifications panel - this will be handled by clicking the bell icon
                     document.querySelector('[data-notification-trigger]')?.dispatchEvent(new Event('click'));
                   }}
                 >
-                  <Bell className="h-5 w-5 mr-2" />
+                  <Bell className="h-6 w-6 mr-3" />
                   View All Notifications
                 </Button>
               </CardContent>
