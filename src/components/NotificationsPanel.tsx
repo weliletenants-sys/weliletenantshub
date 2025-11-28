@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format, formatDistanceToNow } from "date-fns";
 import { useOptimisticPayment } from "@/hooks/useOptimisticPayment";
@@ -19,12 +20,14 @@ import MessageThreadDialog from "./MessageThreadDialog";
 interface Notification {
   id: string;
   sender_id: string;
+  recipient_id: string;
   title: string;
   message: string;
   priority: "low" | "normal" | "high" | "urgent";
   read: boolean;
   read_at: string | null;
   created_at: string;
+  parent_notification_id: string | null;
   payment_data?: {
     tenant_id: string;
     tenant_name: string;
@@ -51,6 +54,7 @@ export const NotificationsPanel = () => {
   const [showReceipt, setShowReceipt] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
+  const [filterType, setFilterType] = useState<"all" | "payment" | "message" | "system">("all");
   const observerTarget = useRef<HTMLDivElement>(null);
   const [receiptData, setReceiptData] = useState<{
     paymentData: {
@@ -137,6 +141,15 @@ export const NotificationsPanel = () => {
       fetchNotifications(0, false);
     }
   }, [open]);
+
+  // Filter notifications based on selected type
+  const filteredNotifications = notifications.filter(notification => {
+    if (filterType === "all") return true;
+    if (filterType === "payment") return notification.payment_data !== null;
+    if (filterType === "message") return notification.payment_data === null && notification.parent_notification_id === null;
+    if (filterType === "system") return notification.sender_id === notification.recipient_id; // System messages
+    return true;
+  });
   
   // Infinite scroll observer
   useEffect(() => {
@@ -388,7 +401,7 @@ export const NotificationsPanel = () => {
         </Button>
       </SheetTrigger>
       <SheetContent className="w-full max-w-full sm:max-w-full p-0 flex flex-col h-full">
-        <SheetHeader className="p-6 pb-4 border-b">
+        <SheetHeader className="p-6 pb-0 border-b">
           <SheetTitle className="flex items-center justify-between">
             <span>Notifications</span>
             {unreadCount > 0 && (
@@ -400,6 +413,24 @@ export const NotificationsPanel = () => {
           <SheetDescription>
             {unreadCount > 0 ? `You have ${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}` : 'No new notifications'}
           </SheetDescription>
+          
+          {/* Filter Tabs */}
+          <Tabs value={filterType} onValueChange={(value) => setFilterType(value as typeof filterType)} className="w-full pt-4">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="all" className="text-xs sm:text-sm">
+                All ({notifications.length})
+              </TabsTrigger>
+              <TabsTrigger value="payment" className="text-xs sm:text-sm">
+                Payments ({notifications.filter(n => n.payment_data !== null).length})
+              </TabsTrigger>
+              <TabsTrigger value="message" className="text-xs sm:text-sm">
+                Messages ({notifications.filter(n => n.payment_data === null && n.parent_notification_id === null).length})
+              </TabsTrigger>
+              <TabsTrigger value="system" className="text-xs sm:text-sm">
+                System ({notifications.filter(n => n.sender_id === n.recipient_id).length})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </SheetHeader>
 
         <ScrollArea className="flex-1 p-6">
@@ -414,16 +445,18 @@ export const NotificationsPanel = () => {
                 </Card>
               ))}
             </div>
-          ) : notifications.length === 0 ? (
+          ) : filteredNotifications.length === 0 ? (
             <Card>
               <CardContent className="p-6 text-center">
                 <Bell className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                <p className="text-muted-foreground">No notifications yet</p>
+                <p className="text-muted-foreground">
+                  {filterType === "all" ? "No notifications yet" : `No ${filterType} notifications`}
+                </p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-3 pb-4">
-              {notifications.map((notification) => (
+              {filteredNotifications.map((notification) => (
                 <Card 
                   key={notification.id}
                   className={`${!notification.read ? 'border-primary/50 bg-primary/5' : ''} cursor-pointer hover:shadow-md transition-shadow`}
