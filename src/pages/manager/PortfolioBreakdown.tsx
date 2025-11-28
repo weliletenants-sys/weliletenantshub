@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { z } from "zod";
+import { useRealtimeAllTenants, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
 
 interface TenantData {
   id: string;
@@ -57,6 +58,9 @@ const ManagerPortfolioBreakdown = () => {
   const [jumpToPageInputs, setJumpToPageInputs] = useState<Record<string, string>>({});
   const [showAllTenants, setShowAllTenants] = useState<Record<string, boolean>>({});
   const defaultPageSize = 10;
+
+  // Enable real-time updates
+  useRealtimeAllTenants();
 
   // Load saved ranges from localStorage on mount
   useEffect(() => {
@@ -170,6 +174,18 @@ const ManagerPortfolioBreakdown = () => {
 
   useEffect(() => {
     fetchPortfolioBreakdown();
+
+    // Listen for real-time updates and refetch
+    const unregisterCallback = registerSyncCallback((table) => {
+      if (table === 'tenants') {
+        console.log(`Real-time update detected on ${table}, refreshing portfolio breakdown`);
+        fetchPortfolioBreakdown();
+      }
+    });
+
+    return () => {
+      unregisterCallback();
+    };
   }, [startDate, endDate]);
 
   useEffect(() => {

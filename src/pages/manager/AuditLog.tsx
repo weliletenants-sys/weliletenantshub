@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import PullToRefresh from "react-simple-pull-to-refresh";
 import { haptics } from "@/utils/haptics";
 import { toast } from "sonner";
+import { registerSyncCallback } from "@/hooks/useRealtimeSubscription";
 
 interface AuditLog {
   id: string;
@@ -47,6 +48,16 @@ const ManagerAuditLog = () => {
 
   useEffect(() => {
     fetchAuditLogs();
+
+    // Listen for real-time updates and refetch
+    const unregisterCallback = registerSyncCallback((table) => {
+      console.log(`Real-time update detected on ${table}, refreshing audit logs`);
+      fetchAuditLogs();
+    });
+
+    return () => {
+      unregisterCallback();
+    };
   }, []);
 
   useEffect(() => {
