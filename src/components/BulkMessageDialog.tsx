@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Send, FileText, Trash2, Share2, Lock, Tag } from "lucide-react";
+import { MessageSquare, Send, FileText, Trash2, Share2, Lock, Tag, Code2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { CustomTemplateDialog } from "./CustomTemplateDialog";
 import {
@@ -129,6 +129,17 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<string>("");
+  const [showVariableHelper, setShowVariableHelper] = useState(false);
+
+  // Available template variables
+  const TEMPLATE_VARIABLES = [
+    { key: "{{AGENT_NAME}}", description: "Agent's full name", example: "John Doe" },
+    { key: "{{AGENT_PHONE}}", description: "Agent's phone number", example: "+256 700 123456" },
+    { key: "{{TENANT_COUNT}}", description: "Number of active tenants", example: "15" },
+    { key: "{{PORTFOLIO_VALUE}}", description: "Current portfolio value", example: "UGX 5,000,000" },
+    { key: "{{COLLECTION_RATE}}", description: "Collection rate percentage", example: "85%" },
+    { key: "{{MOTORCYCLE_PROGRESS}}", description: "Progress toward motorcycle reward", example: "30/50 tenants" },
+  ];
 
   useEffect(() => {
     if (open) {
@@ -289,6 +300,54 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
     toast.success("Tenant tag inserted");
   };
 
+  const insertVariable = (variable: string) => {
+    setMessage(prev => prev + " " + variable);
+    toast.success("Variable inserted");
+  };
+
+  const replaceVariablesForAgent = async (messageText: string, agentId: string): Promise<string> => {
+    try {
+      // Fetch agent data
+      const { data: agent, error: agentError } = await supabase
+        .from("agents")
+        .select(`
+          *,
+          profiles:user_id (
+            full_name,
+            phone_number
+          )
+        `)
+        .eq("id", agentId)
+        .single();
+
+      if (agentError) throw agentError;
+
+      // Fetch tenant count for this agent
+      const { count: tenantCount } = await supabase
+        .from("tenants")
+        .select("*", { count: "exact", head: true })
+        .eq("agent_id", agentId);
+
+      // Calculate motorcycle progress
+      const activeTenants = tenantCount || 0;
+      const motorcycleProgress = `${activeTenants}/50 tenants`;
+
+      // Replace all variables
+      let processedMessage = messageText
+        .replace(/\{\{AGENT_NAME\}\}/g, agent.profiles?.full_name || "Agent")
+        .replace(/\{\{AGENT_PHONE\}\}/g, agent.profiles?.phone_number || "N/A")
+        .replace(/\{\{TENANT_COUNT\}\}/g, String(tenantCount || 0))
+        .replace(/\{\{PORTFOLIO_VALUE\}\}/g, `UGX ${Number(agent.portfolio_value || 0).toLocaleString()}`)
+        .replace(/\{\{COLLECTION_RATE\}\}/g, `${Number(agent.collection_rate || 0).toFixed(1)}%`)
+        .replace(/\{\{MOTORCYCLE_PROGRESS\}\}/g, motorcycleProgress);
+
+      return processedMessage;
+    } catch (error) {
+      console.error("Error replacing variables for agent:", error);
+      return messageText; // Return original message if error
+    }
+  };
+
   const resetForm = () => {
     setTitle("");
     setMessage("");
@@ -296,6 +355,7 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
     setSelectedTemplate("");
     setShowTemplates(true);
     setSelectedTenantId("");
+    setShowVariableHelper(false);
   };
 
   const handleSend = async () => {
@@ -310,37 +370,45 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      let recipientUserIds: string[] = [];
+      let agentIds: string[] = [];
 
       if (sendToAll) {
         const { data: allAgents, error: agentsError } = await supabase
           .from("agents")
-          .select("user_id");
+          .select("id, user_id");
         
         if (agentsError) throw agentsError;
-        recipientUserIds = allAgents?.map(a => a.user_id) || [];
+        agentIds = allAgents?.map(a => a.id) || [];
       } else {
         if (selectedAgentIds.length === 0) {
           toast.error("No agents selected");
           return;
         }
-
-        const { data: agents, error: agentsError } = await supabase
-          .from("agents")
-          .select("user_id")
-          .in("id", selectedAgentIds);
-
-        if (agentsError) throw agentsError;
-        recipientUserIds = agents?.map(a => a.user_id) || [];
+        agentIds = selectedAgentIds;
       }
 
-      const notifications = recipientUserIds.map(recipientId => ({
-        sender_id: user.id,
-        recipient_id: recipientId,
-        title,
-        message,
-        priority,
-      }));
+      // Get agent data with user_ids
+      const { data: agentsData, error: agentsError } = await supabase
+        .from("agents")
+        .select("id, user_id")
+        .in("id", agentIds);
+
+      if (agentsError) throw agentsError;
+
+      // Process messages with variable replacement for each agent
+      const notifications = await Promise.all(
+        (agentsData || []).map(async (agent) => {
+          const personalizedMessage = await replaceVariablesForAgent(message, agent.id);
+          
+          return {
+            sender_id: user.id,
+            recipient_id: agent.user_id,
+            title,
+            message: personalizedMessage,
+            priority,
+          };
+        })
+      );
 
       const { error: insertError } = await supabase
         .from("notifications")
@@ -348,7 +416,7 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
 
       if (insertError) throw insertError;
 
-      const count = sendToAll ? recipientUserIds.length : selectedAgentIds.length;
+      const count = sendToAll ? agentIds.length : selectedAgentIds.length;
       toast.success(`Message sent to ${count} agent(s)`, {
         description: `"${title}" was delivered successfully`
       });
@@ -580,6 +648,53 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
                   <p className="text-xs text-muted-foreground">
                     Insert a clickable tenant tag into your message
                   </p>
+                </div>
+
+                {/* Template Variables Helper */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Template Variables</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowVariableHelper(!showVariableHelper)}
+                    >
+                      <Code2 className="h-4 w-4 mr-2" />
+                      {showVariableHelper ? "Hide" : "Show"} Variables
+                    </Button>
+                  </div>
+                  
+                  {showVariableHelper && (
+                    <Card className="bg-muted/50">
+                      <CardContent className="p-4 space-y-3">
+                        <p className="text-xs text-muted-foreground">
+                          Click a variable to insert it. Variables will be replaced with agent-specific data when sent.
+                        </p>
+                        <div className="grid grid-cols-1 gap-2">
+                          {TEMPLATE_VARIABLES.map((variable) => (
+                            <div
+                              key={variable.key}
+                              className="flex items-start justify-between gap-2 p-2 rounded hover:bg-background cursor-pointer transition-colors"
+                              onClick={() => insertVariable(variable.key)}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <code className="text-xs font-mono bg-background px-2 py-1 rounded">
+                                  {variable.key}
+                                </code>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {variable.description}
+                                </p>
+                              </div>
+                              <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                ex: {variable.example}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
 
                 <div className="space-y-2">
