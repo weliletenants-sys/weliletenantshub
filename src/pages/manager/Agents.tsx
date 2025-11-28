@@ -9,12 +9,21 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRealtimeAgents, useRealtimeAllTenants, useRealtimeProfiles, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
-import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Activity, Wallet, ChevronDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Activity, Wallet, ChevronDown, Download, CheckSquare, Square } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface AgentWithDetails {
   id: string;
@@ -70,6 +79,7 @@ const ManagerAgents = () => {
   const [portfolioSortBy, setPortfolioSortBy] = useState<"portfolio_value" | "percentage" | "tenant_count" | "agent_name">("portfolio_value");
   const [portfolioSortDirection, setPortfolioSortDirection] = useState<"asc" | "desc">("desc");
   const [portfolioGrowthFilter, setPortfolioGrowthFilter] = useState<"all" | "positive" | "negative">("all");
+  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set());
   
   // Enable real-time updates
   useRealtimeAgents();
@@ -363,6 +373,131 @@ const ManagerAgents = () => {
   };
 
   const hasActiveFilters = statusFilter !== "all" || motorcycleFilter !== "all" || portfolioMinFilter || portfolioMaxFilter;
+
+  const handleSelectAll = () => {
+    if (selectedAgents.size === agents.length) {
+      setSelectedAgents(new Set());
+    } else {
+      setSelectedAgents(new Set(agents.map(a => a.id)));
+    }
+  };
+
+  const handleSelectAgent = (agentId: string) => {
+    const newSelected = new Set(selectedAgents);
+    if (newSelected.has(agentId)) {
+      newSelected.delete(agentId);
+    } else {
+      newSelected.add(agentId);
+    }
+    setSelectedAgents(newSelected);
+  };
+
+  const exportSelectedAgentsToCSV = () => {
+    if (selectedAgents.size === 0) {
+      toast.error("No agents selected", {
+        description: "Please select agents to export"
+      });
+      return;
+    }
+
+    const selectedAgentData = agents.filter(a => selectedAgents.has(a.id));
+    
+    // Create CSV content
+    const headers = [
+      "Agent Name",
+      "Phone Number",
+      "Total Tenants",
+      "Active Tenants",
+      "Collection Rate (%)",
+      "Monthly Earnings (UGX)",
+      "Portfolio Value (UGX)",
+      "Motorcycle Eligible",
+      "Motorcycle Applied",
+      "Status"
+    ];
+    
+    const rows = selectedAgentData.map(agent => [
+      agent.profiles?.full_name || "Unknown",
+      agent.profiles?.phone_number || "",
+      agent.tenant_count,
+      agent.active_tenants || 0,
+      (agent.collection_rate || 0).toFixed(2),
+      (agent.monthly_earnings || 0).toFixed(2),
+      (agent.portfolio_value || 0).toFixed(2),
+      agent.motorcycle_eligible ? "Yes" : "No",
+      agent.motorcycle_applied ? "Yes" : "No",
+      agent.tenant_count > 0 ? "Active" : "Inactive"
+    ]);
+    
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
+    
+    // Create and download file
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `agents_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success(`Exported ${selectedAgents.size} agent(s) to CSV`);
+  };
+
+  const exportAllAgentsToCSV = () => {
+    // Create CSV content for all agents
+    const headers = [
+      "Agent Name",
+      "Phone Number",
+      "Total Tenants",
+      "Active Tenants",
+      "Collection Rate (%)",
+      "Monthly Earnings (UGX)",
+      "Portfolio Value (UGX)",
+      "Motorcycle Eligible",
+      "Motorcycle Applied",
+      "Status"
+    ];
+    
+    const rows = agents.map(agent => [
+      agent.profiles?.full_name || "Unknown",
+      agent.profiles?.phone_number || "",
+      agent.tenant_count,
+      agent.active_tenants || 0,
+      (agent.collection_rate || 0).toFixed(2),
+      (agent.monthly_earnings || 0).toFixed(2),
+      (agent.portfolio_value || 0).toFixed(2),
+      agent.motorcycle_eligible ? "Yes" : "No",
+      agent.motorcycle_applied ? "Yes" : "No",
+      agent.tenant_count > 0 ? "Active" : "Inactive"
+    ]);
+    
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
+    
+    // Create and download file
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `all_agents_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success(`Exported ${agents.length} agent(s) to CSV`);
+  };
+
+  const clearSelection = () => {
+    setSelectedAgents(new Set());
+  };
 
   // Sort and filter portfolio breakdown based on selected options
   const sortedPortfolioBreakdown = [...agentPortfolioBreakdown]
@@ -790,6 +925,40 @@ const ManagerAgents = () => {
           </Card>
         )}
 
+        {/* Bulk Actions Toolbar */}
+        {selectedAgents.size > 0 && (
+          <Card className="border-primary/50 bg-primary/5">
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CheckSquare className="h-5 w-5 text-primary" />
+                  <span className="font-medium">
+                    {selectedAgents.size} agent{selectedAgents.size !== 1 ? 's' : ''} selected
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportSelectedAgentsToCSV}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Selected
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearSelection}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -799,14 +968,39 @@ const ManagerAgents = () => {
                   Total: {totalAgents} agent{totalAgents !== 1 ? 's' : ''}
                 </CardDescription>
               </div>
-              <div className="relative w-full md:w-80">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name or phone..."
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="pl-10"
-                />
+              <div className="flex gap-2 items-center w-full md:w-auto">
+                <div className="relative flex-1 md:flex-initial md:w-80">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name or phone..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Download className="h-4 w-4 mr-2" />
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={exportAllAgentsToCSV}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Export All ({agents.length})
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={exportSelectedAgentsToCSV}
+                      disabled={selectedAgents.size === 0}
+                    >
+                      <CheckSquare className="h-4 w-4 mr-2" />
+                      Export Selected ({selectedAgents.size})
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </CardHeader>
@@ -815,6 +1009,13 @@ const ManagerAgents = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[50px]">
+                      <Checkbox
+                        checked={selectedAgents.size === agents.length && agents.length > 0}
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Select all agents"
+                      />
+                    </TableHead>
                     <TableHead>Agent Name</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead 
@@ -856,13 +1057,13 @@ const ManagerAgents = () => {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8">
+                      <TableCell colSpan={9} className="text-center py-8">
                         Loading agents...
                       </TableCell>
                     </TableRow>
                   ) : agents.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         No agents found
                       </TableCell>
                     </TableRow>
@@ -870,27 +1071,53 @@ const ManagerAgents = () => {
                     agents.map((agent) => (
                       <TableRow 
                         key={agent.id} 
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => navigate(`/manager/agents/${agent.id}`)}
+                        className="hover:bg-muted/50"
                       >
-                        <TableCell className="font-medium">
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedAgents.has(agent.id)}
+                            onCheckedChange={() => handleSelectAgent(agent.id)}
+                            aria-label={`Select ${agent.profiles?.full_name || 'agent'}`}
+                          />
+                        </TableCell>
+                        <TableCell 
+                          className="font-medium cursor-pointer"
+                          onClick={() => navigate(`/manager/agents/${agent.id}`)}
+                        >
                           {agent.profiles?.full_name || 'Unknown Agent'}
                         </TableCell>
-                        <TableCell>{agent.profiles?.phone_number || '-'}</TableCell>
-                        <TableCell>
+                        <TableCell 
+                          className="cursor-pointer"
+                          onClick={() => navigate(`/manager/agents/${agent.id}`)}
+                        >
+                          {agent.profiles?.phone_number || '-'}
+                        </TableCell>
+                        <TableCell 
+                          className="cursor-pointer"
+                          onClick={() => navigate(`/manager/agents/${agent.id}`)}
+                        >
                           <Badge variant="outline">
                             {agent.tenant_count} tenant{agent.tenant_count !== 1 ? 's' : ''}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell 
+                          className="cursor-pointer"
+                          onClick={() => navigate(`/manager/agents/${agent.id}`)}
+                        >
                           <span className={Number(agent.collection_rate || 0) >= 95 ? "text-green-600 font-medium" : "text-yellow-600"}>
                             {Number(agent.collection_rate || 0).toFixed(1)}%
                           </span>
                         </TableCell>
-                        <TableCell className="font-medium">
+                        <TableCell 
+                          className="font-medium cursor-pointer"
+                          onClick={() => navigate(`/manager/agents/${agent.id}`)}
+                        >
                           UGX {Number(agent.monthly_earnings || 0).toLocaleString()}
                         </TableCell>
-                        <TableCell className="font-medium">
+                        <TableCell 
+                          className="font-medium cursor-pointer"
+                          onClick={() => navigate(`/manager/agents/${agent.id}`)}
+                        >
                           <div className="flex flex-col">
                             <span>UGX {Number(agent.portfolio_value || 0).toLocaleString()}</span>
                             <span className="text-xs text-muted-foreground">
@@ -898,7 +1125,10 @@ const ManagerAgents = () => {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell 
+                          className="cursor-pointer"
+                          onClick={() => navigate(`/manager/agents/${agent.id}`)}
+                        >
                           {agent.motorcycle_eligible ? (
                             agent.motorcycle_applied ? (
                               <Badge className="bg-green-600">Applied</Badge>
@@ -909,7 +1139,10 @@ const ManagerAgents = () => {
                             <Badge variant="secondary">Not Eligible</Badge>
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell 
+                          className="cursor-pointer"
+                          onClick={() => navigate(`/manager/agents/${agent.id}`)}
+                        >
                           <Badge variant={agent.tenant_count > 0 ? "default" : "secondary"}>
                             {agent.tenant_count > 0 ? "Active" : "Inactive"}
                           </Badge>
