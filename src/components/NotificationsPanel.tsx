@@ -22,6 +22,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import PaymentReceipt from "./PaymentReceipt";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeSubscription";
 import MessageThreadDialog from "./MessageThreadDialog";
+import { useNotificationAlerts } from "@/hooks/useNotificationAlerts";
 
 interface Notification {
   id: string;
@@ -94,9 +95,27 @@ export const NotificationsPanel = () => {
   } | null>(null);
   
   const optimisticPayment = useOptimisticPayment();
+  const { playPaymentAlert, vibrateForPayment } = useNotificationAlerts();
   
   // Enable realtime subscription for notifications
   useRealtimeNotifications();
+
+  // Track previous notification count to detect new notifications
+  const prevNotificationCountRef = useRef<number>(0);
+
+  // Detect new payment notifications and trigger alerts
+  useEffect(() => {
+    const currentPaymentCount = notifications.filter(n => n.payment_data && !n.read).length;
+    const prevPaymentCount = prevNotificationCountRef.current;
+
+    // If we have new unread payment notifications, play alert
+    if (currentPaymentCount > prevPaymentCount && prevPaymentCount > 0) {
+      playPaymentAlert();
+      vibrateForPayment();
+    }
+
+    prevNotificationCountRef.current = currentPaymentCount;
+  }, [notifications, playPaymentAlert, vibrateForPayment]);
 
   const fetchNotifications = async (pageNum = 0, append = false) => {
     try {
