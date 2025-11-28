@@ -5,9 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Radio, TrendingUp, CheckCircle2, Clock, Users } from "lucide-react";
+import { Radio, TrendingUp, CheckCircle2, Clock, Users, XCircle, UserCheck } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeSubscription";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 interface PaymentBroadcast {
   id: string;
@@ -27,6 +30,17 @@ interface PaymentBroadcast {
   totalAgents: number;
   appliedCount: number;
   responseRate: number;
+  notifications: any[];
+}
+
+interface AgentResponse {
+  agent_id: string;
+  agent_name: string;
+  agent_phone: string;
+  applied: boolean;
+  notification_id: string;
+  read: boolean;
+  read_at: string | null;
 }
 
 export const PaymentBroadcastWidget = () => {
@@ -34,6 +48,9 @@ export const PaymentBroadcastWidget = () => {
   const [loading, setLoading] = useState(true);
   const [totalBroadcasts, setTotalBroadcasts] = useState(0);
   const [avgResponseRate, setAvgResponseRate] = useState(0);
+  const [selectedBroadcast, setSelectedBroadcast] = useState<PaymentBroadcast | null>(null);
+  const [agentResponses, setAgentResponses] = useState<AgentResponse[]>([]);
+  const [loadingResponses, setLoadingResponses] = useState(false);
 
   // Subscribe to real-time notifications updates
   useRealtimeNotifications();
@@ -98,6 +115,7 @@ export const PaymentBroadcastWidget = () => {
           totalAgents,
           appliedCount,
           responseRate,
+          notifications: group,
         };
       });
 
@@ -141,6 +159,61 @@ export const PaymentBroadcastWidget = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const fetchAgentResponses = async (broadcast: PaymentBroadcast) => {
+    setLoadingResponses(true);
+    try {
+      // Get all agents with their profiles
+      const { data: agentsData } = await supabase
+        .from("agents")
+        .select(`
+          id,
+          user_id,
+          profiles:user_id(full_name, phone_number)
+        `);
+
+      if (!agentsData) return;
+
+      // Map notifications by recipient
+      const notificationMap = new Map();
+      broadcast.notifications.forEach((notif) => {
+        notificationMap.set(notif.recipient_id, notif);
+      });
+
+      // Build agent response list
+      const responses: AgentResponse[] = agentsData.map((agent) => {
+        const notif = notificationMap.get(agent.user_id);
+        const paymentData = notif?.payment_data as any;
+        
+        return {
+          agent_id: agent.id,
+          agent_name: (agent.profiles as any)?.full_name || "Unknown Agent",
+          agent_phone: (agent.profiles as any)?.phone_number || "",
+          applied: paymentData?.applied === true,
+          notification_id: notif?.id || "",
+          read: notif?.read || false,
+          read_at: notif?.read_at || null,
+        };
+      });
+
+      // Sort: applied first, then by name
+      responses.sort((a, b) => {
+        if (a.applied !== b.applied) return a.applied ? -1 : 1;
+        return a.agent_name.localeCompare(b.agent_name);
+      });
+
+      setAgentResponses(responses);
+    } catch (error) {
+      console.error("Error fetching agent responses:", error);
+    } finally {
+      setLoadingResponses(false);
+    }
+  };
+
+  const handleBroadcastClick = (broadcast: PaymentBroadcast) => {
+    setSelectedBroadcast(broadcast);
+    fetchAgentResponses(broadcast);
+  };
 
   if (loading) {
     return (
@@ -193,7 +266,8 @@ export const PaymentBroadcastWidget = () => {
               {broadcasts.map((broadcast) => (
                 <div
                   key={broadcast.id}
-                  className="p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                  className="p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
+                  onClick={() => handleBroadcastClick(broadcast)}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
@@ -255,6 +329,149 @@ export const PaymentBroadcastWidget = () => {
           </ScrollArea>
         )}
       </CardContent>
+
+      {/* Agent Responses Detail Dialog */}
+      <Dialog open={!!selectedBroadcast} onOpenChange={() => setSelectedBroadcast(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Agent Responses - {selectedBroadcast?.payment_data.tenant_name}</DialogTitle>
+            <DialogDescription>
+              Payment broadcast sent {selectedBroadcast && formatDistanceToNow(new Date(selectedBroadcast.created_at), { addSuffix: true })}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedBroadcast && (
+            <div className="space-y-4">
+              {/* Broadcast Summary */}
+              <div className="p-4 bg-primary/5 rounded-lg border">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Payment Amount</p>
+                    <p className="text-xl font-bold text-primary">
+                      UGX {selectedBroadcast.payment_data.amount.toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Payment Method</p>
+                    <Badge variant="outline" className="mt-1">
+                      {selectedBroadcast.payment_data.payment_method}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Response Rate</p>
+                    <p className="text-xl font-bold">
+                      {selectedBroadcast.responseRate.toFixed(0)}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Applied By</p>
+                    <p className="text-xl font-bold">
+                      {selectedBroadcast.appliedCount}/{selectedBroadcast.totalAgents} agents
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Agent List */}
+              {loadingResponses ? (
+                <div className="space-y-2">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : (
+                <ScrollArea className="h-[400px] pr-4">
+                  <div className="space-y-2">
+                    {/* Applied Section */}
+                    {agentResponses.filter((r) => r.applied).length > 0 && (
+                      <div className="mb-4">
+                        <div className="flex items-center gap-2 mb-2 sticky top-0 bg-background py-2">
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          <h4 className="font-semibold text-sm">
+                            Applied ({agentResponses.filter((r) => r.applied).length})
+                          </h4>
+                        </div>
+                        {agentResponses
+                          .filter((r) => r.applied)
+                          .map((response) => (
+                            <div
+                              key={response.agent_id}
+                              className="p-3 border rounded-lg bg-green-500/5 border-green-500/20"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-500/20">
+                                    <UserCheck className="h-4 w-4 text-green-600" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">{response.agent_name}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {response.agent_phone}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/30">
+                                  Applied
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+
+                    {/* Not Applied Section */}
+                    {agentResponses.filter((r) => !r.applied).length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 sticky top-0 bg-background py-2">
+                          <Clock className="h-4 w-4 text-orange-500" />
+                          <h4 className="font-semibold text-sm">
+                            Not Applied ({agentResponses.filter((r) => !r.applied).length})
+                          </h4>
+                        </div>
+                        {agentResponses
+                          .filter((r) => !r.applied)
+                          .map((response) => (
+                            <div
+                              key={response.agent_id}
+                              className="p-3 border rounded-lg bg-orange-500/5 border-orange-500/20"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-orange-500/20">
+                                    <XCircle className="h-4 w-4 text-orange-600" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">{response.agent_name}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {response.agent_phone}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  {response.read ? (
+                                    <Badge variant="outline" className="text-xs">
+                                      Read {response.read_at && formatDistanceToNow(new Date(response.read_at), { addSuffix: true })}
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="bg-red-500/10 text-red-700 border-red-500/30 text-xs">
+                                      Unread
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
