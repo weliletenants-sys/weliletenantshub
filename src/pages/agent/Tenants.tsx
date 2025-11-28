@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import AgentLayout from "@/components/AgentLayout";
 import { TenantListSkeleton } from "@/components/TenantDetailSkeleton";
+import { ContentTransition, StaggeredList } from "@/components/ContentTransition";
 import { RefreshIndicator } from "@/components/RefreshIndicator";
 import { RealtimeSyncIndicator } from "@/components/RealtimeSyncIndicator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -136,21 +137,25 @@ const AgentTenants = () => {
 
   return (
     <AgentLayout currentPage="/agent/tenants">
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              👥 My Tenants
-              <RefreshIndicator isRefreshing={isFetching && !isLoading} />
-              <RealtimeSyncIndicator lastSyncTime={lastSyncTime} compact />
-            </h1>
-            <p className="text-sm text-muted-foreground">Your portfolio</p>
+      <ContentTransition
+        loading={isLoading}
+        skeleton={<TenantListSkeleton />}
+      >
+        <div className="space-y-6 animate-reveal">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                👥 My Tenants
+                <RefreshIndicator isRefreshing={isFetching && !isLoading} />
+                <RealtimeSyncIndicator lastSyncTime={lastSyncTime} compact />
+              </h1>
+              <p className="text-sm text-muted-foreground">Your portfolio</p>
+            </div>
+            <Button onClick={() => navigate("/agent/new-tenant")} size="lg" className="h-12 shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95">
+              <Plus className="h-5 w-5 mr-1" />
+              Add
+            </Button>
           </div>
-          <Button onClick={() => navigate("/agent/new-tenant")} size="lg" className="h-12 shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95">
-            <Plus className="h-5 w-5 mr-1" />
-            Add
-          </Button>
-        </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 h-12">
@@ -216,6 +221,7 @@ const AgentTenants = () => {
           </TabsContent>
         </Tabs>
       </div>
+      </ContentTransition>
     </AgentLayout>
   );
 };

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import PullToRefresh from "react-simple-pull-to-refresh";
 import AgentLayout from "@/components/AgentLayout";
 import { DashboardSkeleton } from "@/components/TenantDetailSkeleton";
+import { ContentTransition, SlideUpTransition } from "@/components/ContentTransition";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -246,11 +247,15 @@ const AgentDashboard = () => {
   return (
     <AgentLayout currentPage="/agent/dashboard">
       <PullToRefresh onRefresh={handleRefresh} pullingContent="">
-        <div className="space-y-6">
-          <div className="mb-4">
-            <h1 className="text-2xl font-bold">Dashboard 📊</h1>
-            <p className="text-sm text-muted-foreground">Your stats at a glance</p>
-          </div>
+        <ContentTransition
+          loading={isLoading}
+          skeleton={<DashboardSkeleton />}
+        >
+          <div className="space-y-6 animate-reveal">
+            <div className="mb-4">
+              <h1 className="text-2xl font-bold">Dashboard 📊</h1>
+              <p className="text-sm text-muted-foreground">Your stats at a glance</p>
+            </div>
 
           {/* Quick Action Buttons */}
           <div className="grid grid-cols-2 gap-3">
@@ -566,6 +571,7 @@ const AgentDashboard = () => {
           </CardContent>
         </Card>
       </div>
+        </ContentTransition>
       </PullToRefresh>
     </AgentLayout>
   );
