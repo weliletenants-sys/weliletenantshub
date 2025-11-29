@@ -108,16 +108,39 @@ const ManagerDashboard = () => {
       const startDateStr = start.toISOString().split('T')[0];
       const endDateStr = end.toISOString().split('T')[0];
 
-      // Get verified collections within date range
+      // Get verified collections within date range with manager details
       const { data: collections, error } = await supabase
         .from('collections')
-        .select('amount, collection_date, payment_method')
+        .select(`
+          amount, 
+          collection_date, 
+          payment_method,
+          verified_at,
+          verified_by,
+          tenants (
+            tenant_name
+          ),
+          agents (
+            profiles:user_id (
+              full_name
+            )
+          )
+        `)
         .eq('status', 'verified')
         .gte('collection_date', startDateStr)
         .lte('collection_date', endDateStr)
         .order('collection_date', { ascending: true });
 
       if (error) throw error;
+
+      // Fetch manager names for verified_by
+      const managerIds = [...new Set(collections?.map(c => c.verified_by).filter(Boolean))];
+      const { data: managers } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', managerIds);
+
+      const managerMap = new Map(managers?.map(m => [m.id, m.full_name]));
 
       // Calculate total rent
       const totalRent = collections?.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0;
@@ -141,7 +164,15 @@ const ManagerDashboard = () => {
       const dailyBreakdown = Array.from(dailyMap.entries()).map(([date, amount]) => ({
         date: format(new Date(date), 'MMM dd'),
         fullDate: date,
-        amount
+        amount,
+        payments: collections?.filter(c => c.collection_date === date).map(c => ({
+          amount: parseFloat(c.amount.toString()),
+          tenantName: c.tenants?.tenant_name || 'Unknown',
+          agentName: c.agents?.profiles?.full_name || 'Unknown',
+          managerName: c.verified_by ? (managerMap.get(c.verified_by) || 'Unknown') : 'Unknown',
+          verifiedAt: c.verified_at,
+          paymentMethod: c.payment_method
+        })) || []
       }));
 
       // Weekly breakdown - group by weeks within the selected range
@@ -1402,6 +1433,50 @@ const ManagerDashboard = () => {
                         </BarChart>
                       </ResponsiveContainer>
                     </ChartContainer>
+
+                    {/* Detailed Payment Breakdown by Day */}
+                    <div className="mt-6 space-y-4">
+                      <h4 className="font-semibold text-sm">Verified Payments by Day</h4>
+                      <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                        {paymentReportData.dailyBreakdown.filter(day => day.payments && day.payments.length > 0).map((day, idx) => (
+                          <div key={idx} className="border rounded-lg p-4 bg-muted/30">
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <p className="font-semibold text-sm">{day.date}</p>
+                                <p className="text-xs text-muted-foreground">{day.payments.length} payment{day.payments.length !== 1 ? 's' : ''}</p>
+                              </div>
+                              <Badge variant="outline" className="text-xs">
+                                UGX {day.amount.toLocaleString()}
+                              </Badge>
+                            </div>
+                            <div className="space-y-2">
+                              {day.payments.map((payment: any, pIdx: number) => (
+                                <div key={pIdx} className="flex items-start justify-between text-xs p-2 bg-background rounded border">
+                                  <div className="space-y-1 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium">{payment.tenantName}</span>
+                                      <Badge variant="secondary" className="text-xs">
+                                        {payment.paymentMethod?.toUpperCase() || 'CASH'}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-muted-foreground">Agent: {payment.agentName}</p>
+                                    <p className="text-success font-medium">Verified by: {payment.managerName}</p>
+                                    {payment.verifiedAt && (
+                                      <p className="text-muted-foreground">
+                                        {format(new Date(payment.verifiedAt), 'MMM dd, yyyy HH:mm')}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="font-bold text-right">
+                                    UGX {payment.amount.toLocaleString()}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
 
