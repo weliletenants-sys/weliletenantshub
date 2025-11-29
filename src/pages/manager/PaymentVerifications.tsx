@@ -6,7 +6,7 @@ import { PaymentVerificationsSkeleton } from "@/components/TenantDetailSkeleton"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Clock, User, DollarSign, Calendar, Loader2, Eye } from "lucide-react";
+import { Check, X, Clock, User, DollarSign, Calendar, Loader2, Eye, CheckSquare, Square } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -70,6 +70,14 @@ const PaymentVerifications = () => {
     const saved = localStorage.getItem('payment-undo-history');
     return saved ? JSON.parse(saved) : [];
   });
+  const [selectedPaymentIds, setSelectedPaymentIds] = useState<Set<string>>(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    // Clear selection when switching tabs
+    setSelectedPaymentIds(new Set());
+  };
   
   // Optimistic mutations
   const verifyMutation = useOptimisticPaymentVerification();
@@ -341,6 +349,114 @@ const PaymentVerifications = () => {
     toast.success("Undo history cleared");
   };
 
+  const togglePaymentSelection = (paymentId: string) => {
+    setSelectedPaymentIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(paymentId)) {
+        newSet.delete(paymentId);
+      } else {
+        newSet.add(paymentId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllPending = () => {
+    setSelectedPaymentIds(new Set(pendingPayments.map(p => p.id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedPaymentIds(new Set());
+  };
+
+  const handleBulkVerify = async () => {
+    if (selectedPaymentIds.size === 0) {
+      toast.error("No payments selected");
+      return;
+    }
+
+    try {
+      setIsBulkProcessing(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const selectedPayments = pendingPayments.filter(p => selectedPaymentIds.has(p.id));
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const payment of selectedPayments) {
+        try {
+          await verifyMutation.mutateAsync({
+            paymentId: payment.id,
+            managerId: user.id
+          });
+          successCount++;
+        } catch (error) {
+          console.error(`Error verifying payment ${payment.id}:`, error);
+          errorCount++;
+        }
+      }
+
+      haptics.success();
+      toast.success(`Bulk verification complete`, {
+        description: `${successCount} verified${errorCount > 0 ? `, ${errorCount} failed` : ''}`
+      });
+
+      setSelectedPaymentIds(new Set());
+    } catch (error) {
+      console.error("Error in bulk verification:", error);
+      toast.error("Failed to complete bulk verification");
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkReject = async () => {
+    if (selectedPaymentIds.size === 0) {
+      toast.error("No payments selected");
+      return;
+    }
+
+    // For bulk rejection, we'll use a default reason
+    const reason = "Bulk rejection by manager";
+    
+    try {
+      setIsBulkProcessing(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const selectedPayments = pendingPayments.filter(p => selectedPaymentIds.has(p.id));
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const payment of selectedPayments) {
+        try {
+          await rejectMutation.mutateAsync({
+            paymentId: payment.id,
+            managerId: user.id,
+            reason
+          });
+          successCount++;
+        } catch (error) {
+          console.error(`Error rejecting payment ${payment.id}:`, error);
+          errorCount++;
+        }
+      }
+
+      haptics.success();
+      toast.success(`Bulk rejection complete`, {
+        description: `${successCount} rejected${errorCount > 0 ? `, ${errorCount} failed` : ''}`
+      });
+
+      setSelectedPaymentIds(new Set());
+    } catch (error) {
+      console.error("Error in bulk rejection:", error);
+      toast.error("Failed to complete bulk rejection");
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
   const pendingPayments = payments?.filter(p => p.status === "pending") || [];
   const verifiedPayments = payments?.filter(p => p.status === "verified") || [];
   const rejectedPayments = payments?.filter(p => p.status === "rejected") || [];
@@ -357,20 +473,40 @@ const PaymentVerifications = () => {
     }
   };
 
-  const PaymentCard = ({ payment }: { payment: Payment }) => (
-    <Card className="mb-4">
-      <CardContent className="p-5">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex-1">
-            <h3 className="font-semibold text-lg mb-1">{payment.tenants.tenant_name}</h3>
-            <p className="text-sm text-muted-foreground mb-2">{payment.tenants.tenant_phone}</p>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
-              <User className="h-4 w-4" />
-              <span>Agent: {payment.agent.profiles.full_name || payment.agent.profiles.phone_number}</span>
+  const PaymentCard = ({ payment }: { payment: Payment }) => {
+    const isSelected = selectedPaymentIds.has(payment.id);
+    const isPending = payment.status === "pending";
+    
+    return (
+      <Card className={`mb-4 transition-all ${isSelected ? 'ring-2 ring-primary' : ''}`}>
+        <CardContent className="p-5">
+          <div className="flex justify-between items-start mb-4">
+            <div className="flex items-start gap-3 flex-1">
+              {isPending && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 mt-1"
+                  onClick={() => togglePaymentSelection(payment.id)}
+                >
+                  {isSelected ? (
+                    <CheckSquare className="h-5 w-5 text-primary" />
+                  ) : (
+                    <Square className="h-5 w-5" />
+                  )}
+                </Button>
+              )}
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg mb-1">{payment.tenants.tenant_name}</h3>
+                <p className="text-sm text-muted-foreground mb-2">{payment.tenants.tenant_phone}</p>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                  <User className="h-4 w-4" />
+                  <span>Agent: {payment.agent.profiles.full_name || payment.agent.profiles.phone_number}</span>
+                </div>
+              </div>
             </div>
+            {getStatusBadge(payment.status)}
           </div>
-          {getStatusBadge(payment.status)}
-        </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="flex items-center gap-2">
@@ -470,7 +606,8 @@ const PaymentVerifications = () => {
         </div>
       </CardContent>
     </Card>
-  );
+    );
+  };
 
   if (isLoading) {
     return (
@@ -483,7 +620,7 @@ const PaymentVerifications = () => {
   return (
     <ManagerLayout currentPage="/manager/payment-verifications">
       <div className="mb-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold mb-2">Payment Verifications</h1>
             <p className="text-muted-foreground">Review and verify agent payment submissions</p>
@@ -534,13 +671,66 @@ const PaymentVerifications = () => {
         </Card>
       </div>
 
+      {/* Bulk Actions Toolbar */}
+      {selectedPaymentIds.size > 0 && (
+        <Card className="mb-6 border-primary/50 bg-primary/5">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <CheckSquare className="h-5 w-5 text-primary" />
+                  <span className="font-semibold">
+                    {selectedPaymentIds.size} payment{selectedPaymentIds.size > 1 ? 's' : ''} selected
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={deselectAll}
+                  className="h-8"
+                >
+                  Clear Selection
+                </Button>
+              </div>
+              <div className="flex items-center gap-3">
+                {activeTab === 'pending' && (
+                  <>
+                    <Button
+                      onClick={handleBulkVerify}
+                      disabled={isBulkProcessing}
+                      className="gap-2"
+                    >
+                      {isBulkProcessing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4" />
+                      )}
+                      Verify All Selected
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={handleBulkReject}
+                      disabled={isBulkProcessing}
+                      className="gap-2"
+                    >
+                      <X className="h-4 w-4" />
+                      Reject All Selected
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Payment Submissions</CardTitle>
           <CardDescription>Review agent payment entries and verify for commission approval</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-3 mb-6">
               <TabsTrigger value="pending">
                 Pending ({pendingPayments.length})
@@ -561,6 +751,31 @@ const PaymentVerifications = () => {
                 </div>
               ) : (
                 <div>
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b">
+                    <p className="text-sm text-muted-foreground">
+                      {selectedPaymentIds.size > 0 
+                        ? `${selectedPaymentIds.size} of ${pendingPayments.length} selected`
+                        : `${pendingPayments.length} pending payment${pendingPayments.length > 1 ? 's' : ''}`
+                      }
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={selectedPaymentIds.size === pendingPayments.length ? deselectAll : selectAllPending}
+                    >
+                      {selectedPaymentIds.size === pendingPayments.length ? (
+                        <>
+                          <Square className="h-4 w-4 mr-2" />
+                          Deselect All
+                        </>
+                      ) : (
+                        <>
+                          <CheckSquare className="h-4 w-4 mr-2" />
+                          Select All
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   {pendingPayments.map(payment => (
                     <PaymentCard key={payment.id} payment={payment} />
                   ))}
