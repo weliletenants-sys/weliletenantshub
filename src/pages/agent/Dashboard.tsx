@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import PullToRefresh from "react-simple-pull-to-refresh";
+import { useSwipeable } from "react-swipeable";
 import AgentLayout from "@/components/AgentLayout";
 import { DashboardSkeleton } from "@/components/TenantDetailSkeleton";
 import { ContentTransition, SlideUpTransition } from "@/components/ContentTransition";
@@ -452,6 +453,20 @@ const AgentDashboard = () => {
   const portfolioPercentage = agentData ? (agentData.portfolio_value / agentData.portfolio_limit) * 100 : 0;
   const tenantsToMotorcycle = Math.max(0, 50 - (agentData?.active_tenants || 0));
 
+  // Swipe handlers for commission card
+  const commissionSwipeHandlers = useSwipeable({
+    onSwipedLeft: () => {
+      haptics.light();
+      navigate("/agent/earnings");
+    },
+    onSwipedRight: () => {
+      haptics.light();
+      navigate("/agent/earnings");
+    },
+    trackMouse: true,
+    trackTouch: true,
+  });
+
   if (isLoading || authLoading) {
     return (
       <AgentLayout currentPage="/agent/dashboard">
@@ -474,10 +489,17 @@ const AgentDashboard = () => {
             </div>
 
           {/* Commission Hero Card - PRIORITY DISPLAY */}
-          <Card className="bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 text-white overflow-hidden relative hover:shadow-2xl transition-all border-4 border-emerald-400/50">
-            <div className="absolute top-0 right-0 w-72 h-72 bg-white/10 rounded-full -translate-y-32 translate-x-32" />
-            <div className="absolute bottom-0 left-0 w-56 h-56 bg-white/10 rounded-full translate-y-28 -translate-x-28" />
-            <CardContent className="p-8 relative z-10">
+          <div {...commissionSwipeHandlers} className="cursor-pointer active:scale-98 transition-transform">
+            <Card className="bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 text-white overflow-hidden relative hover:shadow-2xl transition-all border-4 border-emerald-400/50">
+              <div className="absolute top-0 right-0 w-72 h-72 bg-white/10 rounded-full -translate-y-32 translate-x-32" />
+              <div className="absolute bottom-0 left-0 w-56 h-56 bg-white/10 rounded-full translate-y-28 -translate-x-28" />
+              
+              {/* Swipe Hint Indicator */}
+              <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1 animate-pulse">
+                <span className="text-xs font-medium">👈 Swipe</span>
+              </div>
+              
+              <CardContent className="p-8 relative z-10">
               <div className="space-y-5">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-white/25 backdrop-blur-sm rounded-2xl">
@@ -516,6 +538,7 @@ const AgentDashboard = () => {
               </div>
             </CardContent>
           </Card>
+          </div>
 
           {/* Manager Messages - ULTRA PROMINENT DISPLAY */}
           <Card
