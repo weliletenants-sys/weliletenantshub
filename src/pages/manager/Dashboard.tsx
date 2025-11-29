@@ -8,7 +8,7 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -32,6 +32,7 @@ import { PaymentBroadcastWidget } from "@/components/PaymentBroadcastWidget";
 import { DailyRepaymentCalculatorDialog } from "@/components/DailyRepaymentCalculatorDialog";
 import { useManagerTutorial } from "@/hooks/useManagerTutorial";
 import ManagerPaymentDialog from "@/components/ManagerPaymentDialog";
+import BatchPaymentDialog from "@/components/BatchPaymentDialog";
 import AgentsList from "@/components/AgentsListWidget";
 import { SkeletonWrapper } from "@/components/SkeletonWrapper";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -55,6 +56,7 @@ const ManagerDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [batchPaymentDialogOpen, setBatchPaymentDialogOpen] = useState(false);
   const [showTenantSearch, setShowTenantSearch] = useState(false);
   const [showAgentSearch, setShowAgentSearch] = useState(false);
   const [tenantSearchQuery, setTenantSearchQuery] = useState("");
@@ -893,7 +895,7 @@ const ManagerDashboard = () => {
             </Card>
 
           {/* Broadcast Messaging Feature */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card id="bulk-messaging" className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -964,6 +966,33 @@ const ManagerDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+
+            <Card className="bg-gradient-to-r from-blue-500/10 to-blue-600/5 border-blue-500/20">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <Wallet className="h-5 w-5" />
+                      Batch Payments
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Record multiple payments at once
+                    </p>
+                  </div>
+                  <Button 
+                    size="lg"
+                    className="bg-blue-600 hover:bg-blue-700"
+                    onClick={() => {
+                      setBatchPaymentDialogOpen(true);
+                      haptics.light();
+                    }}
+                  >
+                    <Save className="h-5 w-5 mr-2" />
+                    Batch
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           <DailyRepaymentCalculatorDialog
@@ -974,6 +1003,11 @@ const ManagerDashboard = () => {
           <ManagerPaymentDialog
             open={paymentDialogOpen}
             onOpenChange={setPaymentDialogOpen}
+          />
+
+          <BatchPaymentDialog
+            open={batchPaymentDialogOpen}
+            onOpenChange={setBatchPaymentDialogOpen}
           />
 
 
