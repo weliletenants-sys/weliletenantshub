@@ -56,6 +56,7 @@ const ManagerDashboard = () => {
     totalVerifiedCommission: 0,
   });
   const [commissionByMethod, setCommissionByMethod] = useState<any[]>([]);
+  const [topAgentsByCommission, setTopAgentsByCommission] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -557,6 +558,9 @@ const ManagerDashboard = () => {
 
         setCommissionByMethod(commissionMethodData);
 
+        // Fetch top agents by commission
+        await fetchTopAgentsByCommission();
+
         setStats({
           totalAgents,
           activeAgents: totalAgents,
@@ -685,6 +689,9 @@ const ManagerDashboard = () => {
 
     setCommissionByMethod(commissionMethodData);
 
+    // Refresh top agents leaderboard
+    await fetchTopAgentsByCommission();
+
     setStats(prev => ({
       ...prev,
       totalAgents,
@@ -699,6 +706,78 @@ const ManagerDashboard = () => {
     }));
 
     toast.success("Dashboard refreshed");
+  };
+
+  const fetchTopAgentsByCommission = async () => {
+    try {
+      // Fetch all verified collections with agent info
+      const { data: verifiedCollections } = await supabase
+        .from("collections")
+        .select(`
+          commission,
+          payment_method,
+          agent_id,
+          agents!inner(
+            id,
+            user_id,
+            profiles!agents_user_id_fkey(
+              full_name,
+              phone_number
+            )
+          )
+        `)
+        .eq("status", "verified");
+
+      if (!verifiedCollections) return;
+
+      // Group by agent and calculate totals
+      const agentCommissionMap = new Map();
+
+      verifiedCollections.forEach((collection: any) => {
+        const agentId = collection.agent_id;
+        const agentName = collection.agents?.profiles?.full_name || collection.agents?.profiles?.phone_number || 'Unknown Agent';
+        const commission = parseFloat(collection.commission?.toString() || '0');
+        const paymentMethod = collection.payment_method || 'cash';
+
+        if (!agentCommissionMap.has(agentId)) {
+          agentCommissionMap.set(agentId, {
+            agentId,
+            agentName,
+            totalCommission: 0,
+            paymentMethods: { cash: 0, mtn: 0, airtel: 0 },
+            paymentCount: 0,
+          });
+        }
+
+        const agentData = agentCommissionMap.get(agentId);
+        agentData.totalCommission += commission;
+        agentData.paymentMethods[paymentMethod] = (agentData.paymentMethods[paymentMethod] || 0) + 1;
+        agentData.paymentCount += 1;
+      });
+
+      // Convert to array and calculate preferred payment method
+      const agentLeaderboard = Array.from(agentCommissionMap.values()).map(agent => {
+        const preferredMethod = Object.entries(agent.paymentMethods)
+          .sort((a, b) => (b[1] as number) - (a[1] as number))[0][0];
+        
+        const preferredMethodDisplay = 
+          preferredMethod === 'cash' ? 'Cash' :
+          preferredMethod === 'mtn' ? 'MTN Mobile Money' :
+          'Airtel Money';
+
+        return {
+          ...agent,
+          preferredMethod: preferredMethodDisplay,
+        };
+      });
+
+      // Sort by total commission (descending) and take top 5
+      agentLeaderboard.sort((a, b) => b.totalCommission - a.totalCommission);
+      setTopAgentsByCommission(agentLeaderboard.slice(0, 5));
+    } catch (error) {
+      console.error("Error fetching top agents by commission:", error);
+      setTopAgentsByCommission([]);
+    }
   };
 
   const fetchPaymentMethodBreakdown = async () => {
@@ -2031,71 +2110,142 @@ const ManagerDashboard = () => {
           </Card>
         </div>
 
-        {/* Commission Breakdown by Payment Method */}
-        <Card className="border-green-500/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-green-600" />
-              Commission Breakdown by Payment Method
-            </CardTitle>
-            <CardDescription>
-              Total verified commissions earned across all payment methods
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {commissionByMethod.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No commission data available yet</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {commissionByMethod.map((item, index) => (
-                  <div key={item.method} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`h-3 w-3 rounded-full ${
-                          item.method === 'Cash' ? 'bg-blue-500' :
-                          item.method === 'MTN Mobile Money' ? 'bg-yellow-500' :
-                          'bg-red-500'
-                        }`} />
-                        <span className="font-medium text-sm">{item.method}</span>
+        {/* Commission Stats Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Commission Breakdown by Payment Method */}
+          <Card className="border-green-500/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-green-600" />
+                Commission Breakdown by Payment Method
+              </CardTitle>
+              <CardDescription>
+                Total verified commissions earned across all payment methods
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {commissionByMethod.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No commission data available yet</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {commissionByMethod.map((item, index) => (
+                    <div key={item.method} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`h-3 w-3 rounded-full ${
+                            item.method === 'Cash' ? 'bg-blue-500' :
+                            item.method === 'MTN Mobile Money' ? 'bg-yellow-500' :
+                            'bg-red-500'
+                          }`} />
+                          <span className="font-medium text-sm">{item.method}</span>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-green-700">
+                            UGX {item.commission.toLocaleString()}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.percentage.toFixed(1)}% of total
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-bold text-green-700">
-                          UGX {item.commission.toLocaleString()}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.percentage.toFixed(1)}% of total
-                        </p>
+                      <div className="w-full bg-muted rounded-full h-3">
+                        <div 
+                          className={`h-3 rounded-full transition-all ${
+                            item.method === 'Cash' ? 'bg-blue-500' :
+                            item.method === 'MTN Mobile Money' ? 'bg-yellow-500' :
+                            'bg-red-500'
+                          }`}
+                          style={{ width: `${item.percentage}%` }}
+                        />
                       </div>
                     </div>
-                    <div className="w-full bg-muted rounded-full h-3">
-                      <div 
-                        className={`h-3 rounded-full transition-all ${
-                          item.method === 'Cash' ? 'bg-blue-500' :
-                          item.method === 'MTN Mobile Money' ? 'bg-yellow-500' :
-                          'bg-red-500'
-                        }`}
-                        style={{ width: `${item.percentage}%` }}
-                      />
+                  ))}
+                  
+                  {/* Summary */}
+                  <div className="pt-4 border-t border-border">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-semibold">Total Commission (All Methods)</span>
+                      <span className="font-bold text-green-700 text-lg">
+                        UGX {stats.totalVerifiedCommission.toLocaleString()}
+                      </span>
                     </div>
-                  </div>
-                ))}
-                
-                {/* Summary */}
-                <div className="pt-4 border-t border-border">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-semibold">Total Commission (All Methods)</span>
-                    <span className="font-bold text-green-700 text-lg">
-                      UGX {stats.totalVerifiedCommission.toLocaleString()}
-                    </span>
                   </div>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Top Agents by Commission Leaderboard */}
+          <Card className="border-amber-500/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="h-5 w-5 text-amber-500" />
+                Top Agents by Commission
+              </CardTitle>
+              <CardDescription>
+                Highest earning agents from verified payments
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {topAgentsByCommission.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Award className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No commission data available yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {topAgentsByCommission.map((agent, index) => (
+                    <div
+                      key={agent.agentId}
+                      className="p-4 rounded-lg border bg-card hover:shadow-md transition-all cursor-pointer hover:border-amber-500/50"
+                      onClick={() => {
+                        haptics.light();
+                        navigate(`/manager/agents/${agent.agentId}`);
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+                            index === 0 ? 'bg-amber-500 text-white' :
+                            index === 1 ? 'bg-gray-400 text-white' :
+                            index === 2 ? 'bg-amber-700 text-white' :
+                            'bg-muted text-muted-foreground'
+                          }`}>
+                            #{index + 1}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm">{agent.agentName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {agent.paymentCount} payment{agent.paymentCount !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-green-700">
+                            UGX {agent.totalCommission.toLocaleString()}
+                          </p>
+                          <div className="flex items-center gap-1 mt-1">
+                            <div className={`h-2 w-2 rounded-full ${
+                              agent.preferredMethod === 'Cash' ? 'bg-blue-500' :
+                              agent.preferredMethod === 'MTN Mobile Money' ? 'bg-yellow-500' :
+                              'bg-red-500'
+                            }`} />
+                            <p className="text-xs text-muted-foreground">
+                              {agent.preferredMethod}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Live Activity Feed */}
         <div id="activity-feed">
