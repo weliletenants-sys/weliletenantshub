@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Calculator, Copy, ListOrdered } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Calculator, Copy, ListOrdered, Save, FolderOpen, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 
@@ -16,6 +17,13 @@ interface BulkResult {
   day30: number;
   day60: number;
   day90: number;
+}
+
+interface SavedTemplate {
+  id: string;
+  name: string;
+  amounts: string;
+  createdAt: string;
 }
 
 const calculateDailyRate = (rent: number, days: number): number => {
@@ -37,6 +45,29 @@ const ManagerCalculatorPage = () => {
   // Bulk mode state
   const [bulkInput, setBulkInput] = useState<string>("");
   const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
+
+  // Template state
+  const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [loadDialogOpen, setLoadDialogOpen] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+
+  // Load saved templates from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("calculator-templates-manager");
+    if (saved) {
+      try {
+        setSavedTemplates(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to load templates:", e);
+      }
+    }
+  }, []);
+
+  // Save templates to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem("calculator-templates-manager", JSON.stringify(savedTemplates));
+  }, [savedTemplates]);
 
   const calculateDailyRepayment = () => {
     const rent = parseFloat(rentAmount);
@@ -170,6 +201,55 @@ const ManagerCalculatorPage = () => {
     haptics.light();
   };
 
+  const saveAsTemplate = () => {
+    if (!bulkInput.trim()) {
+      toast.error("Please enter rent amounts before saving");
+      return;
+    }
+
+    if (!templateName.trim()) {
+      toast.error("Please enter a template name");
+      return;
+    }
+
+    if (templateName.length > 50) {
+      toast.error("Template name must be less than 50 characters");
+      return;
+    }
+
+    if (savedTemplates.length >= 20) {
+      toast.error("Maximum 20 templates allowed. Delete some to add new ones.");
+      return;
+    }
+
+    const newTemplate: SavedTemplate = {
+      id: Date.now().toString(),
+      name: templateName.trim(),
+      amounts: bulkInput.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    setSavedTemplates([...savedTemplates, newTemplate]);
+    setTemplateName("");
+    setSaveDialogOpen(false);
+    toast.success(`Template "${newTemplate.name}" saved!`);
+    haptics.success();
+  };
+
+  const loadTemplate = (template: SavedTemplate) => {
+    setBulkInput(template.amounts);
+    setLoadDialogOpen(false);
+    toast.success(`Template "${template.name}" loaded!`);
+    haptics.light();
+  };
+
+  const deleteTemplate = (id: string) => {
+    const template = savedTemplates.find(t => t.id === id);
+    setSavedTemplates(savedTemplates.filter(t => t.id !== id));
+    toast.success(`Template "${template?.name}" deleted`);
+    haptics.light();
+  };
+
   return (
     <ManagerLayout currentPage="/manager/calculator">
       <div className="max-w-4xl mx-auto">
@@ -255,12 +335,101 @@ const ManagerCalculatorPage = () => {
 
               <TabsContent value="bulk" className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="bulk-input">
-                    Enter Multiple Rent Amounts
-                    <span className="text-sm text-muted-foreground ml-2">
-                      (comma-separated or one per line, max 50)
-                    </span>
-                  </Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label htmlFor="bulk-input">
+                      Enter Multiple Rent Amounts
+                      <span className="text-sm text-muted-foreground ml-2">
+                        (comma-separated or one per line, max 50)
+                      </span>
+                    </Label>
+                    <div className="flex gap-2">
+                      <Dialog open={loadDialogOpen} onOpenChange={setLoadDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <FolderOpen className="h-4 w-4 mr-2" />
+                            Load Template
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Load Saved Template</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                            {savedTemplates.length === 0 ? (
+                              <p className="text-sm text-muted-foreground text-center py-8">
+                                No saved templates yet. Save your first template to reuse rent amount sets.
+                              </p>
+                            ) : (
+                              savedTemplates.map((template) => (
+                                <div
+                                  key={template.id}
+                                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium truncate">{template.name}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {new Date(template.createdAt).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                  <div className="flex gap-2 ml-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => loadTemplate(template)}
+                                    >
+                                      Load
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => deleteTemplate(template.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+
+                      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Template
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Save as Template</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="template-name">Template Name</Label>
+                              <Input
+                                id="template-name"
+                                placeholder="e.g., Standard Properties"
+                                value={templateName}
+                                onChange={(e) => setTemplateName(e.target.value.slice(0, 50))}
+                                maxLength={50}
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Give your template a descriptive name for easy identification
+                              </p>
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <Button onClick={saveAsTemplate} className="w-full">
+                              <Save className="h-4 w-4 mr-2" />
+                              Save Template
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
                   <Textarea
                     id="bulk-input"
                     placeholder="e.g., 100000, 200000, 350000&#10;or one per line"
