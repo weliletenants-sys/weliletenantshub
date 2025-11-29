@@ -518,15 +518,70 @@ const AgentEarnings = () => {
           </CardContent>
         </Card>
 
-        {recentCollections.length > 0 && (
+        {/* Pending Payments Section */}
+        {recentCollections.filter((c: any) => c.status === 'pending').length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Recent Collections This Month</CardTitle>
-              <CardDescription>Your latest commission earnings</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-amber-500" />
+                Pending Verification
+              </CardTitle>
+              <CardDescription>
+                Payments awaiting manager approval
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                 {recentCollections.map((collection, idx) => (
+                {recentCollections
+                  .filter((c: any) => c.status === 'pending')
+                  .map((collection: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-3 border border-amber-500/30 rounded-lg bg-amber-500/5 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                          <Clock className="h-5 w-5 text-amber-500" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{collection.tenants?.tenant_name || 'Unknown'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(collection.collection_date).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Payment: UGX {collection.amount.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-amber-600 text-lg">
+                          UGX {collection.commission.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Pending</p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {recentCollections.filter((c: any) => c.status === 'verified').length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Verified Collections</CardTitle>
+              <CardDescription>Your latest verified commission earnings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {recentCollections
+                  .filter((c: any) => c.status === 'verified')
+                  .slice(0, 10)
+                  .map((collection, idx) => (
                   <div key={idx} className="flex items-center justify-between p-3 border rounded-lg hover:shadow-md transition-shadow">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -546,13 +601,14 @@ const AgentEarnings = () => {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-success text-lg">+UGX {collection.commission.toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground">Commission (5%)</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {((collection.commission / collection.amount) * 100).toFixed(1)}% of payment
-                      </p>
-                    </div>
+                      <div className="text-right">
+                        <p className="font-bold text-success text-lg">+UGX {collection.commission.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">Commission (5%)</p>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                          <CheckCircle2 className="h-3 w-3 text-success" />
+                          Verified
+                        </div>
+                      </div>
                   </div>
                 ))}
               </div>

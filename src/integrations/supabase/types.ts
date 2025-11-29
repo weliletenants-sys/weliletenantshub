@@ -193,6 +193,8 @@ export type Database = {
           collection_date: string
           commission: number
           created_at: string
+          created_by: string | null
+          created_by_manager: boolean | null
           id: string
           payment_method: string | null
           rejection_reason: string | null
@@ -207,6 +209,8 @@ export type Database = {
           collection_date?: string
           commission: number
           created_at?: string
+          created_by?: string | null
+          created_by_manager?: boolean | null
           id?: string
           payment_method?: string | null
           rejection_reason?: string | null
@@ -221,6 +225,8 @@ export type Database = {
           collection_date?: string
           commission?: number
           created_at?: string
+          created_by?: string | null
+          created_by_manager?: boolean | null
           id?: string
           payment_method?: string | null
           rejection_reason?: string | null
