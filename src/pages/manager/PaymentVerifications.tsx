@@ -23,8 +23,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import PaymentReceipt from "@/components/PaymentReceipt";
-import { useOptimisticPaymentVerification, useOptimisticPaymentRejection } from "@/hooks/useOptimisticPaymentVerification";
+import { useOptimisticPaymentVerification, useOptimisticPaymentRejection, useUndoPaymentAction } from "@/hooks/useOptimisticPaymentVerification";
 import { haptics } from "@/utils/haptics";
+import { Undo2 } from "lucide-react";
 
 interface Payment {
   id: string;
@@ -66,6 +67,10 @@ const PaymentVerifications = () => {
   // Optimistic mutations
   const verifyMutation = useOptimisticPaymentVerification();
   const rejectMutation = useOptimisticPaymentRejection();
+  const undoMutation = useUndoPaymentAction();
+  
+  // Track recent actions for undo (paymentId -> {undoData, toastId, timeoutId})
+  const [recentActions, setRecentActions] = useState<Map<string, any>>(new Map());
 
   // Fetch all payments
   const { data: payments, isLoading } = useQuery({
@@ -127,16 +132,59 @@ const PaymentVerifications = () => {
     };
   }, [queryClient]);
 
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      recentActions.forEach(action => {
+        if (action.timeoutId) {
+          clearTimeout(action.timeoutId);
+        }
+      });
+    };
+  }, [recentActions]);
+
   const handleVerify = async (payment: Payment) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       haptics.light();
-      await verifyMutation.mutateAsync({
+      const result = await verifyMutation.mutateAsync({
         paymentId: payment.id,
         managerId: user.id
       });
+
+      // Store undo data
+      const undoData = {
+        paymentId: payment.id,
+        previousStatus: verifyMutation.context?.previousStatus || payment.status || 'pending',
+        previousVerifiedBy: verifyMutation.context?.previousVerifiedBy || payment.verified_by,
+        previousVerifiedAt: verifyMutation.context?.previousVerifiedAt || payment.verified_at,
+        previousRejectionReason: verifyMutation.context?.previousRejectionReason || payment.rejection_reason,
+        tenantName: payment.tenants.tenant_name
+      };
+
+      // Show undo toast with 120 second duration
+      const toastId = toast.success(`Payment verified for ${payment.tenants.tenant_name}`, {
+        description: 'Tap Undo to revert this action',
+        duration: 120000, // 120 seconds
+        action: {
+          label: 'Undo',
+          onClick: () => handleUndo(payment.id),
+        },
+      });
+
+      // Set timeout to remove from recentActions after 120 seconds
+      const timeoutId = setTimeout(() => {
+        setRecentActions(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(payment.id);
+          return newMap;
+        });
+      }, 120000);
+
+      // Track this action
+      setRecentActions(prev => new Map(prev).set(payment.id, { undoData, toastId, timeoutId }));
     } catch (error) {
       console.error("Error verifying payment:", error);
     }
@@ -181,17 +229,79 @@ const PaymentVerifications = () => {
       if (!user) throw new Error("Not authenticated");
 
       haptics.light();
-      await rejectMutation.mutateAsync({
+      const result = await rejectMutation.mutateAsync({
         paymentId: selectedPayment.id,
         managerId: user.id,
         reason: rejectionReason
       });
+
+      // Store undo data
+      const undoData = {
+        paymentId: selectedPayment.id,
+        previousStatus: rejectMutation.context?.previousStatus || selectedPayment.status || 'pending',
+        previousVerifiedBy: rejectMutation.context?.previousVerifiedBy || selectedPayment.verified_by,
+        previousVerifiedAt: rejectMutation.context?.previousVerifiedAt || selectedPayment.verified_at,
+        previousRejectionReason: rejectMutation.context?.previousRejectionReason || selectedPayment.rejection_reason,
+        tenantName: selectedPayment.tenants.tenant_name
+      };
+
+      // Show undo toast with 120 second duration
+      const toastId = toast.error(`Payment rejected for ${selectedPayment.tenants.tenant_name}`, {
+        description: 'Tap Undo to revert this action',
+        duration: 120000, // 120 seconds
+        action: {
+          label: 'Undo',
+          onClick: () => handleUndo(selectedPayment.id),
+        },
+      });
+
+      // Set timeout to remove from recentActions after 120 seconds
+      const timeoutId = setTimeout(() => {
+        setRecentActions(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(selectedPayment.id);
+          return newMap;
+        });
+      }, 120000);
+
+      // Track this action
+      setRecentActions(prev => new Map(prev).set(selectedPayment.id, { undoData, toastId, timeoutId }));
       
       setShowRejectDialog(false);
       setSelectedPayment(null);
       setRejectionReason("");
     } catch (error) {
       console.error("Error rejecting payment:", error);
+    }
+  };
+
+  const handleUndo = async (paymentId: string) => {
+    const actionData = recentActions.get(paymentId);
+    if (!actionData) {
+      toast.error("Cannot undo: action expired or not found");
+      return;
+    }
+
+    try {
+      // Clear the timeout
+      if (actionData.timeoutId) {
+        clearTimeout(actionData.timeoutId);
+      }
+
+      // Dismiss the original toast
+      toast.dismiss(actionData.toastId);
+
+      // Perform undo
+      await undoMutation.mutateAsync(actionData.undoData);
+
+      // Remove from recent actions
+      setRecentActions(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(paymentId);
+        return newMap;
+      });
+    } catch (error) {
+      console.error("Error undoing action:", error);
     }
   };
 
