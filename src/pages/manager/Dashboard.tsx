@@ -57,6 +57,7 @@ const ManagerDashboard = () => {
   });
   const [commissionByMethod, setCommissionByMethod] = useState<any[]>([]);
   const [topAgentsByCommission, setTopAgentsByCommission] = useState<any[]>([]);
+  const [commissionTimePeriod, setCommissionTimePeriod] = useState<'7d' | '30d' | 'all'>('30d');
   const [isLoading, setIsLoading] = useState(true);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -558,8 +559,8 @@ const ManagerDashboard = () => {
 
         setCommissionByMethod(commissionMethodData);
 
-        // Fetch top agents by commission
-        await fetchTopAgentsByCommission();
+        // Fetch top agents by commission (default to 30 days)
+        await fetchTopAgentsByCommission('30d');
 
         setStats({
           totalAgents,
@@ -689,8 +690,8 @@ const ManagerDashboard = () => {
 
     setCommissionByMethod(commissionMethodData);
 
-    // Refresh top agents leaderboard
-    await fetchTopAgentsByCommission();
+    // Refresh top agents leaderboard with current time period
+    await fetchTopAgentsByCommission(commissionTimePeriod);
 
     setStats(prev => ({
       ...prev,
@@ -708,15 +709,16 @@ const ManagerDashboard = () => {
     toast.success("Dashboard refreshed");
   };
 
-  const fetchTopAgentsByCommission = async () => {
+  const fetchTopAgentsByCommission = async (timePeriod: '7d' | '30d' | 'all' = '30d') => {
     try {
-      // Fetch all verified collections with agent info
-      const { data: verifiedCollections } = await supabase
+      // Build date filter based on time period
+      let dateFilter: any = supabase
         .from("collections")
         .select(`
           commission,
           payment_method,
           agent_id,
+          collection_date,
           agents!inner(
             id,
             user_id,
@@ -727,6 +729,18 @@ const ManagerDashboard = () => {
           )
         `)
         .eq("status", "verified");
+
+      // Apply date range filter
+      if (timePeriod !== 'all') {
+        const now = new Date();
+        const daysAgo = timePeriod === '7d' ? 7 : 30;
+        const startDate = new Date(now);
+        startDate.setDate(startDate.getDate() - daysAgo);
+        
+        dateFilter = dateFilter.gte("collection_date", startDate.toISOString().split('T')[0]);
+      }
+
+      const { data: verifiedCollections } = await dateFilter;
 
       if (!verifiedCollections) return;
 
@@ -2181,19 +2195,63 @@ const ManagerDashboard = () => {
           {/* Top Agents by Commission Leaderboard */}
           <Card className="border-amber-500/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Award className="h-5 w-5 text-amber-500" />
-                Top Agents by Commission
-              </CardTitle>
-              <CardDescription>
-                Highest earning agents from verified payments
-              </CardDescription>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Award className="h-5 w-5 text-amber-500" />
+                    Top Agents by Commission
+                  </CardTitle>
+                  <CardDescription>
+                    Highest earning agents from verified payments
+                  </CardDescription>
+                </div>
+              </div>
+              
+              {/* Time Period Filter Buttons */}
+              <div className="flex gap-2 mt-4">
+                <Button
+                  size="sm"
+                  variant={commissionTimePeriod === '7d' ? 'default' : 'outline'}
+                  onClick={() => {
+                    setCommissionTimePeriod('7d');
+                    fetchTopAgentsByCommission('7d');
+                    haptics.light();
+                  }}
+                  className="text-xs"
+                >
+                  Last 7 Days
+                </Button>
+                <Button
+                  size="sm"
+                  variant={commissionTimePeriod === '30d' ? 'default' : 'outline'}
+                  onClick={() => {
+                    setCommissionTimePeriod('30d');
+                    fetchTopAgentsByCommission('30d');
+                    haptics.light();
+                  }}
+                  className="text-xs"
+                >
+                  Last 30 Days
+                </Button>
+                <Button
+                  size="sm"
+                  variant={commissionTimePeriod === 'all' ? 'default' : 'outline'}
+                  onClick={() => {
+                    setCommissionTimePeriod('all');
+                    fetchTopAgentsByCommission('all');
+                    haptics.light();
+                  }}
+                  className="text-xs"
+                >
+                  All Time
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {topAgentsByCommission.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Award className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>No commission data available yet</p>
+                  <p>No commission data available for this period</p>
                 </div>
               ) : (
                 <div className="space-y-3">
