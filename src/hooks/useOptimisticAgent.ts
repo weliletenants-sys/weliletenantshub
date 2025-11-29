@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { haptics } from '@/utils/haptics';
+import { useOptimisticStatusStore } from './useOptimisticStatus';
 
 interface SuspendAgentData {
   agentId: string;
@@ -39,6 +40,7 @@ interface DeleteAgentData {
  */
 export const useOptimisticAgentSuspension = () => {
   const queryClient = useQueryClient();
+  const { addOperation, updateOperation } = useOptimisticStatusStore();
 
   return useMutation({
     mutationFn: async (data: SuspendAgentData) => {

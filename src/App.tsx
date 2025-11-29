@@ -16,6 +16,7 @@ import { changelog } from "@/data/changelog";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 import { PerformanceIndicator } from "@/components/PerformanceIndicator";
+import { OptimisticStatusIndicator } from "@/components/OptimisticStatusIndicator";
 
 // Eagerly load critical pages
 import Index from "./pages/Index";
@@ -110,6 +111,7 @@ const AppContent = () => {
       <Sonner />
       <InstallReminderProvider />
       <PerformanceIndicator />
+      <OptimisticStatusIndicator />
       
       {/* Changelog Dialog - Shows after updates */}
       <ChangelogDialog

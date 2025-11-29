@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { haptics } from '@/utils/haptics';
 import type { Tables } from '@/integrations/supabase/types';
+import { useOptimisticStatusStore } from './useOptimisticStatus';
 
 type Tenant = Tables<'tenants'>;
 
@@ -49,6 +50,7 @@ interface UpdateTenantData {
  */
 export const useOptimisticTenantDeletion = () => {
   const queryClient = useQueryClient();
+  const { addOperation, updateOperation } = useOptimisticStatusStore();
 
   return useMutation({
     mutationFn: async (data: DeleteTenantData) => {
@@ -84,6 +86,9 @@ export const useOptimisticTenantDeletion = () => {
     },
 
     onMutate: async (data) => {
+      // Track operation
+      const operationId = addOperation('delete-tenant', `Deleting ${data.tenantName}`);
+
       // Cancel outgoing queries
       await queryClient.cancelQueries({ queryKey: ['tenants', data.agentId] });
       await queryClient.cancelQueries({ queryKey: ['tenant', data.tenantId] });
@@ -105,10 +110,15 @@ export const useOptimisticTenantDeletion = () => {
       // Instant haptic feedback
       haptics.light();
 
-      return { previousTenants, previousTenant };
+      return { previousTenants, previousTenant, operationId };
     },
 
     onError: (error, data, context) => {
+      // Update operation status
+      if (context?.operationId) {
+        updateOperation(context.operationId, 'error', error instanceof Error ? error.message : 'Failed to delete');
+      }
+
       // Rollback on error
       if (context?.previousTenants) {
         queryClient.setQueryData(['tenants', data.agentId], context.previousTenants);
@@ -123,7 +133,12 @@ export const useOptimisticTenantDeletion = () => {
       });
     },
 
-    onSuccess: () => {
+    onSuccess: (result, data, context) => {
+      // Update operation status
+      if (context?.operationId) {
+        updateOperation(context.operationId, 'success');
+      }
+
       haptics.success();
       toast.success("Tenant deleted successfully");
     },
@@ -141,6 +156,7 @@ export const useOptimisticTenantDeletion = () => {
  */
 export const useOptimisticTenantTransfer = () => {
   const queryClient = useQueryClient();
+  const { addOperation, updateOperation } = useOptimisticStatusStore();
 
   return useMutation({
     mutationFn: async (data: TransferTenantData) => {
@@ -188,6 +204,9 @@ export const useOptimisticTenantTransfer = () => {
     },
 
     onMutate: async (data) => {
+      // Track operation
+      const operationId = addOperation('transfer-tenant', `Transferring ${data.tenantName} to ${data.newAgentName}`);
+
       // Cancel outgoing queries
       await queryClient.cancelQueries({ queryKey: ['tenants', data.currentAgentId] });
       await queryClient.cancelQueries({ queryKey: ['tenants', data.newAgentId] });
@@ -219,10 +238,15 @@ export const useOptimisticTenantTransfer = () => {
       // Instant haptic feedback
       haptics.light();
 
-      return { previousCurrentAgentTenants, previousNewAgentTenants, previousTenant };
+      return { previousCurrentAgentTenants, previousNewAgentTenants, previousTenant, operationId };
     },
 
     onError: (error, data, context) => {
+      // Update operation status
+      if (context?.operationId) {
+        updateOperation(context.operationId, 'error', error instanceof Error ? error.message : 'Failed to transfer');
+      }
+
       // Rollback on error
       if (context?.previousCurrentAgentTenants) {
         queryClient.setQueryData(['tenants', data.currentAgentId], context.previousCurrentAgentTenants);
@@ -240,7 +264,12 @@ export const useOptimisticTenantTransfer = () => {
       });
     },
 
-    onSuccess: (result, data) => {
+    onSuccess: (result, data, context) => {
+      // Update operation status
+      if (context?.operationId) {
+        updateOperation(context.operationId, 'success');
+      }
+
       haptics.success();
       toast.success(`Tenant transferred to ${data.newAgentName} successfully`);
     },
@@ -260,6 +289,7 @@ export const useOptimisticTenantTransfer = () => {
  */
 export const useOptimisticTenantUpdate = () => {
   const queryClient = useQueryClient();
+  const { addOperation, updateOperation } = useOptimisticStatusStore();
 
   return useMutation({
     mutationFn: async (data: UpdateTenantData) => {
@@ -274,6 +304,10 @@ export const useOptimisticTenantUpdate = () => {
     },
 
     onMutate: async (data) => {
+      // Track operation
+      const tenantName = data.updates.tenant_name || 'tenant';
+      const operationId = addOperation('update-tenant', `Updating ${tenantName}`);
+
       // Cancel outgoing queries
       await queryClient.cancelQueries({ queryKey: ['tenant', data.tenantId] });
       await queryClient.cancelQueries({ queryKey: ['tenants', data.agentId] });
@@ -297,10 +331,15 @@ export const useOptimisticTenantUpdate = () => {
       // Instant haptic feedback
       haptics.light();
 
-      return { previousTenant, previousTenants };
+      return { previousTenant, previousTenants, operationId };
     },
 
     onError: (error, data, context) => {
+      // Update operation status
+      if (context?.operationId) {
+        updateOperation(context.operationId, 'error', error instanceof Error ? error.message : 'Failed to update');
+      }
+
       // Rollback on error
       if (context?.previousTenant) {
         queryClient.setQueryData(['tenant', data.tenantId], context.previousTenant);
@@ -315,7 +354,12 @@ export const useOptimisticTenantUpdate = () => {
       });
     },
 
-    onSuccess: () => {
+    onSuccess: (result, data, context) => {
+      // Update operation status
+      if (context?.operationId) {
+        updateOperation(context.operationId, 'success');
+      }
+
       haptics.success();
       toast.success("Tenant updated successfully");
     },
