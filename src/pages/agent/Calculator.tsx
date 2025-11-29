@@ -308,6 +308,26 @@ const CalculatorPage = () => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     
+    // Helper function to add purple header with logo
+    const addPurpleHeader = () => {
+      // Purple background header
+      doc.setFillColor(107, 45, 197); // Purple #6B2DC5
+      doc.rect(0, 0, pageWidth, 50, 'F');
+      
+      // Load and add Welile logo on purple background
+      const img = new Image();
+      img.src = '/welile-logo-pdf.jpg';
+      doc.addImage(img, 'JPEG', 15, 5, 40, 40);
+      
+      // Custom header text on purple background if provided
+      if (pdfHeader) {
+        doc.setTextColor(255, 255, 255); // White text on purple
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text(pdfHeader, 60, 25);
+      }
+    };
+    
     // Helper function to add footer to a page
     const addFooter = (pageNum: number, totalPages: number) => {
       if (pdfFooter) {
@@ -329,41 +349,28 @@ const CalculatorPage = () => {
     };
     
     // Calculate total pages needed
-    const itemsPerPage = Math.floor((pageHeight - 100) / 8);
+    const itemsPerPage = Math.floor((pageHeight - 110) / 8);
     const totalPages = Math.ceil(bulkResults.length / itemsPerPage);
     
-    // Load and add Welile logo
-    const img = new Image();
-    img.src = '/welile-logo-pdf.jpg';
+    // Add purple header with logo to first page
+    addPurpleHeader();
     
-    // Add logo (40x40 size, positioned in top-left)
-    doc.addImage(img, 'JPEG', 15, 5, 40, 40);
-    
-    // Custom header text if provided
-    if (pdfHeader) {
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
-      doc.text(pdfHeader, 60, 20);
-    }
-    
-    // Title
+    // Title below purple header
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(16);
-    const titleYPos = 55;
-    doc.text("Daily Repayment Rates - Bulk Calculation", 15, titleYPos);
+    doc.setFont(undefined, 'bold');
+    doc.text("Daily Repayment Rates - Bulk Calculation", 15, 65);
     
     // Agent name and date
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    const metaYPos = 63;
     if (pdfName) {
-      doc.text(`Prepared by: ${pdfName}`, 15, metaYPos);
+      doc.text(`Prepared by: ${pdfName}`, 15, 73);
     }
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 15, metaYPos + 6);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 15, 79);
     
     // Table headers
-    let yPos = 80;
+    let yPos = 90;
     doc.setFontSize(10);
     doc.setFont(undefined, 'bold');
     doc.text("Rent Amount", 15, yPos);
@@ -386,11 +393,12 @@ const CalculatorPage = () => {
         doc.addPage();
         currentPage++;
         
-        // Add logo on new pages too
-        doc.addImage(img, 'JPEG', 15, 5, 40, 40);
-        yPos = 55;
+        // Add purple header with logo on new pages
+        addPurpleHeader();
+        yPos = 65;
         
         // Re-add table headers on new page
+        doc.setTextColor(0, 0, 0);
         doc.setFont(undefined, 'bold');
         doc.text("Rent Amount", 15, yPos);
         doc.text("30 Days", 70, yPos);
