@@ -31,6 +31,8 @@ import { PaymentBroadcastWidget } from "@/components/PaymentBroadcastWidget";
 import { DailyRepaymentCalculatorDialog } from "@/components/DailyRepaymentCalculatorDialog";
 import { useManagerTutorial } from "@/hooks/useManagerTutorial";
 import ManagerPaymentDialog from "@/components/ManagerPaymentDialog";
+import AgentsList from "@/components/AgentsListWidget";
+import { SkeletonWrapper } from "@/components/SkeletonWrapper";
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -1453,6 +1455,55 @@ const ManagerDashboard = () => {
           <div id="payment-broadcast">
             <PaymentBroadcastWidget />
           </div>
+
+          {/* Agents Quick List */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary" />
+                    Your Agents
+                  </CardTitle>
+                  <CardDescription>
+                    Quick access to agent profiles and tenants
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/manager/agents")}
+                >
+                  View All
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <SkeletonWrapper 
+                loading={isLoading}
+                skeleton={
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex items-center gap-3 p-3 border rounded-lg">
+                        <Skeleton className="h-12 w-12 rounded-full" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-48" />
+                        </div>
+                        <Skeleton className="h-9 w-24" />
+                      </div>
+                    ))}
+                  </div>
+                }
+              >
+                <AgentsList 
+                  onPaymentClick={() => {
+                    setPaymentDialogOpen(true);
+                    haptics.light();
+                  }}
+                />
+              </SkeletonWrapper>
+            </CardContent>
+          </Card>
 
           {/* Admin Access Card */}
         <Card className="bg-primary/10 border-primary/20">
