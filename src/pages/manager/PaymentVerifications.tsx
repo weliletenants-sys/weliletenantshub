@@ -23,6 +23,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import PaymentReceipt from "@/components/PaymentReceipt";
+import { useOptimisticPaymentVerification, useOptimisticPaymentRejection } from "@/hooks/useOptimisticPaymentVerification";
+import { haptics } from "@/utils/haptics";
 
 interface Payment {
   id: string;
@@ -60,6 +62,10 @@ const PaymentVerifications = () => {
   const [loadingTenant, setLoadingTenant] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [activeTab, setActiveTab] = useState<string>("pending");
+  
+  // Optimistic mutations
+  const verifyMutation = useOptimisticPaymentVerification();
+  const rejectMutation = useOptimisticPaymentRejection();
 
   // Fetch all payments
   const { data: payments, isLoading } = useQuery({
@@ -121,68 +127,19 @@ const PaymentVerifications = () => {
     };
   }, [queryClient]);
 
-  // Verify payment mutation
-  const verifyMutation = useMutation({
-    mutationFn: async (paymentId: string) => {
+  const handleVerify = async (payment: Payment) => {
+    try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { error } = await supabase
-        .from("collections")
-        .update({
-          status: "verified",
-          verified_by: user.id,
-          verified_at: new Date().toISOString(),
-        })
-        .eq("id", paymentId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Payment verified successfully!");
-      queryClient.invalidateQueries({ queryKey: ["all-payments"] });
-    },
-    onError: (error) => {
-      toast.error("Failed to verify payment", {
-        description: error.message,
+      haptics.light();
+      await verifyMutation.mutateAsync({
+        paymentId: payment.id,
+        managerId: user.id
       });
-    },
-  });
-
-  // Reject payment mutation
-  const rejectMutation = useMutation({
-    mutationFn: async ({ paymentId, reason }: { paymentId: string; reason: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const { error } = await supabase
-        .from("collections")
-        .update({
-          status: "rejected",
-          verified_by: user.id,
-          verified_at: new Date().toISOString(),
-          rejection_reason: reason,
-        })
-        .eq("id", paymentId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Payment rejected");
-      queryClient.invalidateQueries({ queryKey: ["all-payments"] });
-      setShowRejectDialog(false);
-      setSelectedPayment(null);
-      setRejectionReason("");
-    },
-    onError: (error) => {
-      toast.error("Failed to reject payment", {
-        description: error.message,
-      });
-    },
-  });
-
-  const handleVerify = (payment: Payment) => {
-    verifyMutation.mutate(payment.id);
+    } catch (error) {
+      console.error("Error verifying payment:", error);
+    }
   };
 
   const handleReject = (payment: Payment) => {
@@ -213,12 +170,29 @@ const PaymentVerifications = () => {
     }
   };
 
-  const confirmReject = () => {
+  const confirmReject = async () => {
     if (!selectedPayment || !rejectionReason.trim()) {
       toast.error("Please provide a reason for rejection");
       return;
     }
-    rejectMutation.mutate({ paymentId: selectedPayment.id, reason: rejectionReason });
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      haptics.light();
+      await rejectMutation.mutateAsync({
+        paymentId: selectedPayment.id,
+        managerId: user.id,
+        reason: rejectionReason
+      });
+      
+      setShowRejectDialog(false);
+      setSelectedPayment(null);
+      setRejectionReason("");
+    } catch (error) {
+      console.error("Error rejecting payment:", error);
+    }
   };
 
   const pendingPayments = payments?.filter(p => p.status === "pending") || [];
