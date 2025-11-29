@@ -81,10 +81,22 @@ export default defineConfig(({ mode }) => ({
         skipWaiting: true,
         clientsClaim: true,
         sourcemap: true,
-        // Immediate update strategy
-        navigateFallback: null,
-        // Clear all caches on update
+        navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/api/, /^\/auth/],
         maximumFileSizeToCacheInBytes: 5000000, // 5MB
+        // Precache critical routes for instant offline access
+        additionalManifestEntries: [
+          { url: '/', revision: Date.now().toString() },
+          { url: '/login', revision: Date.now().toString() },
+          { url: '/agent/dashboard', revision: Date.now().toString() },
+          { url: '/agent/tenants', revision: Date.now().toString() },
+          { url: '/agent/collections', revision: Date.now().toString() },
+          { url: '/agent/new-tenant', revision: Date.now().toString() },
+          { url: '/agent/notifications', revision: Date.now().toString() },
+          { url: '/manager/dashboard', revision: Date.now().toString() },
+          { url: '/manager/agents', revision: Date.now().toString() },
+          { url: '/manager/verifications', revision: Date.now().toString() },
+        ],
         runtimeCaching: [
           // Google Fonts - Cache first with long expiration
           {
