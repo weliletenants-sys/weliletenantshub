@@ -8,7 +8,7 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save, DollarSign } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save, DollarSign, Download, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -37,6 +37,8 @@ import AgentsList from "@/components/AgentsListWidget";
 import { SkeletonWrapper } from "@/components/SkeletonWrapper";
 import { useDebounce } from "@/hooks/useDebounce";
 import { ManagerCommissionSummaryDialog } from "@/components/ManagerCommissionSummaryDialog";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -998,13 +1000,138 @@ const ManagerDashboard = () => {
           };
         })
       );
-
       // Sort by total collections (highest first)
       agentBreakdown.sort((a, b) => b.total - a.total);
 
       setAgentPaymentMethodData(agentBreakdown.filter(a => a.total > 0));
     } catch (error) {
       console.error("Error fetching agent payment method breakdown:", error);
+    }
+  };
+
+  // Export payment method data as CSV
+  const exportPaymentMethodCSV = () => {
+    try {
+      const timePeriodLabel = 
+        paymentMethodTimePeriod === '7d' ? 'Last 7 Days' :
+        paymentMethodTimePeriod === '30d' ? 'Last 30 Days' :
+        paymentMethodTimePeriod === '90d' ? 'Last 90 Days' :
+        'All Time';
+
+      let csvContent = `Payment Method Breakdown Report\n`;
+      csvContent += `Period: ${timePeriodLabel}\n`;
+      csvContent += `Generated: ${format(new Date(), 'PPP')}\n\n`;
+      
+      csvContent += `Payment Method,Amount (UGX),Trend (%)\n`;
+      
+      paymentMethodData.forEach(item => {
+        csvContent += `${item.method},${item.amount.toFixed(2)},${item.trend.toFixed(2)}\n`;
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `payment-method-breakdown-${paymentMethodTimePeriod}-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success('CSV exported successfully');
+      haptics.success();
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      toast.error('Failed to export CSV');
+    }
+  };
+
+  // Export payment method data as PDF
+  const exportPaymentMethodPDF = () => {
+    try {
+      const doc = new jsPDF();
+      const timePeriodLabel = 
+        paymentMethodTimePeriod === '7d' ? 'Last 7 Days' :
+        paymentMethodTimePeriod === '30d' ? 'Last 30 Days' :
+        paymentMethodTimePeriod === '90d' ? 'Last 90 Days' :
+        'All Time';
+
+      // Header with purple background
+      doc.setFillColor(107, 45, 197); // #6B2DC5
+      doc.rect(0, 0, 210, 35, 'F');
+      
+      // Logo text
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(24);
+      doc.text('Welile', 15, 20);
+      
+      // Report title
+      doc.setFontSize(14);
+      doc.text('Payment Method Breakdown Report', 15, 30);
+      
+      // Report details
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Period: ${timePeriodLabel}`, 15, 45);
+      doc.text(`Generated: ${format(new Date(), 'PPP')}`, 15, 52);
+      
+      // Summary statistics
+      const totalAmount = paymentMethodData.reduce((sum, item) => sum + item.amount, 0);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Total Collections: UGX ${totalAmount.toLocaleString()}`, 15, 62);
+      
+      // Payment method breakdown table
+      const tableData = paymentMethodData.map(item => [
+        item.method,
+        `UGX ${item.amount.toLocaleString()}`,
+        `${item.trend > 0 ? '+' : ''}${item.trend.toFixed(1)}%`,
+        `${((item.amount / totalAmount) * 100).toFixed(1)}%`
+      ]);
+      
+      autoTable(doc, {
+        startY: 70,
+        head: [['Payment Method', 'Amount', 'Trend', '% of Total']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { 
+          fillColor: [107, 45, 197],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold'
+        },
+        styles: { 
+          fontSize: 10,
+          cellPadding: 5
+        },
+        columnStyles: {
+          0: { cellWidth: 50 },
+          1: { cellWidth: 50, halign: 'right' },
+          2: { cellWidth: 40, halign: 'center' },
+          3: { cellWidth: 40, halign: 'center' }
+        }
+      });
+      
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.text(
+          `Page ${i} of ${pageCount}`,
+          doc.internal.pageSize.getWidth() / 2,
+          doc.internal.pageSize.getHeight() - 10,
+          { align: 'center' }
+        );
+      }
+      
+      doc.save(`payment-method-breakdown-${paymentMethodTimePeriod}-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      toast.success('PDF exported successfully');
+      haptics.success();
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast.error('Failed to export PDF');
     }
   };
 
@@ -2588,7 +2715,29 @@ const ManagerDashboard = () => {
                      'All time'})
                   </CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Export Buttons */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={exportPaymentMethodCSV}
+                    className="text-xs"
+                  >
+                    <FileText className="h-3 w-3 mr-1" />
+                    CSV
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={exportPaymentMethodPDF}
+                    className="text-xs"
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    PDF
+                  </Button>
+                  
+                  {/* Time Period Filters */}
+                  <div className="flex gap-2">
                   <Button
                     size="sm"
                     variant={paymentMethodTimePeriod === '7d' ? 'default' : 'outline'}
@@ -2645,6 +2794,7 @@ const ManagerDashboard = () => {
                   >
                     All Time
                   </Button>
+                  </div>
                 </div>
               </div>
             </CardHeader>
