@@ -2,9 +2,14 @@ import AgentLayout from "@/components/AgentLayout";
 import { EarningsSkeleton } from "@/components/TenantDetailSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { TrendingUp, Wallet, Target, DollarSign, Award, Calendar, TrendingDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { TrendingUp, Wallet, Target, DollarSign, Award, Calendar, TrendingDown, CalendarIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const AgentEarnings = () => {
   const [loading, setLoading] = useState(true);
@@ -22,10 +27,16 @@ const AgentEarnings = () => {
   });
   const [recentCollections, setRecentCollections] = useState<any[]>([]);
   const [dailyBreakdown, setDailyBreakdown] = useState<any[]>([]);
+  
+  // Date range state for daily breakdown
+  const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
+    start: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    end: new Date()
+  });
 
   useEffect(() => {
     fetchEarningsData();
-  }, []);
+  }, [dateRange]);
 
   const fetchEarningsData = async () => {
     try {
@@ -46,11 +57,13 @@ const AgentEarnings = () => {
       const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
+      // Get collections for selected date range
       const { data: thisMonthCollections } = await supabase
         .from('collections')
         .select('amount, commission, collection_date, tenants(tenant_name)')
         .eq('agent_id', agentData.id)
-        .gte('collection_date', firstDayThisMonth.toISOString().split('T')[0])
+        .gte('collection_date', dateRange.start.toISOString().split('T')[0])
+        .lte('collection_date', dateRange.end.toISOString().split('T')[0])
         .order('collection_date', { ascending: false });
 
       const { data: lastMonthCollections } = await supabase
@@ -98,7 +111,7 @@ const AgentEarnings = () => {
 
       setRecentCollections(thisMonthCollections?.slice(0, 10) || []);
 
-      // Calculate daily breakdown for this month
+      // Calculate daily breakdown for selected date range
       if (thisMonthCollections) {
         const dailyData = thisMonthCollections.reduce((acc: any, collection: any) => {
           const date = collection.collection_date;
@@ -308,77 +321,166 @@ const AgentEarnings = () => {
         </Card>
 
         {/* Daily Commission Breakdown */}
-        {dailyBreakdown.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" />
-                Daily Commission Breakdown
-              </CardTitle>
-              <CardDescription>
-                Your commission earnings by day this month
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {dailyBreakdown.map((day: any, idx: number) => (
-                  <div 
-                    key={idx} 
-                    className="flex items-center justify-between p-4 border rounded-xl hover:shadow-md transition-all hover:bg-accent/50"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="text-center min-w-[60px]">
-                        <p className="text-2xl font-bold text-primary">
-                          {new Date(day.date).getDate()}
-                        </p>
-                        <p className="text-xs text-muted-foreground uppercase">
-                          {new Date(day.date).toLocaleDateString('en-US', { month: 'short' })}
-                        </p>
-                      </div>
-                      <div className="h-12 w-px bg-border" />
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(day.date).toLocaleDateString('en-US', { weekday: 'long' })}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {day.payments} payment{day.payments !== 1 ? 's' : ''} • UGX {day.totalAmount.toLocaleString()} collected
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-success">
-                        +{(day.commission / 1000).toFixed(1)}K
-                      </p>
-                      <p className="text-xs text-muted-foreground">commission</p>
-                    </div>
-                  </div>
-                ))}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  Daily Commission Breakdown
+                </CardTitle>
+                <CardDescription>
+                  {format(dateRange.start, 'MMM d, yyyy')} - {format(dateRange.end, 'MMM d, yyyy')}
+                </CardDescription>
               </div>
+              
+              {/* Date Range Filter */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const now = new Date();
+                    setDateRange({
+                      start: new Date(now.getFullYear(), now.getMonth(), 1),
+                      end: new Date()
+                    });
+                  }}
+                >
+                  This Month
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const now = new Date();
+                    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                    const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+                    setDateRange({
+                      start: lastMonth,
+                      end: lastDayLastMonth
+                    });
+                  }}
+                >
+                  Last Month
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const now = new Date();
+                    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+                    setDateRange({
+                      start: threeMonthsAgo,
+                      end: new Date()
+                    });
+                  }}
+                >
+                  Last 3 Months
+                </Button>
+                
+                {/* Custom Date Range Picker */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      Custom Range
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <div className="p-4 space-y-4">
+                      <div>
+                        <p className="text-sm font-medium mb-2">Start Date</p>
+                        <CalendarComponent
+                          mode="single"
+                          selected={dateRange.start}
+                          onSelect={(date) => date && setDateRange(prev => ({ ...prev, start: date }))}
+                          className={cn("p-3 pointer-events-auto")}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium mb-2">End Date</p>
+                        <CalendarComponent
+                          mode="single"
+                          selected={dateRange.end}
+                          onSelect={(date) => date && setDateRange(prev => ({ ...prev, end: date }))}
+                          className={cn("p-3 pointer-events-auto")}
+                          disabled={(date) => date < dateRange.start}
+                        />
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {dailyBreakdown.length > 0 ? (
+              <>
+                <div className="space-y-2">
+                  {dailyBreakdown.map((day: any, idx: number) => (
+                    <div 
+                      key={idx} 
+                      className="flex items-center justify-between p-4 border rounded-xl hover:shadow-md transition-all hover:bg-accent/50"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="text-center min-w-[60px]">
+                          <p className="text-2xl font-bold text-primary">
+                            {new Date(day.date).getDate()}
+                          </p>
+                          <p className="text-xs text-muted-foreground uppercase">
+                            {new Date(day.date).toLocaleDateString('en-US', { month: 'short' })}
+                          </p>
+                        </div>
+                        <div className="h-12 w-px bg-border" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(day.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {day.payments} payment{day.payments !== 1 ? 's' : ''} • UGX {day.totalAmount.toLocaleString()} collected
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-success">
+                          +{(day.commission / 1000).toFixed(1)}K
+                        </p>
+                        <p className="text-xs text-muted-foreground">commission</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
 
-              {/* Daily Average Summary */}
-              <div className="mt-6 p-4 bg-primary/5 rounded-xl border border-primary/20">
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Total Days</p>
-                    <p className="text-xl font-bold">{dailyBreakdown.length}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Daily Average</p>
-                    <p className="text-xl font-bold text-primary">
-                      {(earnings.thisMonth / dailyBreakdown.length / 1000).toFixed(1)}K
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Best Day</p>
-                    <p className="text-xl font-bold text-success">
-                      {(Math.max(...dailyBreakdown.map((d: any) => d.commission)) / 1000).toFixed(1)}K
-                    </p>
+                {/* Daily Average Summary */}
+                <div className="mt-6 p-4 bg-primary/5 rounded-xl border border-primary/20">
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Total Days</p>
+                      <p className="text-xl font-bold">{dailyBreakdown.length}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Daily Average</p>
+                      <p className="text-xl font-bold text-primary">
+                        {(earnings.thisMonth / dailyBreakdown.length / 1000).toFixed(1)}K
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Best Day</p>
+                      <p className="text-xl font-bold text-success">
+                        {(Math.max(...dailyBreakdown.map((d: any) => d.commission)) / 1000).toFixed(1)}K
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              </>
+            ) : (
+              <p className="text-center text-muted-foreground py-8">
+                No commission data for the selected date range.
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         {recentCollections.length > 0 && (
           <Card>
