@@ -74,7 +74,7 @@ export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentD
         agent_id,
         agents!inner(
           user_id,
-          profiles!inner(full_name)
+          profiles:user_id!inner(full_name)
         )
       `)
       .eq("status", "verified")

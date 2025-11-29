@@ -66,7 +66,7 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
           tenants (tenant_name),
           agent:agents!inner(
             user_id,
-            profiles:profiles!inner(full_name)
+            profiles:user_id!inner(full_name)
           )
         `)
         .order('created_at', { ascending: false })

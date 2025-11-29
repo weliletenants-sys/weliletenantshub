@@ -61,7 +61,7 @@ const ManagerWeeklyReport = () => {
         .from('agents')
         .select(`
           *,
-          profiles!inner(full_name)
+          profiles:user_id!inner(full_name)
         `);
 
       if (agentsError) throw agentsError;
