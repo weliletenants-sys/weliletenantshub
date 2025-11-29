@@ -194,70 +194,30 @@ const ManagerDashboard = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        setIsLoading(true);
-        const [agentsResult, tenantsResult] = await Promise.all([
-          supabase.from("agents").select("*"),
-          supabase.from("tenants").select("*"),
+        // Show dashboard immediately with loading states for individual cards
+        setIsLoading(false);
+        
+        // Fetch only essential counts first (parallel + optimized)
+        const [agentsCount, tenantsCount, pendingVerificationsCount, collectionsData] = await Promise.all([
+          supabase.from("agents").select("*", { count: 'exact', head: false }),
+          supabase.from("tenants").select("outstanding_balance, status"),
+          supabase.from("tenants").select("*", { count: 'exact', head: true }).eq("status", "pending"),
+          supabase.from("collections").select("status")
         ]);
 
-        if (agentsResult.error) {
-          console.error("Error fetching agents:", agentsResult.error);
-        }
-        
-        if (tenantsResult.error) {
-          console.error("Error fetching tenants:", tenantsResult.error);
-        }
+        const totalAgents = agentsCount.data?.length || 0;
+        const totalTenants = tenantsCount.data?.length || 0;
+        const pendingVerifications = pendingVerificationsCount.count || 0;
 
-        const totalAgents = agentsResult.data?.length || 0;
-        const totalTenants = tenantsResult.data?.length || 0;
-        const pendingVerifications = tenantsResult.data?.filter(t => t.status === 'pending').length || 0;
-
-        // Calculate total portfolio value from outstanding balances
-        const totalPortfolioValue = tenantsResult.data?.reduce((sum, tenant) => {
+        // Calculate portfolio value from fetched tenant balances
+        const totalPortfolioValue = tenantsCount.data?.reduce((sum, tenant) => {
           return sum + (parseFloat(tenant.outstanding_balance?.toString() || '0'));
         }, 0) || 0;
 
-        // Calculate portfolio growth (day-over-day and week-over-week)
-        const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const lastWeek = new Date(today);
-        lastWeek.setDate(lastWeek.getDate() - 7);
-
-        // Fetch collections from yesterday to calculate day change
-        const { data: yesterdayCollections } = await supabase
-          .from("collections")
-          .select("amount")
-          .eq("status", "verified")
-          .gte("collection_date", yesterday.toISOString().split('T')[0])
-          .lt("collection_date", today.toISOString().split('T')[0]);
-
-        const yesterdayTotal = yesterdayCollections?.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0;
-
-        // Fetch collections from last 7 days for week change
-        const { data: weekCollections } = await supabase
-          .from("collections")
-          .select("amount, collection_date")
-          .eq("status", "verified")
-          .gte("collection_date", lastWeek.toISOString().split('T')[0]);
-
-        const thisWeekTotal = weekCollections?.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0;
-        
-        // Calculate changes
-        const portfolioDayChange = yesterdayTotal;
-        const portfolioDayChangePercent = totalPortfolioValue > 0 ? (portfolioDayChange / totalPortfolioValue) * 100 : 0;
-        
-        const portfolioWeekChange = thisWeekTotal;
-        const portfolioWeekChangePercent = totalPortfolioValue > 0 ? (portfolioWeekChange / totalPortfolioValue) * 100 : 0;
-
-        // Fetch payment verification stats
-        const { data: collectionsData } = await supabase
-          .from("collections")
-          .select("status");
-
-        const pendingPayments = collectionsData?.filter(c => c.status === 'pending').length || 0;
-        const verifiedPayments = collectionsData?.filter(c => c.status === 'verified').length || 0;
-        const rejectedPayments = collectionsData?.filter(c => c.status === 'rejected').length || 0;
+        // Process payment stats from already fetched collections
+        const pendingPayments = collectionsData.data?.filter(c => c.status === 'pending').length || 0;
+        const verifiedPayments = collectionsData.data?.filter(c => c.status === 'verified').length || 0;
+        const rejectedPayments = collectionsData.data?.filter(c => c.status === 'rejected').length || 0;
 
         setStats({
           totalAgents,
@@ -268,23 +228,59 @@ const ManagerDashboard = () => {
           verifiedPayments,
           rejectedPayments,
           totalPortfolioValue,
-          portfolioDayChange,
-          portfolioDayChangePercent,
-          portfolioWeekChange,
-          portfolioWeekChangePercent,
+          portfolioDayChange: 0,
+          portfolioDayChangePercent: 0,
+          portfolioWeekChange: 0,
+          portfolioWeekChangePercent: 0,
         });
 
-        // Calculate agent growth comparison
-        await calculateAgentGrowthComparison(agentsResult.data || []);
-        
-        // Fetch payment method breakdown
-        await fetchPaymentMethodBreakdown();
-        
-        // Fetch agent payment method breakdown
-        await fetchAgentPaymentMethodBreakdown(agentsResult.data || []);
+        // Load secondary data in background (non-blocking)
+        setTimeout(async () => {
+          const today = new Date();
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          const lastWeek = new Date(today);
+          lastWeek.setDate(lastWeek.getDate() - 7);
+
+          const [yesterdayCollections, weekCollections] = await Promise.all([
+            supabase
+              .from("collections")
+              .select("amount")
+              .eq("status", "verified")
+              .gte("collection_date", yesterday.toISOString().split('T')[0])
+              .lt("collection_date", today.toISOString().split('T')[0]),
+            supabase
+              .from("collections")
+              .select("amount")
+              .eq("status", "verified")
+              .gte("collection_date", lastWeek.toISOString().split('T')[0])
+          ]);
+
+          const yesterdayTotal = yesterdayCollections.data?.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0;
+          const thisWeekTotal = weekCollections.data?.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0;
+
+          const portfolioDayChange = yesterdayTotal;
+          const portfolioDayChangePercent = totalPortfolioValue > 0 ? (portfolioDayChange / totalPortfolioValue) * 100 : 0;
+          const portfolioWeekChange = thisWeekTotal;
+          const portfolioWeekChangePercent = totalPortfolioValue > 0 ? (portfolioWeekChange / totalPortfolioValue) * 100 : 0;
+
+          setStats(prev => ({
+            ...prev,
+            portfolioDayChange,
+            portfolioDayChangePercent,
+            portfolioWeekChange,
+            portfolioWeekChangePercent,
+          }));
+
+          // Load agent growth and payment method data
+          if (agentsCount.data) {
+            await calculateAgentGrowthComparison(agentsCount.data);
+            await fetchAgentPaymentMethodBreakdown(agentsCount.data);
+          }
+          await fetchPaymentMethodBreakdown();
+        }, 100);
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
-      } finally {
         setIsLoading(false);
       }
     };
@@ -304,59 +300,28 @@ const ManagerDashboard = () => {
 
   const handleRefresh = async () => {
     haptics.refresh();
-    const [agentsResult, tenantsResult] = await Promise.all([
+    
+    // Quick refresh of essential data only
+    const [agentsResult, tenantsResult, collectionsData] = await Promise.all([
       supabase.from("agents").select("*"),
-      supabase.from("tenants").select("*"),
+      supabase.from("tenants").select("outstanding_balance, status"),
+      supabase.from("collections").select("status")
     ]);
 
     const totalAgents = agentsResult.data?.length || 0;
     const totalTenants = tenantsResult.data?.length || 0;
     const pendingVerifications = tenantsResult.data?.filter(t => t.status === 'pending').length || 0;
 
-    // Calculate total portfolio value from outstanding balances
     const totalPortfolioValue = tenantsResult.data?.reduce((sum, tenant) => {
       return sum + (parseFloat(tenant.outstanding_balance?.toString() || '0'));
     }, 0) || 0;
 
-    // Calculate portfolio growth
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const lastWeek = new Date(today);
-    lastWeek.setDate(lastWeek.getDate() - 7);
+    const pendingPayments = collectionsData.data?.filter(c => c.status === 'pending').length || 0;
+    const verifiedPayments = collectionsData.data?.filter(c => c.status === 'verified').length || 0;
+    const rejectedPayments = collectionsData.data?.filter(c => c.status === 'rejected').length || 0;
 
-    const { data: yesterdayCollections } = await supabase
-      .from("collections")
-      .select("amount")
-      .eq("status", "verified")
-      .gte("collection_date", yesterday.toISOString().split('T')[0])
-      .lt("collection_date", today.toISOString().split('T')[0]);
-
-    const yesterdayTotal = yesterdayCollections?.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0;
-
-    const { data: weekCollections } = await supabase
-      .from("collections")
-      .select("amount")
-      .eq("status", "verified")
-      .gte("collection_date", lastWeek.toISOString().split('T')[0]);
-
-    const thisWeekTotal = weekCollections?.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0;
-    
-    const portfolioDayChange = yesterdayTotal;
-    const portfolioDayChangePercent = totalPortfolioValue > 0 ? (portfolioDayChange / totalPortfolioValue) * 100 : 0;
-    const portfolioWeekChange = thisWeekTotal;
-    const portfolioWeekChangePercent = totalPortfolioValue > 0 ? (portfolioWeekChange / totalPortfolioValue) * 100 : 0;
-
-    // Fetch payment verification stats
-    const { data: collectionsData } = await supabase
-      .from("collections")
-      .select("status");
-
-    const pendingPayments = collectionsData?.filter(c => c.status === 'pending').length || 0;
-    const verifiedPayments = collectionsData?.filter(c => c.status === 'verified').length || 0;
-    const rejectedPayments = collectionsData?.filter(c => c.status === 'rejected').length || 0;
-
-    setStats({
+    setStats(prev => ({
+      ...prev,
       totalAgents,
       activeAgents: totalAgents,
       totalTenants,
@@ -365,16 +330,8 @@ const ManagerDashboard = () => {
       verifiedPayments,
       rejectedPayments,
       totalPortfolioValue,
-      portfolioDayChange,
-      portfolioDayChangePercent,
-      portfolioWeekChange,
-      portfolioWeekChangePercent,
-    });
-    
-    await calculateAgentGrowthComparison(agentsResult.data || []);
-    await fetchPaymentMethodBreakdown();
-    await fetchAgentPaymentMethodBreakdown(agentsResult.data || []);
-    
+    }));
+
     toast.success("Dashboard refreshed");
   };
 

@@ -28,7 +28,7 @@ export const useAuth = (): AuthData => {
         .from("profiles")
         .select("role")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       const role = profile?.role || null;
 
@@ -39,16 +39,17 @@ export const useAuth = (): AuthData => {
           .from("agents")
           .select("id")
           .eq("user_id", user.id)
-          .single();
+          .maybeSingle();
         agentId = agent?.id;
       }
 
       return { user, role, agentId };
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes - don't refetch during this time
-    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache
-    refetchOnWindowFocus: false, // Don't refetch on window focus
-    refetchOnMount: false, // Don't refetch on component mount if data exists
+    staleTime: 10 * 60 * 1000, // 10 minutes - increased for better performance
+    gcTime: 15 * 60 * 1000, // 15 minutes - keep in cache longer
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false, // Don't refetch on reconnect
   });
 
   return {
