@@ -68,7 +68,8 @@ const ManagerDashboard = () => {
     totalRent: 0,
     dailyBreakdown: [] as any[],
     weeklyBreakdown: [] as any[],
-    paymentMethodBreakdown: [] as any[]
+    paymentMethodBreakdown: [] as any[],
+    managerLeaderboard: [] as any[]
   });
   const [showTenantSearch, setShowTenantSearch] = useState(false);
   const [showAgentSearch, setShowAgentSearch] = useState(false);
@@ -231,11 +232,37 @@ const ManagerDashboard = () => {
         amount
       }));
 
+      // Manager leaderboard - group by manager
+      const managerStatsMap = new Map();
+      collections?.forEach(c => {
+        if (c.verified_by) {
+          const managerId = c.verified_by;
+          const managerName = managerMap.get(managerId) || 'Unknown Manager';
+          
+          if (!managerStatsMap.has(managerId)) {
+            managerStatsMap.set(managerId, {
+              managerId,
+              managerName,
+              verificationCount: 0,
+              totalAmount: 0
+            });
+          }
+          
+          const stats = managerStatsMap.get(managerId);
+          stats.verificationCount += 1;
+          stats.totalAmount += parseFloat(c.amount.toString());
+        }
+      });
+
+      const managerLeaderboard = Array.from(managerStatsMap.values())
+        .sort((a, b) => b.totalAmount - a.totalAmount);
+
       setPaymentReportData({
         totalRent,
         dailyBreakdown,
         weeklyBreakdown,
-        paymentMethodBreakdown
+        paymentMethodBreakdown,
+        managerLeaderboard
       });
     } catch (error) {
       console.error('Error fetching payment report:', error);
@@ -1338,6 +1365,101 @@ const ManagerDashboard = () => {
                         UGX {paymentReportData.totalRent.toLocaleString()}
                       </p>
                     </div>
+                  </CardContent>
+                </Card>
+
+                {/* Manager Verification Leaderboard */}
+                <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Award className="h-5 w-5 text-purple-600" />
+                      Manager Verification Leaderboard
+                    </CardTitle>
+                    <CardDescription>Top managers by verification volume for selected period</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {paymentReportData.managerLeaderboard.length > 0 ? (
+                      <div className="space-y-3">
+                        {paymentReportData.managerLeaderboard.map((manager, index) => (
+                          <div 
+                            key={manager.managerId}
+                            className={cn(
+                              "flex items-center justify-between p-4 rounded-lg border transition-all",
+                              index === 0 && "bg-gradient-to-r from-yellow-500/10 to-yellow-600/5 border-yellow-500/30",
+                              index === 1 && "bg-gradient-to-r from-gray-400/10 to-gray-500/5 border-gray-400/30",
+                              index === 2 && "bg-gradient-to-r from-orange-600/10 to-orange-700/5 border-orange-600/30",
+                              index > 2 && "bg-muted/30 border-border"
+                            )}
+                          >
+                            <div className="flex items-center gap-4 flex-1">
+                              <div className={cn(
+                                "flex items-center justify-center w-10 h-10 rounded-full font-bold text-lg",
+                                index === 0 && "bg-yellow-500 text-white",
+                                index === 1 && "bg-gray-400 text-white",
+                                index === 2 && "bg-orange-600 text-white",
+                                index > 2 && "bg-muted text-muted-foreground"
+                              )}>
+                                {index === 0 && "🥇"}
+                                {index === 1 && "🥈"}
+                                {index === 2 && "🥉"}
+                                {index > 2 && `#${index + 1}`}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-semibold text-sm">{manager.managerName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {manager.verificationCount} payment{manager.verificationCount !== 1 ? 's' : ''} verified
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-lg text-success">
+                                UGX {manager.totalAmount.toLocaleString()}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {((manager.totalAmount / paymentReportData.totalRent) * 100).toFixed(1)}% of total
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Shield className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No verifications in selected period</p>
+                      </div>
+                    )}
+
+                    {/* Summary Stats */}
+                    {paymentReportData.managerLeaderboard.length > 0 && (
+                      <div className="mt-6 pt-6 border-t border-border">
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">Active Managers</p>
+                            <p className="text-2xl font-bold text-primary">
+                              {paymentReportData.managerLeaderboard.length}
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">Avg per Manager</p>
+                            <p className="text-2xl font-bold text-primary">
+                              {paymentReportData.managerLeaderboard.length > 0 
+                                ? (paymentReportData.totalRent / paymentReportData.managerLeaderboard.length).toLocaleString(undefined, { maximumFractionDigits: 0 })
+                                : '0'
+                              }
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">Top Manager</p>
+                            <p className="text-2xl font-bold text-primary">
+                              {paymentReportData.managerLeaderboard.length > 0 
+                                ? ((paymentReportData.managerLeaderboard[0].totalAmount / paymentReportData.totalRent) * 100).toFixed(0)
+                                : '0'
+                              }%
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
