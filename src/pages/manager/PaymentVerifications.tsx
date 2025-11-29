@@ -69,9 +69,12 @@ const PaymentVerifications = () => {
         .from("collections")
         .select(`
           *,
-          agent:agents!inner(
+          agent:agents!inner (
             user_id,
-            profiles:user_id!inner(full_name, phone_number)
+            profiles!agents_user_id_fkey (
+              full_name,
+              phone_number
+            )
           ),
           tenants!inner(tenant_name, tenant_phone)
         `)

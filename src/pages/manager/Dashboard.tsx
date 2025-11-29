@@ -124,7 +124,7 @@ const ManagerDashboard = () => {
             tenant_name
           ),
           agents (
-            profiles:user_id (
+            profiles!agents_user_id_fkey (
               full_name
             )
           )

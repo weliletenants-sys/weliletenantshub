@@ -43,7 +43,7 @@ const ManagerVerifications = () => {
         .select(`
           *,
           agents (
-            profiles:user_id (
+            profiles!agents_user_id_fkey (
               full_name,
               phone_number
             )

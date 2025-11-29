@@ -42,7 +42,7 @@ const ManagerAgentComparison = () => {
         .from("agents")
         .select(`
           *,
-          profiles:user_id (
+          profiles!agents_user_id_fkey (
             full_name,
             phone_number
           )

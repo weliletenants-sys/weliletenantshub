@@ -106,7 +106,7 @@ const ManagerPortfolioBreakdown = () => {
         .select(`
           id,
           user_id,
-          profiles:user_id (
+          profiles!agents_user_id_fkey (
             full_name,
             phone_number
           )

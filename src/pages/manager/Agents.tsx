@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRealtimeAgents, useRealtimeAllTenants, useRealtimeProfiles, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
-import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Activity, Wallet, ChevronDown, Download, CheckSquare, Square, Edit, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Activity, Wallet, ChevronDown, Download, CheckSquare, Square, Edit, Trash2, Shield, ShieldOff } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -155,7 +155,7 @@ const ManagerAgents = () => {
         .from("agents")
         .select(`
           *,
-          profiles:user_id (
+          profiles!agents_user_id_fkey (
             full_name,
             phone_number,
             role
@@ -1080,12 +1080,19 @@ const ManagerAgents = () => {
         </Collapsible>
 
         <div className="flex gap-3">
-          <Button 
-            variant="outline"
-            onClick={() => navigate("/manager/agents/compare")}
-          >
-            Compare Agents
-          </Button>
+            <Button 
+              variant="outline"
+              onClick={() => navigate("/manager/agents/compare")}
+            >
+              Compare Agents
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => navigate("/manager/suspension-history")}
+            >
+              <Shield className="h-4 w-4 mr-2" />
+              Suspension History
+            </Button>
           <Button 
             variant="outline"
             onClick={() => setShowFilters(!showFilters)}
