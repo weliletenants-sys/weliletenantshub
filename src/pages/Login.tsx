@@ -24,7 +24,6 @@ const Login = () => {
   const [fullName, setFullName] = useState("");
   const [session, setSession] = useState<Session | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -82,14 +81,6 @@ const Login = () => {
       if (error) throw error;
 
       if (data.user) {
-        // Store remember me preference (used by Supabase client persistence)
-        if (!rememberMe) {
-          // Session-only login: clear after browser close
-          await supabase.auth.updateUser({
-            data: { session_only: true }
-          });
-        }
-        
         // Ensure profile exists after login
         const profileExists = await ensureProfileExists(data.user);
         if (profileExists) {
@@ -207,18 +198,6 @@ const Login = () => {
                       </button>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="remember-me"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
-                    />
-                    <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
-                      Remember me on this device
-                    </Label>
-                  </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Logging in..." : "Login"}
                   </Button>
@@ -274,18 +253,6 @@ const Login = () => {
                         )}
                       </button>
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="remember-me-signup"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
-                    />
-                    <Label htmlFor="remember-me-signup" className="text-sm font-normal cursor-pointer">
-                      Remember me on this device
-                    </Label>
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Creating account..." : "Create Account"}
