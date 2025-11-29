@@ -30,25 +30,6 @@ const Login = () => {
     // Check if user is already logged in
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
-        // Check if this is a "remember me" session
-        const rememberMeFlag = sessionStorage.getItem('rememberMe');
-        
-        // If no remember me flag in sessionStorage, this means browser was closed
-        // and session should expire (unless it was a "remember me" login)
-        if (!rememberMeFlag) {
-          // Check if this was a permanent login (stored in localStorage)
-          const permanentLogin = localStorage.getItem('welile_remember_me');
-          
-          if (!permanentLogin) {
-            // Session-only login and browser was closed, sign out
-            await supabase.auth.signOut();
-            return;
-          } else {
-            // Restore the sessionStorage flag for this session
-            sessionStorage.setItem('rememberMe', 'true');
-          }
-        }
-        
         setSession(session);
         // Ensure profile exists before redirecting
         const profileExists = await ensureProfileExists(session.user);
@@ -101,13 +82,12 @@ const Login = () => {
       if (error) throw error;
 
       if (data.user) {
-        // Store remember me preference
-        if (rememberMe) {
-          localStorage.setItem('welile_remember_me', 'true');
-          sessionStorage.setItem('rememberMe', 'true');
-        } else {
-          localStorage.removeItem('welile_remember_me');
-          sessionStorage.setItem('rememberMe', 'true');
+        // Store remember me preference (used by Supabase client persistence)
+        if (!rememberMe) {
+          // Session-only login: clear after browser close
+          await supabase.auth.updateUser({
+            data: { session_only: true }
+          });
         }
         
         // Ensure profile exists after login
@@ -150,15 +130,6 @@ const Login = () => {
       if (error) throw error;
 
       if (data.user) {
-        // Store remember me preference for new accounts
-        if (rememberMe) {
-          localStorage.setItem('welile_remember_me', 'true');
-          sessionStorage.setItem('rememberMe', 'true');
-        } else {
-          localStorage.removeItem('welile_remember_me');
-          sessionStorage.setItem('rememberMe', 'true');
-        }
-        
         // Ensure profile exists after signup
         const profileExists = await ensureProfileExists(data.user);
         if (profileExists) {
