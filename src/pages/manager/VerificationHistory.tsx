@@ -14,7 +14,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Search, CheckCircle, XCircle, Clock, Filter, X, ChevronLeft, ChevronRight, CalendarIcon, User, History } from "lucide-react";
+import { Search, CheckCircle, XCircle, Clock, Filter, X, ChevronLeft, ChevronRight, CalendarIcon, User, History, Edit, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { haptics } from "@/utils/haptics";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useRealtimeAllCollections, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
 
@@ -63,6 +68,16 @@ const VerificationHistory = () => {
     rejected: number;
     total: number;
   }>>([]);
+  
+  // Edit/Delete state
+  const [editingPayment, setEditingPayment] = useState<VerificationRecord | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editPaymentMethod, setEditPaymentMethod] = useState("");
+  const [editCollectionDate, setEditCollectionDate] = useState<Date | undefined>(undefined);
+  const [editRejectionReason, setEditRejectionReason] = useState("");
+  const [deletingPayment, setDeletingPayment] = useState<VerificationRecord | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletionReason, setDeletionReason] = useState("");
 
   const fetchVerifications = async () => {
     try {
@@ -286,6 +301,92 @@ const VerificationHistory = () => {
         {method.toUpperCase()}
       </Badge>
     );
+  };
+
+  const handleEditClick = (payment: VerificationRecord) => {
+    setEditingPayment(payment);
+    setEditAmount(payment.amount.toString());
+    setEditPaymentMethod(payment.payment_method);
+    setEditCollectionDate(new Date(payment.collection_date));
+    setEditRejectionReason(payment.rejection_reason || "");
+    haptics.light();
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingPayment) return;
+
+    try {
+      const { error } = await supabase
+        .from("collections")
+        .update({
+          amount: parseFloat(editAmount),
+          payment_method: editPaymentMethod,
+          collection_date: editCollectionDate ? format(editCollectionDate, "yyyy-MM-dd") : editingPayment.collection_date,
+          rejection_reason: editRejectionReason || null,
+        })
+        .eq("id", editingPayment.id);
+
+      if (error) throw error;
+
+      toast.success("Payment updated successfully");
+      setEditingPayment(null);
+      fetchVerifications();
+      haptics.success();
+    } catch (error) {
+      console.error("Error updating payment:", error);
+      toast.error("Failed to update payment");
+      haptics.error();
+    }
+  };
+
+  const handleDeleteClick = (payment: VerificationRecord) => {
+    setDeletingPayment(payment);
+    setDeleteConfirmText("");
+    setDeletionReason("");
+    haptics.light();
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingPayment || deleteConfirmText !== deletingPayment.tenant.tenant_name || deletionReason.length < 10) {
+      return;
+    }
+
+    try {
+      // Log deletion in audit trail
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error: auditError } = await supabase.from("audit_logs").insert({
+          user_id: user.id,
+          action: "DELETE",
+          table_name: "collections",
+          record_id: deletingPayment.id,
+          old_data: deletingPayment as any,
+          changed_fields: ["deleted"],
+        });
+        
+        if (auditError) {
+          console.error("Error logging audit:", auditError);
+        }
+      }
+
+      const { error } = await supabase
+        .from("collections")
+        .delete()
+        .eq("id", deletingPayment.id);
+
+      if (error) throw error;
+
+      toast.success("Payment deleted successfully");
+      setDeletingPayment(null);
+      setDeleteConfirmText("");
+      setDeletionReason("");
+      fetchVerifications();
+      haptics.success();
+    } catch (error) {
+      console.error("Error deleting payment:", error);
+      toast.error("Failed to delete payment");
+      haptics.error();
+    }
   };
 
   // Statistics
@@ -625,6 +726,7 @@ const VerificationHistory = () => {
                     <TableHead>Verified By</TableHead>
                     <TableHead>Verified At</TableHead>
                     <TableHead>Details</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -708,6 +810,26 @@ const VerificationHistory = () => {
                             <span className="text-muted-foreground text-sm">-</span>
                           )}
                         </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditClick(verification)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteClick(verification)}
+                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -748,6 +870,142 @@ const VerificationHistory = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Edit Payment Dialog */}
+        <Dialog open={!!editingPayment} onOpenChange={(open) => !open && setEditingPayment(null)}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Edit Payment</DialogTitle>
+              <DialogDescription>
+                Update payment details for {editingPayment?.tenant.tenant_name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-amount">Amount (UGX)</Label>
+                <Input
+                  id="edit-amount"
+                  type="number"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  placeholder="Enter amount"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-payment-method">Payment Method</Label>
+                <Select value={editPaymentMethod} onValueChange={setEditPaymentMethod}>
+                  <SelectTrigger id="edit-payment-method">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="mtn">MTN</SelectItem>
+                    <SelectItem value="airtel">Airtel</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Collection Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !editCollectionDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editCollectionDate ? format(editCollectionDate, "MMM dd, yyyy") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={editCollectionDate}
+                      onSelect={setEditCollectionDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              {editingPayment?.status === "rejected" && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-rejection-reason">Rejection Reason</Label>
+                  <Textarea
+                    id="edit-rejection-reason"
+                    value={editRejectionReason}
+                    onChange={(e) => setEditRejectionReason(e.target.value)}
+                    placeholder="Enter rejection reason"
+                    rows={3}
+                  />
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingPayment(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdit}>
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Payment Dialog */}
+        <AlertDialog open={!!deletingPayment} onOpenChange={(open) => !open && setDeletingPayment(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Payment Record</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the payment record for{" "}
+                <span className="font-semibold">{deletingPayment?.tenant.tenant_name}</span>.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="delete-confirm">
+                  Type the tenant name to confirm: <span className="font-semibold">{deletingPayment?.tenant.tenant_name}</span>
+                </Label>
+                <Input
+                  id="delete-confirm"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="Type tenant name here"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="deletion-reason">
+                  Deletion Reason <span className="text-muted-foreground">(minimum 10 characters)</span>
+                </Label>
+                <Textarea
+                  id="deletion-reason"
+                  value={deletionReason}
+                  onChange={(e) => setDeletionReason(e.target.value)}
+                  placeholder="Explain why this payment is being deleted..."
+                  rows={3}
+                />
+              </div>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => {
+                setDeletingPayment(null);
+                setDeleteConfirmText("");
+                setDeletionReason("");
+              }}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDelete}
+                disabled={deleteConfirmText !== deletingPayment?.tenant.tenant_name || deletionReason.length < 10}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                Delete Payment
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </ManagerLayout>
   );
