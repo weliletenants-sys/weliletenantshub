@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Calculator, Copy, ListOrdered, Save, FolderOpen, Trash2, FileDown } from "lucide-react";
+import { Calculator, Copy, ListOrdered, Save, FolderOpen, Trash2, FileDown, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 import jsPDF from "jspdf";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BulkResult {
   rent: number;
@@ -53,7 +54,12 @@ const CalculatorPage = () => {
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [templateName, setTemplateName] = useState("");
 
-  // Load saved templates from localStorage
+  // PDF customization state
+  const [pdfSettingsOpen, setPdfSettingsOpen] = useState(false);
+  const [pdfName, setPdfName] = useState("");
+  const [pdfHeader, setPdfHeader] = useState("");
+
+  // Load saved templates and PDF settings from localStorage
   useEffect(() => {
     const saved = localStorage.getItem("calculator-templates-agent");
     if (saved) {
@@ -63,6 +69,36 @@ const CalculatorPage = () => {
         console.error("Failed to load templates:", e);
       }
     }
+
+    const pdfSettings = localStorage.getItem("pdf-settings-agent");
+    if (pdfSettings) {
+      try {
+        const settings = JSON.parse(pdfSettings);
+        setPdfName(settings.name || "");
+        setPdfHeader(settings.header || "");
+      } catch (e) {
+        console.error("Failed to load PDF settings:", e);
+      }
+    }
+  }, []);
+
+  // Load user profile for default name
+  useEffect(() => {
+    const loadProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && !pdfName) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", user.id)
+          .single();
+        
+        if (profile?.full_name) {
+          setPdfName(profile.full_name);
+        }
+      }
+    };
+    loadProfile();
   }, []);
 
   // Save templates to localStorage whenever they change
@@ -251,6 +287,17 @@ const CalculatorPage = () => {
     haptics.light();
   };
 
+  const savePdfSettings = () => {
+    const settings = {
+      name: pdfName,
+      header: pdfHeader,
+    };
+    localStorage.setItem("pdf-settings-agent", JSON.stringify(settings));
+    setPdfSettingsOpen(false);
+    toast.success("PDF settings saved!");
+    haptics.success();
+  };
+
   const downloadBulkPDF = () => {
     if (bulkResults.length === 0) return;
 
@@ -264,17 +311,31 @@ const CalculatorPage = () => {
     doc.setFontSize(24);
     doc.text("Welile", 15, 20);
     
+    // Custom header text if provided
+    if (pdfHeader) {
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text(pdfHeader, 15, 40);
+    }
+    
     // Title
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(16);
-    doc.text("Daily Repayment Rates - Bulk Calculation", 15, 45);
+    const titleYPos = pdfHeader ? 50 : 45;
+    doc.text("Daily Repayment Rates - Bulk Calculation", 15, titleYPos);
     
-    // Date
+    // Agent name and date
     doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 15, 55);
+    doc.setFont(undefined, 'normal');
+    const metaYPos = pdfHeader ? 58 : 53;
+    if (pdfName) {
+      doc.text(`Prepared by: ${pdfName}`, 15, metaYPos);
+    }
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 15, metaYPos + 6);
     
     // Table headers
-    let yPos = 70;
+    let yPos = pdfHeader ? 75 : 70;
     doc.setFontSize(10);
     doc.setFont(undefined, 'bold');
     doc.text("Rent Amount", 15, yPos);
@@ -508,11 +569,58 @@ const CalculatorPage = () => {
 
                 {bulkResults.length > 0 && (
                   <div className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-5">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
                       <h3 className="text-lg font-semibold">
                         Calculated Rates ({bulkResults.length})
                       </h3>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
+                        <Dialog open={pdfSettingsOpen} onOpenChange={setPdfSettingsOpen}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Settings className="h-4 w-4 mr-2" />
+                              PDF Settings
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Customize PDF Template</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="pdf-name">Your Name</Label>
+                                <Input
+                                  id="pdf-name"
+                                  placeholder="e.g., John Doe"
+                                  value={pdfName}
+                                  onChange={(e) => setPdfName(e.target.value)}
+                                  maxLength={100}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Will appear as "Prepared by" on the PDF
+                                </p>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="pdf-header">Custom Header (Optional)</Label>
+                                <Input
+                                  id="pdf-header"
+                                  placeholder="e.g., Premium Properties Division"
+                                  value={pdfHeader}
+                                  onChange={(e) => setPdfHeader(e.target.value)}
+                                  maxLength={100}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Additional header text to display on PDF
+                                </p>
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button onClick={savePdfSettings} className="w-full">
+                                <Save className="h-4 w-4 mr-2" />
+                                Save Settings
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
                         <Button
                           onClick={downloadBulkPDF}
                           variant="outline"
