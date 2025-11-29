@@ -16,6 +16,28 @@ self.addEventListener('sync', (event) => {
   }
 });
 
+/**
+ * Calculate exponential backoff delay in milliseconds
+ */
+function calculateBackoffDelay(retryCount) {
+  const baseDelay = 1000; // 1 second
+  const maxDelay = 60000; // 60 seconds max
+  const delay = baseDelay * Math.pow(2, retryCount);
+  return Math.min(delay, maxDelay);
+}
+
+/**
+ * Check if enough time has passed since last attempt
+ */
+function shouldRetryItem(item) {
+  if (item.retryCount === 0) return true;
+  
+  const requiredDelay = calculateBackoffDelay(item.retryCount - 1);
+  const timeSinceLastAttempt = Date.now() - (item.lastAttemptTime || 0);
+  
+  return timeSinceLastAttempt >= requiredDelay;
+}
+
 // Process the sync queue
 async function processSyncQueue() {
   try {
@@ -28,7 +50,17 @@ async function processSyncQueue() {
     
     console.log(`Processing ${queue.length} items in sync queue`);
     
+    let skipped = 0;
+    
     for (const item of queue) {
+      // Check if enough time has passed for retry with exponential backoff
+      if (!shouldRetryItem(item)) {
+        skipped++;
+        const nextRetryIn = calculateBackoffDelay(item.retryCount - 1) - (Date.now() - (item.lastAttemptTime || 0));
+        console.log(`Skipping item (backoff): ${item.url}, retry in ${Math.round(nextRetryIn / 1000)}s`);
+        continue;
+      }
+
       try {
         const response = await fetch(item.url, {
           method: item.method,
@@ -55,6 +87,7 @@ async function processSyncQueue() {
           const updateTx = db.transaction('syncQueue', 'readwrite');
           const updateStore = updateTx.objectStore('syncQueue');
           item.retryCount += 1;
+          item.lastAttemptTime = Date.now();
           
           if (item.retryCount >= item.maxRetries) {
             // Remove if max retries reached
@@ -68,9 +101,10 @@ async function processSyncQueue() {
               reason: 'Max retries reached',
             });
           } else {
-            // Update retry count
+            // Update retry count with exponential backoff
             await updateStore.put(item);
-            console.log(`Retry ${item.retryCount}/${item.maxRetries} for:`, item.url);
+            const nextDelay = calculateBackoffDelay(item.retryCount);
+            console.log(`Retry ${item.retryCount}/${item.maxRetries} for: ${item.url}, next retry in ${nextDelay / 1000}s`);
           }
           
           await updateTx.done;
@@ -82,6 +116,7 @@ async function processSyncQueue() {
         const updateTx = db.transaction('syncQueue', 'readwrite');
         const updateStore = updateTx.objectStore('syncQueue');
         item.retryCount += 1;
+        item.lastAttemptTime = Date.now();
         
         if (item.retryCount >= item.maxRetries) {
           await updateStore.delete(item.id);
@@ -94,13 +129,15 @@ async function processSyncQueue() {
           });
         } else {
           await updateStore.put(item);
+          const nextDelay = calculateBackoffDelay(item.retryCount);
+          console.log(`Error retry ${item.retryCount}/${item.maxRetries}, next attempt in ${nextDelay / 1000}s`);
         }
         
         await updateTx.done;
       }
     }
     
-    console.log('Sync queue processing complete');
+    console.log(`Sync queue processing complete (${skipped} items skipped due to backoff)`);
   } catch (error) {
     console.error('Error processing sync queue:', error);
   }
@@ -185,6 +222,7 @@ registerRoute(
             timestamp: Date.now(),
             retryCount: 0,
             maxRetries: 3,
+            lastAttemptTime: 0,
           });
           await tx.done;
           
