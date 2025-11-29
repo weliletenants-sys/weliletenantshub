@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import WelileLogo from "./WelileLogo";
@@ -18,21 +18,8 @@ interface ManagerLayoutProps {
 
 const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
   const createRipple = useRipple();
   const { swipeProgress } = useSwipeBack();
-
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      navigate("/login?role=manager");
-    }
-    setIsLoading(false);
-  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -53,10 +40,6 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
     { icon: Printer, label: "Printable Rates", path: "/manager/printable-rates" },
     { icon: Settings, label: "Settings", path: "/manager/settings" },
   ];
-
-  if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
