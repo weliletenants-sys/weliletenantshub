@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import ManagerLayout from "@/components/ManagerLayout";
 import { PaymentVerificationsSkeleton } from "@/components/TenantDetailSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Search, CheckCircle, XCircle, Clock, Filter, X, ChevronLeft, ChevronRight, CalendarIcon, User, History, Edit, Trash2 } from "lucide-react";
+import { Search, CheckCircle, XCircle, Clock, Filter, X, ChevronLeft, ChevronRight, CalendarIcon, User, History, Edit, Trash2, Loader2, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
@@ -51,6 +52,7 @@ interface VerificationRecord {
 
 const VerificationHistory = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [verifications, setVerifications] = useState<VerificationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -78,6 +80,11 @@ const VerificationHistory = () => {
   const [deletingPayment, setDeletingPayment] = useState<VerificationRecord | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletionReason, setDeletionReason] = useState("");
+  
+  // Verify/Reject state
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [paymentToReject, setPaymentToReject] = useState<VerificationRecord | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const fetchVerifications = async () => {
     try {
@@ -161,8 +168,8 @@ const VerificationHistory = () => {
         `,
           { count: "exact" }
         )
-        .in("status", ["verified", "rejected"])
-        .order("verified_at", { ascending: false });
+        .in("status", ["pending", "verified", "rejected"])
+        .order("created_at", { ascending: false });
 
       // Apply filters
       if (statusFilter !== "all") {
@@ -389,7 +396,72 @@ const VerificationHistory = () => {
     }
   };
 
+  // Verify payment mutation
+  const verifyMutation = useMutation({
+    mutationFn: async (paymentId: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("collections")
+        .update({
+          status: "verified",
+          verified_by: user.id,
+          verified_at: new Date().toISOString(),
+        })
+        .eq("id", paymentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Payment verified successfully!");
+      fetchVerifications();
+      haptics.success();
+    },
+    onError: (error) => {
+      toast.error("Failed to verify payment", {
+        description: error.message,
+      });
+      haptics.error();
+    },
+  });
+
+  // Reject payment mutation
+  const rejectMutation = useMutation({
+    mutationFn: async ({ paymentId, reason }: { paymentId: string; reason: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("collections")
+        .update({
+          status: "rejected",
+          verified_by: user.id,
+          verified_at: new Date().toISOString(),
+          rejection_reason: reason,
+        })
+        .eq("id", paymentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Payment rejected");
+      fetchVerifications();
+      setShowRejectDialog(false);
+      setPaymentToReject(null);
+      setRejectReason("");
+      haptics.success();
+    },
+    onError: (error) => {
+      toast.error("Failed to reject payment", {
+        description: error.message,
+      });
+      haptics.error();
+    },
+  });
+
   // Statistics
+  const pendingCount = verifications.filter((v) => v.status === "pending").length;
   const verifiedCount = verifications.filter((v) => v.status === "verified").length;
   const rejectedCount = verifications.filter((v) => v.status === "rejected").length;
   const totalVerifiedAmount = verifications
@@ -415,7 +487,24 @@ const VerificationHistory = () => {
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Pending Review
+                </CardTitle>
+                <Clock className="h-4 w-4 text-orange-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-orange-600">{pendingCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Awaiting verification
+              </p>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -523,6 +612,7 @@ const VerificationHistory = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="verified">Verified</SelectItem>
                       <SelectItem value="rejected">Rejected</SelectItem>
                     </SelectContent>
@@ -812,6 +902,40 @@ const VerificationHistory = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
+                            {verification.status === "pending" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    haptics.light();
+                                    verifyMutation.mutate(verification.id);
+                                  }}
+                                  disabled={verifyMutation.isPending}
+                                  className="h-8 gap-1"
+                                >
+                                  {verifyMutation.isPending ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Check className="h-3 w-3" />
+                                  )}
+                                  Verify
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => {
+                                    haptics.light();
+                                    setPaymentToReject(verification);
+                                    setShowRejectDialog(true);
+                                  }}
+                                  disabled={rejectMutation.isPending}
+                                  className="h-8 gap-1"
+                                >
+                                  <X className="h-3 w-3" />
+                                  Reject
+                                </Button>
+                              </>
+                            )}
                             <Button
                               variant="outline"
                               size="sm"
@@ -952,6 +1076,49 @@ const VerificationHistory = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Reject Payment Dialog */}
+        <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reject Payment</AlertDialogTitle>
+              <AlertDialogDescription>
+                Please provide a reason for rejecting this payment. This will be recorded in the audit log.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+              <Textarea
+                placeholder="Enter rejection reason..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                className="min-h-[100px]"
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => {
+                setShowRejectDialog(false);
+                setRejectReason("");
+                setPaymentToReject(null);
+              }}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (!paymentToReject || !rejectReason.trim()) {
+                    toast.error("Please provide a reason for rejection");
+                    return;
+                  }
+                  rejectMutation.mutate({ paymentId: paymentToReject.id, reason: rejectReason });
+                }}
+                className="bg-destructive hover:bg-destructive/90"
+                disabled={!rejectReason.trim() || rejectMutation.isPending}
+              >
+                {rejectMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Reject Payment
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Delete Payment Dialog */}
         <AlertDialog open={!!deletingPayment} onOpenChange={(open) => !open && setDeletingPayment(null)}>
