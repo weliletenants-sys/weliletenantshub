@@ -24,11 +24,31 @@ const Login = () => {
   const [fullName, setFullName] = useState("");
   const [session, setSession] = useState<Session | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   useEffect(() => {
     // Check if user is already logged in
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
+        // Check if this is a "remember me" session
+        const rememberMeFlag = sessionStorage.getItem('rememberMe');
+        
+        // If no remember me flag in sessionStorage, this means browser was closed
+        // and session should expire (unless it was a "remember me" login)
+        if (!rememberMeFlag) {
+          // Check if this was a permanent login (stored in localStorage)
+          const permanentLogin = localStorage.getItem('welile_remember_me');
+          
+          if (!permanentLogin) {
+            // Session-only login and browser was closed, sign out
+            await supabase.auth.signOut();
+            return;
+          } else {
+            // Restore the sessionStorage flag for this session
+            sessionStorage.setItem('rememberMe', 'true');
+          }
+        }
+        
         setSession(session);
         // Ensure profile exists before redirecting
         const profileExists = await ensureProfileExists(session.user);
@@ -81,6 +101,15 @@ const Login = () => {
       if (error) throw error;
 
       if (data.user) {
+        // Store remember me preference
+        if (rememberMe) {
+          localStorage.setItem('welile_remember_me', 'true');
+          sessionStorage.setItem('rememberMe', 'true');
+        } else {
+          localStorage.removeItem('welile_remember_me');
+          sessionStorage.setItem('rememberMe', 'true');
+        }
+        
         // Ensure profile exists after login
         const profileExists = await ensureProfileExists(data.user);
         if (profileExists) {
@@ -121,6 +150,15 @@ const Login = () => {
       if (error) throw error;
 
       if (data.user) {
+        // Store remember me preference for new accounts
+        if (rememberMe) {
+          localStorage.setItem('welile_remember_me', 'true');
+          sessionStorage.setItem('rememberMe', 'true');
+        } else {
+          localStorage.removeItem('welile_remember_me');
+          sessionStorage.setItem('rememberMe', 'true');
+        }
+        
         // Ensure profile exists after signup
         const profileExists = await ensureProfileExists(data.user);
         if (profileExists) {
@@ -198,6 +236,18 @@ const Login = () => {
                       </button>
                     </div>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="remember-me"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                    />
+                    <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
+                      Remember me on this device
+                    </Label>
+                  </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Logging in..." : "Login"}
                   </Button>
@@ -253,6 +303,18 @@ const Login = () => {
                         )}
                       </button>
                     </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="remember-me-signup"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                    />
+                    <Label htmlFor="remember-me-signup" className="text-sm font-normal cursor-pointer">
+                      Remember me on this device
+                    </Label>
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Creating account..." : "Create Account"}
