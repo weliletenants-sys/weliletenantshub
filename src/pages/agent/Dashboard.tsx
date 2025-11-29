@@ -11,12 +11,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X, Reply, Send, MessageCircle } from "lucide-react";
+import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X, Reply, Send, MessageCircle, Calculator } from "lucide-react";
 import MessageThreadDialog from "@/components/MessageThreadDialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 import QuickPaymentDialog from "@/components/QuickPaymentDialog";
+import { DailyRepaymentCalculatorDialog } from "@/components/DailyRepaymentCalculatorDialog";
 import { clearOldCaches, getCacheSize } from "@/lib/cacheManager";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
 import { format } from "date-fns";
@@ -30,6 +31,7 @@ const AgentDashboard = () => {
   const [overdueTenants, setOverdueTenants] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [pendingVerifications, setPendingVerifications] = useState(0);
   const [verifiedPayments, setVerifiedPayments] = useState(0);
   const [rejectedPayments, setRejectedPayments] = useState(0);
@@ -621,7 +623,7 @@ const AgentDashboard = () => {
           </Card>
 
           {/* Quick Action Buttons */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <Button 
               size="lg" 
               className="h-24 text-base font-bold shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"
@@ -644,12 +646,31 @@ const AgentDashboard = () => {
                 <span>Quick Pay</span>
               </div>
             </Button>
+
+            <Button 
+              size="lg" 
+              className="h-24 text-base font-bold shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 bg-purple-600 hover:bg-purple-700"
+              onClick={() => {
+                setCalculatorOpen(true);
+                haptics.light();
+              }}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <Calculator className="h-8 w-8" />
+                <span className="text-xs">Calculator</span>
+              </div>
+            </Button>
           </div>
 
           <QuickPaymentDialog
             open={quickPaymentOpen}
             onOpenChange={setQuickPaymentOpen}
             onSuccess={fetchAgentData}
+          />
+
+          <DailyRepaymentCalculatorDialog
+            open={calculatorOpen}
+            onOpenChange={setCalculatorOpen}
           />
 
           {/* Overdue Payment Notifications */}

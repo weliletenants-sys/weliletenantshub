@@ -36,7 +36,9 @@ const AgentWeeklySummary = lazy(() => import("./pages/agent/WeeklySummary"));
 const AgentSettings = lazy(() => import("./pages/agent/Settings"));
 const AgentReceiptHistory = lazy(() => import("./pages/agent/ReceiptHistory"));
 const AgentNotifications = lazy(() => import("./pages/agent/Notifications"));
+const AgentPrintableDailyRates = lazy(() => import("./pages/agent/PrintableDailyRates"));
 const ManagerDashboard = lazy(() => import("./pages/manager/Dashboard"));
+const ManagerPrintableDailyRates = lazy(() => import("./pages/manager/PrintableDailyRates"));
 const ManagerAgents = lazy(() => import("./pages/manager/Agents"));
 const ManagerAgentDetail = lazy(() => import("./pages/manager/AgentDetail"));
 const ManagerTenantDetail = lazy(() => import("./pages/manager/TenantDetail"));
@@ -177,6 +179,11 @@ const AppContent = () => {
                 <AgentNotifications />
               </ProtectedRoute>
             } />
+            <Route path="/agent/printable-rates" element={
+              <ProtectedRoute requiredRole="agent">
+                <AgentPrintableDailyRates />
+              </ProtectedRoute>
+            } />
             <Route path="/manager/dashboard" element={
               <ProtectedRoute requiredRole="manager">
                 <ManagerDashboard />
@@ -240,6 +247,11 @@ const AppContent = () => {
             <Route path="/manager/settings" element={
               <ProtectedRoute requiredRole="manager">
                 <ManagerSettings />
+              </ProtectedRoute>
+            } />
+            <Route path="/manager/printable-rates" element={
+              <ProtectedRoute requiredRole="manager">
+                <ManagerPrintableDailyRates />
               </ProtectedRoute>
             } />
             <Route path="/admin" element={<AdminDashboard />} />

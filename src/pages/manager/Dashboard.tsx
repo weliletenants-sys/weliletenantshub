@@ -7,7 +7,7 @@ import { ContentTransition } from "@/components/ContentTransition";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -28,6 +28,7 @@ import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import { BulkMessageDialog } from "@/components/BulkMessageDialog";
 import { MessageSquare } from "lucide-react";
 import { PaymentBroadcastWidget } from "@/components/PaymentBroadcastWidget";
+import { DailyRepaymentCalculatorDialog } from "@/components/DailyRepaymentCalculatorDialog";
 import { useManagerTutorial } from "@/hooks/useManagerTutorial";
 
 const ManagerDashboard = () => {
@@ -47,6 +48,7 @@ const ManagerDashboard = () => {
     portfolioWeekChangePercent: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [showTenantSearch, setShowTenantSearch] = useState(false);
   const [showAgentSearch, setShowAgentSearch] = useState(false);
   const [tenantSearchQuery, setTenantSearchQuery] = useState("");
@@ -732,22 +734,56 @@ const ManagerDashboard = () => {
             </div>
 
           {/* Broadcast Messaging Feature */}
-          <Card id="bulk-messaging" className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <h3 className="font-semibold text-lg flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5" />
-                    Broadcast Messages
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Send announcements and updates to all agents. Tag specific tenants for attention.
-                  </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card id="bulk-messaging" className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5" />
+                      Broadcast Messages
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Send announcements and updates to all agents
+                    </p>
+                  </div>
+                  <BulkMessageDialog sendToAll={true} />
                 </div>
-                <BulkMessageDialog sendToAll={true} />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-r from-purple-500/10 to-purple-600/5 border-purple-500/20">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <Calculator className="h-5 w-5" />
+                      Daily Repayment Calculator
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Calculate customer payment plans
+                    </p>
+                  </div>
+                  <Button 
+                    size="lg"
+                    className="bg-purple-600 hover:bg-purple-700"
+                    onClick={() => {
+                      setCalculatorOpen(true);
+                      haptics.light();
+                    }}
+                  >
+                    <Calculator className="h-5 w-5 mr-2" />
+                    Calculate
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <DailyRepaymentCalculatorDialog
+            open={calculatorOpen}
+            onOpenChange={setCalculatorOpen}
+          />
 
           {/* Quick Search Section */}
           <div id="search-features" className="grid grid-cols-1 md:grid-cols-2 gap-4">
