@@ -18,7 +18,7 @@ import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { haptics } from "@/utils/haptics";
 import { useRealtimeAllTenants, useRealtimeAllCollections, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
-import { useOptimisticTenantDeletion } from "@/hooks/useOptimisticTenant";
+import { useOptimisticTenantDeletion, useOptimisticTenantTransfer } from "@/hooks/useOptimisticTenant";
 
 interface TenantData {
   id: string;
@@ -82,10 +82,10 @@ const ManagerTenantDetail = () => {
   
   // Optimistic mutations
   const deleteTenantMutation = useOptimisticTenantDeletion();
+  const transferTenantMutation = useOptimisticTenantTransfer();
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [availableAgents, setAvailableAgents] = useState<any[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
-  const [isTransferring, setIsTransferring] = useState(false);
   const [editForm, setEditForm] = useState({
     tenantName: "",
     tenantPhone: "",
@@ -313,81 +313,40 @@ const ManagerTenantDetail = () => {
     if (!tenant || !selectedAgentId) return;
 
     try {
-      setIsTransferring(true);
-
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error("Not authenticated");
         return;
       }
 
-      // Get the new agent's profile info for the audit log
+      // Get agent names for the mutation
       const { data: newAgent } = await supabase
         .from("agents")
-        .select(`
-          id,
-          profiles!agents_user_id_fkey (
-            full_name
-          )
-        `)
+        .select(`profiles!agents_user_id_fkey (full_name)`)
         .eq("id", selectedAgentId)
         .single();
 
-      // Get the old agent's profile info for the audit log
       const { data: oldAgent } = await supabase
         .from("agents")
-        .select(`
-          id,
-          profiles!agents_user_id_fkey (
-            full_name
-          )
-        `)
+        .select(`profiles!agents_user_id_fkey (full_name)`)
         .eq("id", tenant.agent_id)
         .single();
 
-      // Update the tenant's agent_id
-      const { error: updateError } = await supabase
-        .from("tenants")
-        .update({ agent_id: selectedAgentId })
-        .eq("id", tenantId);
+      await transferTenantMutation.mutateAsync({
+        tenantId: tenantId!,
+        tenantName: tenant.tenant_name,
+        currentAgentId: tenant.agent_id,
+        newAgentId: selectedAgentId,
+        newAgentName: newAgent?.profiles?.full_name || "Unknown",
+        oldAgentName: oldAgent?.profiles?.full_name || "Unknown",
+        managerId: user.id,
+      });
 
-      if (updateError) throw updateError;
-
-      // Create audit log entry for the transfer
-      const { error: auditError } = await supabase
-        .from("audit_logs")
-        .insert({
-          user_id: user.id,
-          action: "TRANSFER",
-          table_name: "tenants",
-          record_id: tenantId!,
-          old_data: {
-            agent_id: tenant.agent_id,
-            agent_name: oldAgent?.profiles?.full_name || "Unknown",
-          },
-          new_data: {
-            agent_id: selectedAgentId,
-            agent_name: newAgent?.profiles?.full_name || "Unknown",
-          },
-          changed_fields: ["agent_id"],
-        });
-
-      if (auditError) {
-        console.error("Error creating audit log:", auditError);
-        // Don't fail the transfer if audit log fails, just log it
-      }
-
-      haptics.success();
-      toast.success(`Tenant transferred to ${newAgent?.profiles?.full_name || "new agent"} successfully`);
       setTransferDialogOpen(false);
       setSelectedAgentId("");
       await fetchTenantData();
     } catch (error: any) {
       console.error("Error transferring tenant:", error);
-      haptics.error();
-      toast.error("Failed to transfer tenant");
-    } finally {
-      setIsTransferring(false);
     }
   };
 
@@ -623,9 +582,9 @@ const ManagerTenantDetail = () => {
                       </Button>
                       <Button
                         onClick={handleTransferTenant}
-                        disabled={!selectedAgentId || isTransferring}
+                        disabled={!selectedAgentId || transferTenantMutation.isPending}
                       >
-                        {isTransferring ? "Transferring..." : "Transfer Tenant"}
+                        {transferTenantMutation.isPending ? "Transferring..." : "Transfer Tenant"}
                       </Button>
                     </div>
                   </DialogContent>

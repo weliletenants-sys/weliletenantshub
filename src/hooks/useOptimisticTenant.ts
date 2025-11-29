@@ -14,6 +14,16 @@ interface DeleteTenantData {
   managerId?: string;
 }
 
+interface TransferTenantData {
+  tenantId: string;
+  tenantName: string;
+  currentAgentId: string;
+  newAgentId: string;
+  newAgentName: string;
+  oldAgentName: string;
+  managerId: string;
+}
+
 /**
  * Hook for optimistic tenant deletion with instant UI feedback
  */
@@ -101,6 +111,125 @@ export const useOptimisticTenantDeletion = () => {
     onSettled: (result, error, data) => {
       // Refetch to ensure sync
       queryClient.invalidateQueries({ queryKey: ['tenants', data.agentId] });
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    }
+  });
+};
+
+/**
+ * Hook for optimistic tenant transfer with instant UI feedback
+ */
+export const useOptimisticTenantTransfer = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: TransferTenantData) => {
+      // Fetch agent profiles for audit log
+      const { data: newAgent } = await supabase
+        .from("agents")
+        .select("id")
+        .eq("id", data.newAgentId)
+        .single();
+
+      if (!newAgent) throw new Error("New agent not found");
+
+      // Update tenant's agent_id
+      const { error: updateError } = await supabase
+        .from("tenants")
+        .update({ agent_id: data.newAgentId })
+        .eq("id", data.tenantId);
+
+      if (updateError) throw updateError;
+
+      // Create audit log entry
+      const { error: auditError } = await supabase
+        .from("audit_logs")
+        .insert({
+          user_id: data.managerId,
+          action: "TRANSFER",
+          table_name: "tenants",
+          record_id: data.tenantId,
+          old_data: {
+            agent_id: data.currentAgentId,
+            agent_name: data.oldAgentName,
+          },
+          new_data: {
+            agent_id: data.newAgentId,
+            agent_name: data.newAgentName,
+          },
+          changed_fields: ["agent_id"],
+        });
+
+      if (auditError) {
+        console.error("Error creating audit log:", auditError);
+      }
+
+      return { success: true };
+    },
+
+    onMutate: async (data) => {
+      // Cancel outgoing queries
+      await queryClient.cancelQueries({ queryKey: ['tenants', data.currentAgentId] });
+      await queryClient.cancelQueries({ queryKey: ['tenants', data.newAgentId] });
+      await queryClient.cancelQueries({ queryKey: ['tenant', data.tenantId] });
+
+      // Snapshot previous data
+      const previousCurrentAgentTenants = queryClient.getQueryData<Tenant[]>(['tenants', data.currentAgentId]);
+      const previousNewAgentTenants = queryClient.getQueryData<Tenant[]>(['tenants', data.newAgentId]);
+      const previousTenant = queryClient.getQueryData<Tenant>(['tenant', data.tenantId]);
+
+      // Optimistically remove from current agent's list
+      queryClient.setQueryData<Tenant[]>(['tenants', data.currentAgentId], (old = []) =>
+        old.filter((tenant) => tenant.id !== data.tenantId)
+      );
+
+      // Optimistically add to new agent's list (if cached)
+      if (previousTenant) {
+        queryClient.setQueryData<Tenant[]>(['tenants', data.newAgentId], (old = []) => [
+          { ...previousTenant, agent_id: data.newAgentId },
+          ...old
+        ]);
+      }
+
+      // Update tenant detail
+      queryClient.setQueryData<Tenant>(['tenant', data.tenantId], (old) => 
+        old ? { ...old, agent_id: data.newAgentId } : old
+      );
+
+      // Instant haptic feedback
+      haptics.light();
+
+      return { previousCurrentAgentTenants, previousNewAgentTenants, previousTenant };
+    },
+
+    onError: (error, data, context) => {
+      // Rollback on error
+      if (context?.previousCurrentAgentTenants) {
+        queryClient.setQueryData(['tenants', data.currentAgentId], context.previousCurrentAgentTenants);
+      }
+      if (context?.previousNewAgentTenants) {
+        queryClient.setQueryData(['tenants', data.newAgentId], context.previousNewAgentTenants);
+      }
+      if (context?.previousTenant) {
+        queryClient.setQueryData(['tenant', data.tenantId], context.previousTenant);
+      }
+
+      haptics.error?.();
+      toast.error('Failed to transfer tenant', {
+        description: error instanceof Error ? error.message : 'Please try again'
+      });
+    },
+
+    onSuccess: (result, data) => {
+      haptics.success();
+      toast.success(`Tenant transferred to ${data.newAgentName} successfully`);
+    },
+
+    onSettled: (result, error, data) => {
+      // Refetch to ensure sync
+      queryClient.invalidateQueries({ queryKey: ['tenants', data.currentAgentId] });
+      queryClient.invalidateQueries({ queryKey: ['tenants', data.newAgentId] });
+      queryClient.invalidateQueries({ queryKey: ['tenant', data.tenantId] });
       queryClient.invalidateQueries({ queryKey: ['agents'] });
     }
   });
