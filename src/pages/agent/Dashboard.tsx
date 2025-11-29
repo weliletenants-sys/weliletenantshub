@@ -20,8 +20,9 @@ import QuickPaymentDialog from "@/components/QuickPaymentDialog";
 import { DailyRepaymentCalculatorDialog } from "@/components/DailyRepaymentCalculatorDialog";
 import { clearOldCaches, getCacheSize } from "@/lib/cacheManager";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
-import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
+import { format } from "date-fns";
+import { BackgroundSyncIndicator } from "@/components/BackgroundSyncIndicator";
 
 const AgentDashboard = () => {
   const navigate = useNavigate();
@@ -944,6 +945,8 @@ const AgentDashboard = () => {
           fetchAgentData();
         }}
       />
+      
+      <BackgroundSyncIndicator />
     </AgentLayout>
   );
 };
