@@ -7,7 +7,7 @@ import { ContentTransition } from "@/components/ContentTransition";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -28,6 +28,7 @@ import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import { BulkMessageDialog } from "@/components/BulkMessageDialog";
 import { MessageSquare } from "lucide-react";
 import { PaymentBroadcastWidget } from "@/components/PaymentBroadcastWidget";
+import { useManagerTutorial } from "@/hooks/useManagerTutorial";
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -81,6 +82,20 @@ const ManagerDashboard = () => {
 
   // Track sync status for tenants table (for portfolio value updates)
   const { lastSyncTime } = useRealtimeSyncStatus('tenants');
+
+  // Tutorial/onboarding flow
+  const { hasCompletedTutorial, startTutorial } = useManagerTutorial();
+
+  // Auto-start tutorial on first login
+  useEffect(() => {
+    if (!isLoading && !hasCompletedTutorial) {
+      // Delay to ensure DOM elements are rendered
+      const timer = setTimeout(() => {
+        startTutorial();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, hasCompletedTutorial]);
 
   // Show toast notification when portfolio value changes
   useEffect(() => {
@@ -711,13 +726,13 @@ const ManagerDashboard = () => {
           skeleton={<ManagerDashboardSkeleton />}
         >
           <div className="space-y-6 animate-reveal">
-            <div>
+            <div id="welcome-message">
               <h1 className="text-3xl font-bold">Manager Dashboard</h1>
               <p className="text-muted-foreground">Service Centre Overview</p>
             </div>
 
           {/* Broadcast Messaging Feature */}
-          <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+          <Card id="bulk-messaging" className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
@@ -735,7 +750,7 @@ const ManagerDashboard = () => {
           </Card>
 
           {/* Quick Search Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div id="search-features" className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -794,7 +809,7 @@ const ManagerDashboard = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
+          <Card id="stats-total-agents" className="cursor-pointer hover:shadow-lg transition-all" onClick={() => navigate("/manager/agents")}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Users className="h-4 w-4" />
@@ -809,7 +824,7 @@ const ManagerDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="stats-total-tenants">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <UserCheck className="h-4 w-4" />
@@ -822,7 +837,7 @@ const ManagerDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="stats-pending-verifications" className="cursor-pointer hover:shadow-lg transition-all" onClick={() => navigate("/manager/verifications")}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
@@ -838,6 +853,7 @@ const ManagerDashboard = () => {
           </Card>
 
           <Card 
+            id="stats-portfolio-value"
             className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 cursor-pointer hover:border-primary/40 transition-all hover:shadow-lg"
             onClick={() => {
               haptics.light();
@@ -870,7 +886,9 @@ const ManagerDashboard = () => {
         </div>
 
         {/* Live Activity Feed */}
-        <ActivityFeed maxItems={20} className="lg:col-span-2" />
+        <div id="activity-feed">
+          <ActivityFeed maxItems={20} className="lg:col-span-2" />
+        </div>
 
         {/* Payment Verification Stats */}
         <Card>
@@ -1362,7 +1380,9 @@ const ManagerDashboard = () => {
           </Card>
 
           {/* Payment Broadcast Widget */}
-          <PaymentBroadcastWidget />
+          <div id="payment-broadcast">
+            <PaymentBroadcastWidget />
+          </div>
 
           {/* Admin Access Card */}
         <Card className="bg-primary/10 border-primary/20">
