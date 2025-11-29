@@ -100,6 +100,7 @@ const ManagerDashboard = () => {
   const [paymentMethodData, setPaymentMethodData] = useState<any[]>([]);
   const [agentPaymentMethodData, setAgentPaymentMethodData] = useState<any[]>([]);
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<'all' | 'verified' | 'pending' | 'rejected'>('all');
+  const [paymentMethodTimePeriod, setPaymentMethodTimePeriod] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
 
   // Fetch payment report data with date range
   const fetchPaymentReportData = async (startDate?: Date, endDate?: Date) => {
@@ -619,9 +620,9 @@ const ManagerDashboard = () => {
           // Load agent growth and payment method data
           if (agentsCount.data) {
             await calculateAgentGrowthComparison(agentsCount.data);
-            await fetchAgentPaymentMethodBreakdown(agentsCount.data);
+            await fetchAgentPaymentMethodBreakdown(agentsCount.data, paymentMethodTimePeriod);
           }
-          await fetchPaymentMethodBreakdown();
+          await fetchPaymentMethodBreakdown(paymentMethodTimePeriod);
         }, 100);
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
@@ -818,26 +819,63 @@ const ManagerDashboard = () => {
     }
   };
 
-  const fetchPaymentMethodBreakdown = async () => {
+  const fetchPaymentMethodBreakdown = async (timePeriod: '7d' | '30d' | '90d' | 'all' = '30d') => {
     try {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const now = new Date();
+      let currentPeriodStart: Date;
+      let previousPeriodStart: Date;
+      let previousPeriodEnd: Date;
       
-      const sixtyDaysAgo = new Date();
-      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      // Calculate date ranges based on time period
+      switch (timePeriod) {
+        case '7d':
+          currentPeriodStart = new Date(now);
+          currentPeriodStart.setDate(currentPeriodStart.getDate() - 7);
+          previousPeriodStart = new Date(now);
+          previousPeriodStart.setDate(previousPeriodStart.getDate() - 14);
+          previousPeriodEnd = new Date(currentPeriodStart);
+          break;
+        case '90d':
+          currentPeriodStart = new Date(now);
+          currentPeriodStart.setDate(currentPeriodStart.getDate() - 90);
+          previousPeriodStart = new Date(now);
+          previousPeriodStart.setDate(previousPeriodStart.getDate() - 180);
+          previousPeriodEnd = new Date(currentPeriodStart);
+          break;
+        case 'all':
+          // For "all time", compare current data vs data from 90 days ago
+          currentPeriodStart = new Date('2000-01-01'); // Far back enough to get all data
+          previousPeriodStart = new Date(now);
+          previousPeriodStart.setDate(previousPeriodStart.getDate() - 180);
+          previousPeriodEnd = new Date(now);
+          previousPeriodEnd.setDate(previousPeriodEnd.getDate() - 90);
+          break;
+        default: // 30d
+          currentPeriodStart = new Date(now);
+          currentPeriodStart.setDate(currentPeriodStart.getDate() - 30);
+          previousPeriodStart = new Date(now);
+          previousPeriodStart.setDate(previousPeriodStart.getDate() - 60);
+          previousPeriodEnd = new Date(currentPeriodStart);
+          break;
+      }
 
-      // Fetch current period (last 30 days) - ALL payments regardless of status
-      const { data: currentPeriod } = await supabase
+      // Fetch current period - ALL payments regardless of status
+      let currentQuery = supabase
         .from("collections")
-        .select("amount, payment_method")
-        .gte("collection_date", thirtyDaysAgo.toISOString().split('T')[0]);
+        .select("amount, payment_method");
+      
+      if (timePeriod !== 'all') {
+        currentQuery = currentQuery.gte("collection_date", currentPeriodStart.toISOString().split('T')[0]);
+      }
+      
+      const { data: currentPeriod } = await currentQuery;
 
-      // Fetch previous period (30-60 days ago) - ALL payments regardless of status
+      // Fetch previous period - ALL payments regardless of status
       const { data: previousPeriod } = await supabase
         .from("collections")
         .select("amount, payment_method")
-        .gte("collection_date", sixtyDaysAgo.toISOString().split('T')[0])
-        .lt("collection_date", thirtyDaysAgo.toISOString().split('T')[0]);
+        .gte("collection_date", previousPeriodStart.toISOString().split('T')[0])
+        .lt("collection_date", previousPeriodEnd.toISOString().split('T')[0]);
 
       // Calculate totals by method
       const calculateTotals = (data: any[]) => {
@@ -881,21 +919,45 @@ const ManagerDashboard = () => {
     }
   };
 
-  const fetchAgentPaymentMethodBreakdown = async (agents: any[]) => {
+  const fetchAgentPaymentMethodBreakdown = async (agents: any[], timePeriod: '7d' | '30d' | '90d' | 'all' = '30d') => {
     if (!agents || agents.length === 0) {
       setAgentPaymentMethodData([]);
       return;
     }
 
     try {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const now = new Date();
+      let startDate: Date;
+      
+      // Calculate start date based on time period
+      switch (timePeriod) {
+        case '7d':
+          startDate = new Date(now);
+          startDate.setDate(startDate.getDate() - 7);
+          break;
+        case '90d':
+          startDate = new Date(now);
+          startDate.setDate(startDate.getDate() - 90);
+          break;
+        case 'all':
+          startDate = new Date('2000-01-01'); // Far back enough to get all data
+          break;
+        default: // 30d
+          startDate = new Date(now);
+          startDate.setDate(startDate.getDate() - 30);
+          break;
+      }
 
       // Fetch collections for all agents - ALL payments regardless of status
-      const { data: collections } = await supabase
+      let query = supabase
         .from("collections")
-        .select("agent_id, amount, payment_method")
-        .gte("collection_date", thirtyDaysAgo.toISOString().split('T')[0]);
+        .select("agent_id, amount, payment_method");
+      
+      if (timePeriod !== 'all') {
+        query = query.gte("collection_date", startDate.toISOString().split('T')[0]);
+      }
+      
+      const { data: collections } = await query;
 
       // Calculate payment method breakdown per agent
       const agentBreakdown = await Promise.all(
@@ -2512,13 +2574,79 @@ const ManagerDashboard = () => {
           {/* Payment Method Breakdown */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-primary" />
-                Payment Method Breakdown
-              </CardTitle>
-              <CardDescription>
-                Collections by payment method across all agents (Last 30 days)
-              </CardDescription>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Wallet className="h-5 w-5 text-primary" />
+                    Payment Method Breakdown
+                  </CardTitle>
+                  <CardDescription>
+                    Collections by payment method across all agents (
+                    {paymentMethodTimePeriod === '7d' ? 'Last 7 days' :
+                     paymentMethodTimePeriod === '30d' ? 'Last 30 days' :
+                     paymentMethodTimePeriod === '90d' ? 'Last 90 days' :
+                     'All time'})
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant={paymentMethodTimePeriod === '7d' ? 'default' : 'outline'}
+                    onClick={async () => {
+                      setPaymentMethodTimePeriod('7d');
+                      await fetchPaymentMethodBreakdown('7d');
+                      const { data: agents } = await supabase.from("agents").select("*");
+                      if (agents) await fetchAgentPaymentMethodBreakdown(agents, '7d');
+                      haptics.light();
+                    }}
+                    className="text-xs"
+                  >
+                    7 Days
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={paymentMethodTimePeriod === '30d' ? 'default' : 'outline'}
+                    onClick={async () => {
+                      setPaymentMethodTimePeriod('30d');
+                      await fetchPaymentMethodBreakdown('30d');
+                      const { data: agents } = await supabase.from("agents").select("*");
+                      if (agents) await fetchAgentPaymentMethodBreakdown(agents, '30d');
+                      haptics.light();
+                    }}
+                    className="text-xs"
+                  >
+                    30 Days
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={paymentMethodTimePeriod === '90d' ? 'default' : 'outline'}
+                    onClick={async () => {
+                      setPaymentMethodTimePeriod('90d');
+                      await fetchPaymentMethodBreakdown('90d');
+                      const { data: agents } = await supabase.from("agents").select("*");
+                      if (agents) await fetchAgentPaymentMethodBreakdown(agents, '90d');
+                      haptics.light();
+                    }}
+                    className="text-xs"
+                  >
+                    90 Days
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={paymentMethodTimePeriod === 'all' ? 'default' : 'outline'}
+                    onClick={async () => {
+                      setPaymentMethodTimePeriod('all');
+                      await fetchPaymentMethodBreakdown('all');
+                      const { data: agents } = await supabase.from("agents").select("*");
+                      if (agents) await fetchAgentPaymentMethodBreakdown(agents, 'all');
+                      haptics.light();
+                    }}
+                    className="text-xs"
+                  >
+                    All Time
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <ChartContainer
@@ -2586,7 +2714,12 @@ const ManagerDashboard = () => {
                       UGX {item.amount.toLocaleString()}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      vs. previous 30 days
+                      vs. previous {
+                        paymentMethodTimePeriod === '7d' ? '7 days' :
+                        paymentMethodTimePeriod === '30d' ? '30 days' :
+                        paymentMethodTimePeriod === '90d' ? '90 days' :
+                        '90 days'
+                      }
                     </p>
                   </div>
                 ))}
@@ -2602,7 +2735,11 @@ const ManagerDashboard = () => {
                 Agent Payment Method Preferences
               </CardTitle>
               <CardDescription>
-                Compare payment method usage across top agents (Last 30 days)
+                Compare payment method usage across top agents (
+                {paymentMethodTimePeriod === '7d' ? 'Last 7 days' :
+                 paymentMethodTimePeriod === '30d' ? 'Last 30 days' :
+                 paymentMethodTimePeriod === '90d' ? 'Last 90 days' :
+                 'All time'})
               </CardDescription>
             </CardHeader>
             <CardContent>
