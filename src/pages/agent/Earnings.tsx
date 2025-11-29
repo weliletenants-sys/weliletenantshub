@@ -5,7 +5,8 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { TrendingUp, Wallet, Target, DollarSign, Award, Calendar, TrendingDown, CalendarIcon } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { TrendingUp, Wallet, Target, DollarSign, Award, Calendar, TrendingDown, CalendarIcon, Clock, CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -24,6 +25,8 @@ const AgentEarnings = () => {
     totalPayments: 0,
     averageCommission: 0,
     lastThreeMonths: 0,
+    pendingCommission: 0,
+    pendingPayments: 0,
   });
   const [recentCollections, setRecentCollections] = useState<any[]>([]);
   const [dailyBreakdown, setDailyBreakdown] = useState<any[]>([]);
@@ -73,12 +76,19 @@ const AgentEarnings = () => {
         .gte('collection_date', firstDayLastMonth.toISOString().split('T')[0])
         .lte('collection_date', lastDayLastMonth.toISOString().split('T')[0]);
 
-      // Get lifetime commission data
+      // Get lifetime commission data (verified only)
       const { data: allCollections } = await supabase
         .from('collections')
         .select('commission')
         .eq('agent_id', agentData.id)
         .eq('status', 'verified');
+
+      // Get pending commission data
+      const { data: pendingCollections } = await supabase
+        .from('collections')
+        .select('commission')
+        .eq('agent_id', agentData.id)
+        .eq('status', 'pending');
 
       // Get last 3 months data for trend comparison
       const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
@@ -95,6 +105,9 @@ const AgentEarnings = () => {
       const lastThreeMonthsTotal = (lastThreeMonthsCollections || []).reduce((sum, c) => sum + c.commission, 0);
       const totalPaymentCount = allCollections?.length || 0;
       const avgCommission = totalPaymentCount > 0 ? lifetimeTotal / totalPaymentCount : 0;
+      
+      const pendingTotal = (pendingCollections || []).reduce((sum, c) => sum + c.commission, 0);
+      const pendingCount = pendingCollections?.length || 0;
 
       setEarnings({
         thisMonth: thisMonthTotal,
@@ -107,6 +120,8 @@ const AgentEarnings = () => {
         totalPayments: totalPaymentCount,
         averageCommission: avgCommission,
         lastThreeMonths: lastThreeMonthsTotal,
+        pendingCommission: pendingTotal,
+        pendingPayments: pendingCount,
       });
 
       setRecentCollections(thisMonthCollections?.slice(0, 10) || []);
@@ -168,6 +183,18 @@ const AgentEarnings = () => {
           <p className="text-muted-foreground">Track your income and portfolio growth</p>
         </div>
 
+        {/* Pending Commission Alert */}
+        {earnings.pendingCommission > 0 && (
+          <Alert className="border-amber-500/50 bg-amber-500/10">
+            <Clock className="h-4 w-4 text-amber-500" />
+            <AlertDescription className="text-sm">
+              <span className="font-semibold">UGX {earnings.pendingCommission.toLocaleString()}</span> in commission from{" "}
+              <span className="font-semibold">{earnings.pendingPayments} payment{earnings.pendingPayments !== 1 ? 's' : ''}</span>{" "}
+              is pending manager verification. Once verified, it will be added to your earnings.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Lifetime Commission Hero Card */}
         <Card className="bg-gradient-to-br from-amber-600 via-amber-500 to-yellow-500 text-white overflow-hidden relative shadow-xl">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-32 translate-x-32" />
@@ -180,10 +207,19 @@ const AgentEarnings = () => {
                   <Award className="h-10 w-10" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium opacity-95 mb-1">🏆 Lifetime Commission</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <p className="text-sm font-medium opacity-95">🏆 Verified Lifetime Commission</p>
+                  </div>
                   <h2 className="text-5xl font-black tracking-tight">
                     UGX {earnings.lifetimeCommission.toLocaleString()}
                   </h2>
+                  {earnings.pendingCommission > 0 && (
+                    <p className="text-xs opacity-90 mt-2 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      +UGX {earnings.pendingCommission.toLocaleString()} pending verification
+                    </p>
+                  )}
                 </div>
               </div>
 
