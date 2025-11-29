@@ -34,6 +34,7 @@ import { useManagerTutorial } from "@/hooks/useManagerTutorial";
 import ManagerPaymentDialog from "@/components/ManagerPaymentDialog";
 import AgentsList from "@/components/AgentsListWidget";
 import { SkeletonWrapper } from "@/components/SkeletonWrapper";
+import { useDebounce } from "@/hooks/useDebounce";
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -59,6 +60,8 @@ const ManagerDashboard = () => {
   const [tenantSearchQuery, setTenantSearchQuery] = useState("");
   const [agentSearchQuery, setAgentSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<any[]>([]);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   
   // Tenant filters
@@ -659,6 +662,51 @@ const ManagerDashboard = () => {
     setEndDateFilter(undefined);
   };
 
+  // Debounce the search query for autocomplete
+  const debouncedSearchQuery = useDebounce(tenantSearchQuery, 300);
+
+  // Fetch autocomplete suggestions
+  useEffect(() => {
+    const fetchAutocompleteSuggestions = async () => {
+      if (!debouncedSearchQuery.trim() || debouncedSearchQuery.length < 2) {
+        setAutocompleteSuggestions([]);
+        setShowAutocomplete(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("tenants")
+          .select(`
+            id,
+            tenant_name,
+            tenant_phone,
+            outstanding_balance,
+            status,
+            agents (
+              profiles:user_id (
+                full_name
+              )
+            )
+          `)
+          .or(`tenant_name.ilike.%${debouncedSearchQuery}%,tenant_phone.ilike.%${debouncedSearchQuery}%`)
+          .order("tenant_name", { ascending: true })
+          .limit(8);
+
+        if (error) throw error;
+
+        setAutocompleteSuggestions(data || []);
+        setShowAutocomplete((data || []).length > 0);
+      } catch (error) {
+        console.error("Error fetching autocomplete suggestions:", error);
+      }
+    };
+
+    if (showTenantSearch) {
+      fetchAutocompleteSuggestions();
+    }
+  }, [debouncedSearchQuery, showTenantSearch]);
+
   const clearAgentFilters = () => {
     setAgentStatusFilter("all");
     setMinTenantsFilter("");
@@ -847,6 +895,8 @@ const ManagerDashboard = () => {
                   setShowTenantSearch(true);
                   setSearchResults([]);
                   setTenantSearchQuery("");
+                  setAutocompleteSuggestions([]);
+                  setShowAutocomplete(false);
                   clearTenantFilters();
                   setShowAdvancedFilters(false);
                   }}
@@ -1579,31 +1629,103 @@ const ManagerDashboard = () => {
       </PullToRefresh>
 
       {/* Tenant Search Dialog */}
-      <Dialog open={showTenantSearch} onOpenChange={setShowTenantSearch}>
+      <Dialog 
+        open={showTenantSearch} 
+        onOpenChange={(open) => {
+          setShowTenantSearch(open);
+          if (!open) {
+            setShowAutocomplete(false);
+            setAutocompleteSuggestions([]);
+            setTenantSearchQuery("");
+            setSearchResults([]);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Search Tenants</DialogTitle>
             <DialogDescription>
-              Enter tenant name or phone to search, or click Search to browse all tenants
+              Start typing tenant name or phone to see instant suggestions
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Enter tenant name or phone number (or leave empty to browse all)..."
-                value={tenantSearchQuery}
-                onChange={(e) => setTenantSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleTenantSearch();
-                  }
-                }}
-                className="flex-1"
-              />
-              <Button onClick={handleTenantSearch}>
-                <Search className="h-4 w-4 mr-2" />
-                {tenantSearchQuery.trim() ? "Search" : "Browse All"}
-              </Button>
+            <div className="relative">
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Input
+                    placeholder="Start typing tenant name or phone number..."
+                    value={tenantSearchQuery}
+                    onChange={(e) => {
+                      setTenantSearchQuery(e.target.value);
+                      setSearchResults([]);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleTenantSearch();
+                        setShowAutocomplete(false);
+                      }
+                      if (e.key === 'Escape') {
+                        setShowAutocomplete(false);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (autocompleteSuggestions.length > 0) {
+                        setShowAutocomplete(true);
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  
+                  {/* Autocomplete Dropdown */}
+                  {showAutocomplete && autocompleteSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                      <div className="p-2">
+                        <p className="text-xs text-muted-foreground px-2 py-1 mb-1">
+                          Suggestions ({autocompleteSuggestions.length})
+                        </p>
+                        {autocompleteSuggestions.map((tenant) => (
+                          <div
+                            key={tenant.id}
+                            className="flex items-center justify-between p-3 rounded-md hover:bg-muted cursor-pointer transition-colors"
+                            onClick={() => {
+                              haptics.light();
+                              navigate(`/manager/tenants/${tenant.id}`);
+                              setShowTenantSearch(false);
+                              setShowAutocomplete(false);
+                            }}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-sm truncate">
+                                  {tenant.tenant_name}
+                                </p>
+                                <Badge 
+                                  variant={tenant.status === 'verified' ? 'default' : 'secondary'}
+                                  className="text-xs shrink-0"
+                                >
+                                  {tenant.status || 'pending'}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {tenant.tenant_phone} • Agent: {tenant.agents?.profiles?.full_name || 'Unknown'}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0 ml-3">
+                              <p className="text-sm font-semibold">
+                                UGX {Number(tenant.outstanding_balance || 0).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <Button onClick={handleTenantSearch}>
+                  <Search className="h-4 w-4 mr-2" />
+                  {tenantSearchQuery.trim() ? "Search" : "Browse All"}
+                </Button>
+              </div>
             </div>
 
             {/* Advanced Filters Toggle */}
