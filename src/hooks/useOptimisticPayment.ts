@@ -43,6 +43,9 @@ export const useOptimisticPayment = () => {
         return { offline: true };
       }
 
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
       // Online: submit to server
       const collectionData = {
         agent_id: data.agentId,
@@ -52,6 +55,8 @@ export const useOptimisticPayment = () => {
         payment_method: data.paymentMethod,
         collection_date: data.collectionDate,
         status: 'completed',
+        created_by: user?.id || null,
+        created_by_manager: false, // Agents create payments that need verification
       };
 
       const { data: collection, error: collectionError } = await supabase
@@ -96,6 +101,9 @@ export const useOptimisticPayment = () => {
         });
       }
 
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
       // Optimistically add the collection
       const optimisticCollection: Collection = {
         id: `optimistic-${Date.now()}`,
@@ -107,6 +115,8 @@ export const useOptimisticPayment = () => {
         collection_date: data.collectionDate,
         status: 'pending',
         created_at: new Date().toISOString(),
+        created_by: user?.id || '',
+        created_by_manager: false,
         verified_by: null,
         verified_at: null,
         rejection_reason: null,

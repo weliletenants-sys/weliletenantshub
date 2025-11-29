@@ -113,7 +113,9 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
           commission: commission,
           payment_method: paymentMethod,
           collection_date: format(paymentDate, "yyyy-MM-dd"),
-          status: "pending",
+          status: "pending", // Will be auto-verified by trigger
+          created_by: user.id,
+          created_by_manager: true, // Manager payment - auto-verify
         })
         .select()
         .single();

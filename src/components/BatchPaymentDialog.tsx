@@ -170,7 +170,9 @@ export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentD
             commission: commission,
             payment_method: payment.paymentMethod,
             collection_date: format(payment.paymentDate, "yyyy-MM-dd"),
-            status: "pending",
+            status: "pending", // Will be auto-verified by trigger
+            created_by: user.id,
+            created_by_manager: true, // Manager payment - auto-verify
           })
           .select()
           .single();
