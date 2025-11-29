@@ -68,9 +68,18 @@ const ManagerVerifications = () => {
   }, []);
 
   const handleApprove = async (tenantId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Not authenticated");
+      return;
+    }
+
     const { error } = await supabase
       .from("tenants")
-      .update({ status: "verified", verified_at: new Date().toISOString() })
+      .update({ 
+        status: "verified", 
+        verified_at: new Date().toISOString()
+      })
       .eq("id", tenantId);
 
     if (error) {
@@ -81,6 +90,12 @@ const ManagerVerifications = () => {
   };
 
   const handleReject = async (tenantId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Not authenticated");
+      return;
+    }
+
     const { error } = await supabase
       .from("tenants")
       .update({ status: "rejected" })
