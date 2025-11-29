@@ -809,6 +809,89 @@ const ManagerDashboard = () => {
               <p className="text-muted-foreground">Service Centre Overview</p>
             </div>
 
+            {/* PROMINENT SEARCH HERO SECTION */}
+            <Card className="bg-gradient-to-br from-primary via-primary/90 to-primary/80 border-primary shadow-2xl">
+              <CardContent className="p-8">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl md:text-3xl font-bold text-white mb-2 flex items-center justify-center gap-3">
+                    <Search className="h-8 w-8" />
+                    Quick Search
+                  </h2>
+                  <p className="text-white/90 text-lg">
+                    Find any tenant or agent instantly
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
+                  {/* Tenant Search */}
+                  <button
+                    onClick={() => {
+                      setShowTenantSearch(true);
+                      setSearchResults([]);
+                      setTenantSearchQuery("");
+                      setAutocompleteSuggestions([]);
+                      setShowAutocomplete(false);
+                      clearTenantFilters();
+                      setShowAdvancedFilters(false);
+                      haptics.light();
+                    }}
+                    className="group relative overflow-hidden bg-white hover:bg-white/95 text-foreground rounded-xl p-6 transition-all hover:scale-105 hover:shadow-xl"
+                  >
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                        <UserCheck className="h-8 w-8 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-xl mb-1">Search Tenants</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Find by name or phone number
+                        </p>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2 text-primary font-semibold">
+                        <span>Start Search</span>
+                        <Search className="h-4 w-4" />
+                      </div>
+                    </div>
+                    
+                    {/* Decorative element */}
+                    <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-primary/5 group-hover:bg-primary/10 transition-colors" />
+                  </button>
+
+                  {/* Agent Search */}
+                  <button
+                    onClick={() => {
+                      setShowAgentSearch(true);
+                      setSearchResults([]);
+                      setAgentSearchQuery("");
+                      clearAgentFilters();
+                      setShowAdvancedFilters(false);
+                      haptics.light();
+                    }}
+                    className="group relative overflow-hidden bg-white hover:bg-white/95 text-foreground rounded-xl p-6 transition-all hover:scale-105 hover:shadow-xl"
+                  >
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-16 w-16 rounded-full bg-success/10 flex items-center justify-center group-hover:bg-success/20 transition-colors">
+                        <Users className="h-8 w-8 text-success" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-xl mb-1">Search Agents</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Find by name or phone number
+                        </p>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2 text-success font-semibold">
+                        <span>Start Search</span>
+                        <Search className="h-4 w-4" />
+                      </div>
+                    </div>
+                    
+                    {/* Decorative element */}
+                    <div className="absolute -top-8 -right-8 h-24 w-24 rounded-full bg-success/5 group-hover:bg-success/10 transition-colors" />
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+
           {/* Broadcast Messaging Feature */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card id="bulk-messaging" className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
@@ -893,66 +976,6 @@ const ManagerDashboard = () => {
             onOpenChange={setPaymentDialogOpen}
           />
 
-          {/* Quick Search Section */}
-          <div id="search-features" className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <UserCheck className="h-5 w-5" />
-                  Search Tenants
-                </CardTitle>
-                <CardDescription>
-                  Find tenants by name, phone, or browse all tenants
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  className="w-full" 
-                  size="lg"
-                  onClick={() => {
-                  setShowTenantSearch(true);
-                  setSearchResults([]);
-                  setTenantSearchQuery("");
-                  setAutocompleteSuggestions([]);
-                  setShowAutocomplete(false);
-                  clearTenantFilters();
-                  setShowAdvancedFilters(false);
-                  }}
-                >
-                  <Search className="h-5 w-5 mr-2" />
-                  Search Tenants
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Search Agents
-                </CardTitle>
-                <CardDescription>
-                  Find agents by name or phone number
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  className="w-full" 
-                  size="lg"
-                  onClick={() => {
-                  setShowAgentSearch(true);
-                  setSearchResults([]);
-                  setAgentSearchQuery("");
-                  clearAgentFilters();
-                  setShowAdvancedFilters(false);
-                  }}
-                >
-                  <Search className="h-5 w-5 mr-2" />
-                  Search Agents
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card id="stats-total-agents" className="cursor-pointer hover:shadow-lg transition-all" onClick={() => navigate("/manager/agents")}>
