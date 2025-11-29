@@ -665,6 +665,24 @@ const ManagerDashboard = () => {
   // Debounce the search query for autocomplete
   const debouncedSearchQuery = useDebounce(tenantSearchQuery, 300);
 
+  // Helper function to highlight matching text in autocomplete suggestions
+  const highlightMatch = (text: string, query: string) => {
+    if (!query.trim()) return text;
+    
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const parts = text.split(regex);
+    
+    return parts.map((part, index) => 
+      regex.test(part) ? (
+        <mark key={index} className="bg-primary/20 text-primary font-semibold px-0.5 rounded">
+          {part}
+        </mark>
+      ) : (
+        part
+      )
+    );
+  };
+
   // Fetch autocomplete suggestions
   useEffect(() => {
     const fetchAutocompleteSuggestions = async () => {
@@ -1697,7 +1715,7 @@ const ManagerDashboard = () => {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <p className="font-semibold text-sm truncate">
-                                  {tenant.tenant_name}
+                                  {highlightMatch(tenant.tenant_name, tenantSearchQuery)}
                                 </p>
                                 <Badge 
                                   variant={tenant.status === 'verified' ? 'default' : 'secondary'}
@@ -1707,7 +1725,7 @@ const ManagerDashboard = () => {
                                 </Badge>
                               </div>
                               <p className="text-xs text-muted-foreground truncate">
-                                {tenant.tenant_phone} • Agent: {tenant.agents?.profiles?.full_name || 'Unknown'}
+                                {highlightMatch(tenant.tenant_phone, tenantSearchQuery)} • Agent: {tenant.agents?.profiles?.full_name || 'Unknown'}
                               </p>
                             </div>
                             <div className="text-right shrink-0 ml-3">
