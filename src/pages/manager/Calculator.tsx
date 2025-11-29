@@ -58,6 +58,7 @@ const ManagerCalculatorPage = () => {
   const [pdfSettingsOpen, setPdfSettingsOpen] = useState(false);
   const [pdfName, setPdfName] = useState("");
   const [pdfHeader, setPdfHeader] = useState("");
+  const [pdfFooter, setPdfFooter] = useState("");
 
   // Load saved templates and PDF settings from localStorage
   useEffect(() => {
@@ -76,6 +77,7 @@ const ManagerCalculatorPage = () => {
         const settings = JSON.parse(pdfSettings);
         setPdfName(settings.name || "");
         setPdfHeader(settings.header || "");
+        setPdfFooter(settings.footer || "");
       } catch (e) {
         console.error("Failed to load PDF settings:", e);
       }
@@ -291,6 +293,7 @@ const ManagerCalculatorPage = () => {
     const settings = {
       name: pdfName,
       header: pdfHeader,
+      footer: pdfFooter,
     };
     localStorage.setItem("pdf-settings-manager", JSON.stringify(settings));
     setPdfSettingsOpen(false);
@@ -303,12 +306,37 @@ const ManagerCalculatorPage = () => {
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    
+    // Helper function to add footer to a page
+    const addFooter = (pageNum: number, totalPages: number) => {
+      if (pdfFooter) {
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'italic');
+        doc.setTextColor(100, 100, 100);
+        
+        // Split footer text into lines if too long
+        const footerLines = doc.splitTextToSize(pdfFooter, pageWidth - 30);
+        const footerStartY = pageHeight - 15 - (footerLines.length * 3);
+        
+        footerLines.forEach((line: string, index: number) => {
+          doc.text(line, 15, footerStartY + (index * 3));
+        });
+        
+        // Page number
+        doc.text(`Page ${pageNum} of ${totalPages}`, pageWidth - 30, pageHeight - 10);
+      }
+    };
+    
+    // Calculate total pages needed
+    const itemsPerPage = Math.floor((pageHeight - 100) / 8);
+    const totalPages = Math.ceil(bulkResults.length / itemsPerPage);
     
     // Load and add Welile logo
     const img = new Image();
     img.src = '/welile-logo-pdf.jpg';
     
-    // Add logo (50x50 size, positioned in top-left)
+    // Add logo (40x40 size, positioned in top-left)
     doc.addImage(img, 'JPEG', 15, 5, 40, 40);
     
     // Custom header text if provided
@@ -347,12 +375,29 @@ const ManagerCalculatorPage = () => {
     doc.setFont(undefined, 'normal');
     yPos += 8;
     
+    let currentPage = 1;
+    const maxYPos = pdfFooter ? pageHeight - 25 : pageHeight - 15;
+    
     bulkResults.forEach((result, index) => {
-      if (yPos > 270) {
+      if (yPos > maxYPos) {
+        // Add footer to current page before adding new page
+        addFooter(currentPage, totalPages);
+        
         doc.addPage();
+        currentPage++;
+        
         // Add logo on new pages too
         doc.addImage(img, 'JPEG', 15, 5, 40, 40);
         yPos = 55;
+        
+        // Re-add table headers on new page
+        doc.setFont(undefined, 'bold');
+        doc.text("Rent Amount", 15, yPos);
+        doc.text("30 Days", 70, yPos);
+        doc.text("60 Days", 110, yPos);
+        doc.text("90 Days", 150, yPos);
+        yPos += 8;
+        doc.setFont(undefined, 'normal');
       }
       
       doc.text(`UGX ${result.rent.toLocaleString()}`, 15, yPos);
@@ -361,6 +406,9 @@ const ManagerCalculatorPage = () => {
       doc.text(result.day90.toLocaleString(), 150, yPos);
       yPos += 8;
     });
+    
+    // Add footer to last page
+    addFooter(currentPage, totalPages);
     
     return doc;
   };
@@ -636,6 +684,20 @@ const ManagerCalculatorPage = () => {
                                 />
                                 <p className="text-xs text-muted-foreground">
                                   Additional header text to display on PDF
+                                </p>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="pdf-footer">Footer Text (Optional)</Label>
+                                <Textarea
+                                  id="pdf-footer"
+                                  placeholder="e.g., Terms & Conditions apply. Contact: +256 XXX XXX XXX"
+                                  value={pdfFooter}
+                                  onChange={(e) => setPdfFooter(e.target.value.slice(0, 250))}
+                                  className="resize-none min-h-[80px]"
+                                  maxLength={250}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Footer text for terms, conditions, or contact info (max 250 characters)
                                 </p>
                               </div>
                             </div>
