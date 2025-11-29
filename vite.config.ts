@@ -20,7 +20,10 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: 'auto',
-      includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
+      includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg", "custom-sw.js"],
+      injectManifest: {
+        injectionPoint: undefined,
+      },
       manifest: {
         name: "Welile Agent & Service Centre Portal",
         short_name: "Welile",
