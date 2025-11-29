@@ -21,6 +21,7 @@ const AgentEarnings = () => {
     lastThreeMonths: 0,
   });
   const [recentCollections, setRecentCollections] = useState<any[]>([]);
+  const [dailyBreakdown, setDailyBreakdown] = useState<any[]>([]);
 
   useEffect(() => {
     fetchEarningsData();
@@ -35,7 +36,7 @@ const AgentEarnings = () => {
         .from('agents')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (!agentData) return;
 
@@ -96,6 +97,32 @@ const AgentEarnings = () => {
       });
 
       setRecentCollections(thisMonthCollections?.slice(0, 10) || []);
+
+      // Calculate daily breakdown for this month
+      if (thisMonthCollections) {
+        const dailyData = thisMonthCollections.reduce((acc: any, collection: any) => {
+          const date = collection.collection_date;
+          if (!acc[date]) {
+            acc[date] = {
+              date: date,
+              commission: 0,
+              payments: 0,
+              totalAmount: 0,
+            };
+          }
+          acc[date].commission += parseFloat(collection.commission?.toString() || '0');
+          acc[date].payments += 1;
+          acc[date].totalAmount += parseFloat(collection.amount?.toString() || '0');
+          return acc;
+        }, {});
+
+        // Convert to array and sort by date descending
+        const dailyArray = Object.values(dailyData).sort((a: any, b: any) => 
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+        
+        setDailyBreakdown(dailyArray);
+      }
     } catch (error) {
       console.error('Error fetching earnings:', error);
     } finally {
@@ -279,6 +306,79 @@ const AgentEarnings = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Daily Commission Breakdown */}
+        {dailyBreakdown.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Daily Commission Breakdown
+              </CardTitle>
+              <CardDescription>
+                Your commission earnings by day this month
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {dailyBreakdown.map((day: any, idx: number) => (
+                  <div 
+                    key={idx} 
+                    className="flex items-center justify-between p-4 border rounded-xl hover:shadow-md transition-all hover:bg-accent/50"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="text-center min-w-[60px]">
+                        <p className="text-2xl font-bold text-primary">
+                          {new Date(day.date).getDate()}
+                        </p>
+                        <p className="text-xs text-muted-foreground uppercase">
+                          {new Date(day.date).toLocaleDateString('en-US', { month: 'short' })}
+                        </p>
+                      </div>
+                      <div className="h-12 w-px bg-border" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(day.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {day.payments} payment{day.payments !== 1 ? 's' : ''} • UGX {day.totalAmount.toLocaleString()} collected
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-success">
+                        +{(day.commission / 1000).toFixed(1)}K
+                      </p>
+                      <p className="text-xs text-muted-foreground">commission</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Daily Average Summary */}
+              <div className="mt-6 p-4 bg-primary/5 rounded-xl border border-primary/20">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Total Days</p>
+                    <p className="text-xl font-bold">{dailyBreakdown.length}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Daily Average</p>
+                    <p className="text-xl font-bold text-primary">
+                      {(earnings.thisMonth / dailyBreakdown.length / 1000).toFixed(1)}K
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Best Day</p>
+                    <p className="text-xl font-bold text-success">
+                      {(Math.max(...dailyBreakdown.map((d: any) => d.commission)) / 1000).toFixed(1)}K
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {recentCollections.length > 0 && (
           <Card>
