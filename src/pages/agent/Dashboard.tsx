@@ -21,9 +21,11 @@ import { DailyRepaymentCalculatorDialog } from "@/components/DailyRepaymentCalcu
 import { clearOldCaches, getCacheSize } from "@/lib/cacheManager";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
 import { format } from "date-fns";
+import { useAuth } from "@/hooks/useAuth";
 
 const AgentDashboard = () => {
   const navigate = useNavigate();
+  const { user, agentId, isLoading: authLoading } = useAuth();
   const [agentData, setAgentData] = useState<any>(null);
   const [todaysCollections, setTodaysCollections] = useState(0);
   const [todaysTarget, setTodaysTarget] = useState(0);
@@ -53,10 +55,16 @@ const AgentDashboard = () => {
   useServiceWorker();
 
   useEffect(() => {
-    fetchAgentData();
-    fetchManagerNotifications();
+    if (agentId) {
+      fetchAgentData();
+      fetchManagerNotifications();
+    }
+  }, [agentId]);
+
+  useEffect(() => {
+    if (!user || !agentId) return;
     
-    // Initialize cache management
+    // Initialize cache management once
     const initCache = async () => {
       await clearOldCaches();
       
@@ -90,7 +98,7 @@ const AgentDashboard = () => {
         supabase.removeChannel(channel).catch(console.error);
       });
     };
-  }, []);
+  }, [user, agentId]);
 
   // Show overdue notification on dashboard load
   useEffect(() => {
@@ -107,18 +115,15 @@ const AgentDashboard = () => {
 
   const fetchAgentData = async () => {
     try {
+      if (!agentId) return;
+      
       setIsLoading(true);
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        console.error("Auth error:", userError);
-        return;
-      }
 
       const { data: agent, error } = await supabase
         .from("agents")
         .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
+        .eq("id", agentId)
+        .single();
 
       if (error) {
         console.error("Error fetching agent data:", error);
@@ -126,50 +131,77 @@ const AgentDashboard = () => {
         return;
       }
 
-      if (!agent) {
-        toast.error("Agent profile not found. Please contact support.");
-        return;
-      }
-
       setAgentData(agent);
 
       const today = new Date().toISOString().split('T')[0];
 
-      // Calculate today's collections
-      const { data: collections } = await supabase
-        .from("collections")
-        .select("amount")
-        .eq("agent_id", agent.id)
-        .eq("collection_date", today);
+      // Batch all queries in parallel for faster loading
+      const [
+        collectionsResult,
+        dueTenantsResult,
+        overdueResult,
+        pendingResult,
+        verifiedResult,
+        rejectedResult,
+        paymentMethodResult
+      ] = await Promise.all([
+        supabase
+          .from("collections")
+          .select("amount")
+          .eq("agent_id", agentId)
+          .eq("collection_date", today),
+        
+        supabase
+          .from("tenants")
+          .select("rent_amount")
+          .eq("agent_id", agentId)
+          .eq("next_payment_date", today)
+          .eq("status", "verified"),
+        
+        supabase
+          .from("tenants")
+          .select("id, tenant_name, next_payment_date, outstanding_balance")
+          .eq("agent_id", agentId)
+          .lt("next_payment_date", today)
+          .in("status", ["verified", "active"])
+          .order("next_payment_date", { ascending: true }),
+        
+        supabase
+          .from("collections")
+          .select("id")
+          .eq("agent_id", agentId)
+          .eq("status", "pending"),
+        
+        supabase
+          .from("collections")
+          .select("id")
+          .eq("agent_id", agentId)
+          .eq("status", "verified"),
+        
+        supabase
+          .from("collections")
+          .select("id")
+          .eq("agent_id", agentId)
+          .eq("status", "rejected"),
+        
+        supabase
+          .from("collections")
+          .select("amount, payment_method")
+          .eq("agent_id", agentId)
+          .gte("collection_date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+      ]);
 
-      const total = collections?.reduce((sum, col) => sum + parseFloat(col.amount.toString()), 0) || 0;
+      // Process results
+      const total = collectionsResult.data?.reduce((sum, col) => sum + parseFloat(col.amount.toString()), 0) || 0;
       setTodaysCollections(total);
 
-      // Get tenants due today
-      const { data: dueTenantsData } = await supabase
-        .from("tenants")
-        .select("rent_amount")
-        .eq("agent_id", agent.id)
-        .eq("next_payment_date", today)
-        .eq("status", "verified");
-
-      const dueCount = dueTenantsData?.length || 0;
-      const target = dueTenantsData?.reduce((sum, tenant) => sum + parseFloat(tenant.rent_amount?.toString() || '0'), 0) || 0;
-      
+      const dueCount = dueTenantsResult.data?.length || 0;
+      const target = dueTenantsResult.data?.reduce((sum, tenant) => sum + parseFloat(tenant.rent_amount?.toString() || '0'), 0) || 0;
       setTenantsDueToday(dueCount);
       setTodaysTarget(target);
 
-      // Fetch overdue tenants
-      const { data: overdueData } = await supabase
-        .from("tenants")
-        .select("id, tenant_name, next_payment_date, outstanding_balance")
-        .eq("agent_id", agent.id)
-        .lt("next_payment_date", today)
-        .in("status", ["verified", "active"])
-        .order("next_payment_date", { ascending: true });
-
-      if (overdueData) {
-        const overdueWithDays = overdueData.map(tenant => {
+      if (overdueResult.data) {
+        const overdueWithDays = overdueResult.data.map(tenant => {
           const daysOverdue = Math.floor(
             (new Date().getTime() - new Date(tenant.next_payment_date).getTime()) / (1000 * 60 * 60 * 24)
           );
@@ -178,94 +210,28 @@ const AgentDashboard = () => {
         setOverdueTenants(overdueWithDays);
       }
 
-      // Fetch payment verification stats
-      const { data: pendingData } = await supabase
-        .from("collections")
-        .select("id")
-        .eq("agent_id", agent.id)
-        .eq("status", "pending");
-      
-      const { data: verifiedData } = await supabase
-        .from("collections")
-        .select("id")
-        .eq("agent_id", agent.id)
-        .eq("status", "verified");
-      
-      const { data: rejectedData } = await supabase
-        .from("collections")
-        .select("id")
-        .eq("agent_id", agent.id)
-        .eq("status", "rejected");
+      setPendingVerifications(pendingResult.data?.length || 0);
+      setVerifiedPayments(verifiedResult.data?.length || 0);
+      setRejectedPayments(rejectedResult.data?.length || 0);
 
-      setPendingVerifications(pendingData?.length || 0);
-      setVerifiedPayments(verifiedData?.length || 0);
-      setRejectedPayments(rejectedData?.length || 0);
+      // Process payment method breakdown
+      if (paymentMethodResult.data) {
+        const methodTotals = paymentMethodResult.data.reduce((acc: any, col: any) => {
+          const method = col.payment_method || 'unknown';
+          acc[method] = (acc[method] || 0) + parseFloat(col.amount?.toString() || '0');
+          return acc;
+        }, {});
 
-      // Fetch payment method breakdown (last 30 days)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+        const breakdownData = Object.entries(methodTotals).map(([method, amount]) => ({
+          method: method.charAt(0).toUpperCase() + method.slice(1),
+          amount: amount as number
+        }));
 
-      const sixtyDaysAgo = new Date();
-      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-      const sixtyDaysAgoStr = sixtyDaysAgo.toISOString().split('T')[0];
-
-      // Current period (last 30 days)
-      const { data: currentPeriodData } = await supabase
-        .from("collections")
-        .select("payment_method, amount")
-        .eq("agent_id", agent.id)
-        .gte("collection_date", thirtyDaysAgoStr)
-        .eq("status", "verified");
-
-      // Previous period (30-60 days ago)
-      const { data: previousPeriodData } = await supabase
-        .from("collections")
-        .select("payment_method, amount")
-        .eq("agent_id", agent.id)
-        .gte("collection_date", sixtyDaysAgoStr)
-        .lt("collection_date", thirtyDaysAgoStr)
-        .eq("status", "verified");
-
-      // Calculate totals by payment method
-      const methodTotals: { [key: string]: { current: number; previous: number } } = {
-        cash: { current: 0, previous: 0 },
-        mtn: { current: 0, previous: 0 },
-        airtel: { current: 0, previous: 0 },
-      };
-
-      currentPeriodData?.forEach(item => {
-        const method = item.payment_method || 'cash';
-        if (methodTotals[method]) {
-          methodTotals[method].current += parseFloat(item.amount.toString());
-        }
-      });
-
-      previousPeriodData?.forEach(item => {
-        const method = item.payment_method || 'cash';
-        if (methodTotals[method]) {
-          methodTotals[method].previous += parseFloat(item.amount.toString());
-        }
-      });
-
-      // Build chart data with trends
-      const breakdownData = Object.entries(methodTotals).map(([method, totals]) => {
-        const trendPercent = totals.previous > 0 
-          ? ((totals.current - totals.previous) / totals.previous) * 100 
-          : totals.current > 0 ? 100 : 0;
-        
-        return {
-          method: method === 'cash' ? 'Cash' : method === 'mtn' ? 'MTN' : 'Airtel',
-          amount: totals.current,
-          trend: trendPercent,
-          trendIcon: trendPercent > 5 ? 'up' : trendPercent < -5 ? 'down' : 'neutral',
-          color: method === 'cash' ? 'hsl(var(--success))' : method === 'mtn' ? 'hsl(var(--warning))' : 'hsl(var(--destructive))',
-        };
-      });
-
-      setPaymentMethodBreakdown(breakdownData);
-    } catch (error: any) {
-      toast.error("Failed to load dashboard data");
+        setPaymentMethodBreakdown(breakdownData);
+      }
+    } catch (error) {
+      console.error("Error in fetchAgentData:", error);
+      toast.error("Failed to load dashboard");
     } finally {
       setIsLoading(false);
     }
@@ -280,8 +246,7 @@ const AgentDashboard = () => {
 
   const fetchManagerNotifications = async () => {
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) return;
+      if (!user) return;
 
       const { data, error } = await supabase
         .from("notifications")
@@ -301,15 +266,20 @@ const AgentDashboard = () => {
 
       const filteredData = (data || []).filter(n => !dismissedNotifications.includes(n.id));
       
-      // Fetch reply counts for each notification
-      const counts: { [key: string]: number } = {};
-      for (const notification of filteredData) {
-        const { count } = await supabase
+      // Batch fetch reply counts in parallel
+      const countsPromises = filteredData.map(notification =>
+        supabase
           .from("notifications")
           .select("*", { count: 'exact', head: true })
-          .eq("parent_notification_id", notification.id);
-        counts[notification.id] = count || 0;
-      }
+          .eq("parent_notification_id", notification.id)
+          .then(({ count }) => ({ id: notification.id, count: count || 0 }))
+      );
+      
+      const countsResults = await Promise.all(countsPromises);
+      const counts: { [key: string]: number } = {};
+      countsResults.forEach(result => {
+        counts[result.id] = result.count;
+      });
       setThreadCounts(counts);
       
       const newCount = filteredData.length;
@@ -422,7 +392,7 @@ const AgentDashboard = () => {
   const portfolioPercentage = agentData ? (agentData.portfolio_value / agentData.portfolio_limit) * 100 : 0;
   const tenantsToMotorcycle = Math.max(0, 50 - (agentData?.active_tenants || 0));
 
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return (
       <AgentLayout currentPage="/agent/dashboard">
         <DashboardSkeleton />
