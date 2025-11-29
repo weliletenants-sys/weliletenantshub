@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { DollarSign, Send, Users, Calendar } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface AgentSummary {
   agentId: string;
@@ -33,6 +34,7 @@ interface AgentSummary {
 
 export function ManagerCommissionSummaryDialog() {
   const [open, setOpen] = useState(false);
+  const [sentAgentIds, setSentAgentIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const today = new Date().toISOString().split('T')[0];
 
@@ -92,7 +94,7 @@ export function ManagerCommissionSummaryDialog() {
     enabled: open,
   });
 
-  // Send notifications mutation
+  // Send notifications mutation (bulk or individual)
   const sendNotificationsMutation = useMutation({
     mutationFn: async (agentSummaries: AgentSummary[]) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -118,14 +120,33 @@ Keep up the excellent work! 🚀`,
       const { error } = await supabase.from("notifications").insert(notifications);
       if (error) throw error;
 
+      // Mark these agents as sent
+      setSentAgentIds(prev => {
+        const newSet = new Set(prev);
+        agentSummaries.forEach(s => newSet.add(s.agentId));
+        return newSet;
+      });
+
       return notifications.length;
     },
-    onSuccess: (count) => {
-      toast.success(`Sent ${count} commission ${count === 1 ? 'summary' : 'summaries'}`, {
-        description: "Agents have been notified of their daily earnings",
-      });
+    onSuccess: (count, variables) => {
+      const isSingle = variables.length === 1;
+      toast.success(
+        isSingle 
+          ? `Sent summary to ${variables[0].agentName}`
+          : `Sent ${count} commission ${count === 1 ? 'summary' : 'summaries'}`,
+        {
+          description: isSingle 
+            ? "Agent has been notified of their daily earnings"
+            : "Agents have been notified of their daily earnings",
+        }
+      );
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      setOpen(false);
+      
+      // Only close dialog if sending to all
+      if (!isSingle) {
+        setOpen(false);
+      }
     },
     onError: (error) => {
       console.error("Error sending summaries:", error);
@@ -135,12 +156,21 @@ Keep up the excellent work! 🚀`,
     },
   });
 
+  // Reset sent agents when dialog closes
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen) {
+      setSentAgentIds(new Set());
+    }
+  };
+
   const totalAgents = summaries?.length || 0;
+  const remainingAgents = summaries?.filter(s => !sentAgentIds.has(s.agentId)) || [];
   const totalCommission = summaries?.reduce((sum, s) => sum + s.totalCommission, 0) || 0;
   const totalPayments = summaries?.reduce((sum, s) => sum + s.paymentCount, 0) || 0;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button variant="outline" className="w-full">
           <Calendar className="mr-2 h-4 w-4" />
@@ -206,70 +236,110 @@ Keep up the excellent work! 🚀`,
             {/* Agent Summaries */}
             <ScrollArea className="h-[400px] pr-4">
               <div className="space-y-4">
-                {summaries?.map((summary) => (
-                  <Card key={summary.agentId} className="border-l-4 border-l-primary">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">{summary.agentName}</CardTitle>
-                        <Badge variant="secondary">
-                          {summary.paymentCount} payment{summary.paymentCount > 1 ? 's' : ''}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Commission:</span>
-                        <span className="font-semibold text-primary">
-                          UGX {summary.totalCommission.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Total Amount:</span>
-                        <span className="font-semibold">
-                          UGX {summary.totalAmount.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Avg per Payment:</span>
-                        <span className="font-semibold">
-                          UGX {Math.round(summary.totalCommission / summary.paymentCount).toLocaleString()}
-                        </span>
-                      </div>
-                      
-                      {summary.payments.length <= 3 && (
-                        <>
-                          <Separator className="my-2" />
-                          <div className="space-y-1">
-                            <p className="text-xs text-muted-foreground mb-1">Payments:</p>
-                            {summary.payments.map((payment, idx) => (
-                              <div key={idx} className="text-xs flex justify-between">
-                                <span>• {payment.tenantName}</span>
-                                <span className="text-primary">
-                                  UGX {payment.commission.toLocaleString()}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </>
+                {summaries?.map((summary) => {
+                  const isSent = sentAgentIds.has(summary.agentId);
+                  return (
+                    <Card 
+                      key={summary.agentId} 
+                      className={cn(
+                        "border-l-4 transition-all",
+                        isSent 
+                          ? "border-l-success bg-success/5 opacity-75" 
+                          : "border-l-primary"
                       )}
-                    </CardContent>
-                  </Card>
-                ))}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-1">
+                            <CardTitle className="text-lg">{summary.agentName}</CardTitle>
+                            {isSent && (
+                              <Badge className="bg-success text-white">
+                                Sent ✓
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">
+                              {summary.paymentCount} payment{summary.paymentCount > 1 ? 's' : ''}
+                            </Badge>
+                            <Button
+                              size="sm"
+                              disabled={isSent || sendNotificationsMutation.isPending}
+                              onClick={() => sendNotificationsMutation.mutate([summary])}
+                              className="h-8"
+                            >
+                              <Send className="h-3 w-3 mr-1" />
+                              Send
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Commission:</span>
+                          <span className="font-semibold text-primary">
+                            UGX {summary.totalCommission.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Total Amount:</span>
+                          <span className="font-semibold">
+                            UGX {summary.totalAmount.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Avg per Payment:</span>
+                          <span className="font-semibold">
+                            UGX {Math.round(summary.totalCommission / summary.paymentCount).toLocaleString()}
+                          </span>
+                        </div>
+                        
+                        {summary.payments.length <= 3 && (
+                          <>
+                            <Separator className="my-2" />
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground mb-1">Payments:</p>
+                              {summary.payments.map((payment, idx) => (
+                                <div key={idx} className="text-xs flex justify-between">
+                                  <span>• {payment.tenantName}</span>
+                                  <span className="text-primary">
+                                    UGX {payment.commission.toLocaleString()}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </ScrollArea>
 
             {/* Send Button */}
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button variant="outline" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => summaries && sendNotificationsMutation.mutate(summaries)}
-                disabled={sendNotificationsMutation.isPending}
-              >
-                <Send className="mr-2 h-4 w-4" />
-                Send to {totalAgents} Agent{totalAgents > 1 ? 's' : ''}
-              </Button>
+            <div className="flex justify-between items-center pt-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                {sentAgentIds.size > 0 && (
+                  <span>
+                    {sentAgentIds.size} of {totalAgents} sent
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setOpen(false)}>
+                  Close
+                </Button>
+                {remainingAgents.length > 0 && (
+                  <Button
+                    onClick={() => sendNotificationsMutation.mutate(remainingAgents)}
+                    disabled={sendNotificationsMutation.isPending}
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    Send to {remainingAgents.length === totalAgents ? 'All' : `Remaining ${remainingAgents.length}`}
+                  </Button>
+                )}
+              </div>
             </div>
           </>
         )}
