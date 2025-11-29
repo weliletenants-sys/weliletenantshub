@@ -655,6 +655,13 @@ const ManagerAgents = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Get manager profile for notification
+      const { data: managerProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
+
       // Update agent suspension status
       const { error } = await supabase
         .from("agents")
@@ -667,6 +674,21 @@ const ManagerAgents = () => {
         .eq("id", suspendingAgent.id);
 
       if (error) throw error;
+
+      // Send notification to agent
+      const { error: notificationError } = await supabase
+        .from("notifications")
+        .insert({
+          sender_id: user.id,
+          recipient_id: suspendingAgent.user_id,
+          title: "Account Suspended",
+          message: `Your agent account has been suspended by ${managerProfile?.full_name || "a manager"}.\n\nReason: ${suspensionReason}\n\nPlease contact your manager for more information.`,
+          priority: "high"
+        });
+
+      if (notificationError) {
+        console.error("Error sending notification:", notificationError);
+      }
 
       // Log suspension in audit trail
       const { error: auditError } = await supabase.from("audit_logs").insert({
@@ -686,7 +708,7 @@ const ManagerAgents = () => {
         console.error("Error logging audit:", auditError);
       }
 
-      toast.success("Agent suspended successfully");
+      toast.success("Agent suspended and notified successfully");
       setSuspendingAgent(null);
       setSuspensionReason("");
       fetchAgents();
@@ -710,6 +732,13 @@ const ManagerAgents = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Get manager profile for notification
+      const { data: managerProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
+
       const { error } = await supabase
         .from("agents")
         .update({
@@ -721,6 +750,21 @@ const ManagerAgents = () => {
         .eq("id", agent.id);
 
       if (error) throw error;
+
+      // Send notification to agent
+      const { error: notificationError } = await supabase
+        .from("notifications")
+        .insert({
+          sender_id: user.id,
+          recipient_id: agent.user_id,
+          title: "Account Reactivated",
+          message: `Your agent account has been reactivated by ${managerProfile?.full_name || "a manager"}.\n\nYou can now access your account and resume your activities. Welcome back!`,
+          priority: "normal"
+        });
+
+      if (notificationError) {
+        console.error("Error sending notification:", notificationError);
+      }
 
       // Log unsuspension in audit trail
       const { error: auditError } = await supabase.from("audit_logs").insert({
@@ -737,7 +781,7 @@ const ManagerAgents = () => {
         console.error("Error logging audit:", auditError);
       }
 
-      toast.success("Agent reactivated successfully");
+      toast.success("Agent reactivated and notified successfully");
       fetchAgents();
       haptics.success();
     } catch (error) {
