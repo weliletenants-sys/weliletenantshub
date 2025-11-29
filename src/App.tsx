@@ -37,6 +37,7 @@ const AgentSettings = lazy(() => import("./pages/agent/Settings"));
 const AgentReceiptHistory = lazy(() => import("./pages/agent/ReceiptHistory"));
 const AgentNotifications = lazy(() => import("./pages/agent/Notifications"));
 const AgentPrintableDailyRates = lazy(() => import("./pages/agent/PrintableDailyRates"));
+const AgentTrainingMaterials = lazy(() => import("./pages/agent/TrainingMaterials"));
 const ManagerDashboard = lazy(() => import("./pages/manager/Dashboard"));
 const ManagerPrintableDailyRates = lazy(() => import("./pages/manager/PrintableDailyRates"));
 const ManagerAgents = lazy(() => import("./pages/manager/Agents"));
@@ -182,6 +183,11 @@ const AppContent = () => {
             <Route path="/agent/printable-rates" element={
               <ProtectedRoute requiredRole="agent">
                 <AgentPrintableDailyRates />
+              </ProtectedRoute>
+            } />
+            <Route path="/agent/training" element={
+              <ProtectedRoute requiredRole="agent">
+                <AgentTrainingMaterials />
               </ProtectedRoute>
             } />
             <Route path="/manager/dashboard" element={
