@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRealtimeAgents, useRealtimeAllTenants, useRealtimeProfiles, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
-import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Activity, Wallet, ChevronDown, Download, CheckSquare, Square } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, TrendingUp, DollarSign, Bike, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X, Activity, Wallet, ChevronDown, Download, CheckSquare, Square, Edit, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -26,6 +26,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { BulkMessageDialog } from "@/components/BulkMessageDialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { haptics } from "@/utils/haptics";
 
 interface AgentWithDetails {
   id: string;
@@ -82,6 +87,16 @@ const ManagerAgents = () => {
   const [portfolioSortDirection, setPortfolioSortDirection] = useState<"asc" | "desc">("desc");
   const [portfolioGrowthFilter, setPortfolioGrowthFilter] = useState<"all" | "positive" | "negative">("all");
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set());
+  
+  // Edit/Delete state
+  const [editingAgent, setEditingAgent] = useState<AgentWithDetails | null>(null);
+  const [editFullName, setEditFullName] = useState("");
+  const [editPhoneNumber, setEditPhoneNumber] = useState("");
+  const [editPortfolioLimit, setEditPortfolioLimit] = useState("");
+  const [deletingAgent, setDeletingAgent] = useState<AgentWithDetails | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletionReason, setDeletionReason] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
   
   // Enable real-time updates
   useRealtimeAgents();
@@ -505,6 +520,116 @@ const ManagerAgents = () => {
     return agents
       .filter(a => selectedAgents.has(a.id))
       .map(a => a.profiles?.full_name || "Unknown Agent");
+  };
+
+  // Edit Agent Handler
+  const handleEditClick = (agent: AgentWithDetails, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingAgent(agent);
+    setEditFullName(agent.profiles?.full_name || "");
+    setEditPhoneNumber(agent.profiles?.phone_number || "");
+    setEditPortfolioLimit(agent.portfolio_limit?.toString() || "20000000");
+    haptics.light();
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingAgent) return;
+
+    try {
+      setActionLoading(true);
+
+      // Update profile
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          full_name: editFullName,
+          phone_number: editPhoneNumber
+        })
+        .eq("id", editingAgent.user_id);
+
+      if (profileError) throw profileError;
+
+      // Update agent portfolio limit
+      const { error: agentError } = await supabase
+        .from("agents")
+        .update({
+          portfolio_limit: parseFloat(editPortfolioLimit)
+        })
+        .eq("id", editingAgent.id);
+
+      if (agentError) throw agentError;
+
+      toast.success("Agent updated successfully");
+      setEditingAgent(null);
+      fetchAgents();
+      haptics.success();
+    } catch (error) {
+      console.error("Error updating agent:", error);
+      toast.error("Failed to update agent");
+      haptics.error();
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Delete Agent Handler
+  const handleDeleteClick = (agent: AgentWithDetails, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeletingAgent(agent);
+    setDeleteConfirmText("");
+    setDeletionReason("");
+    haptics.light();
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingAgent || deleteConfirmText !== deletingAgent.profiles?.full_name || deletionReason.length < 10) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+
+      // Log deletion in audit trail
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error: auditError } = await supabase.from("audit_logs").insert({
+          user_id: user.id,
+          action: "DELETE",
+          table_name: "agents",
+          record_id: deletingAgent.id,
+          old_data: {
+            ...deletingAgent,
+            deletion_reason: deletionReason
+          } as any,
+          changed_fields: ["deleted"],
+        });
+        
+        if (auditError) {
+          console.error("Error logging audit:", auditError);
+        }
+      }
+
+      // Delete agent (cascade will handle related records)
+      const { error } = await supabase
+        .from("agents")
+        .delete()
+        .eq("id", deletingAgent.id);
+
+      if (error) throw error;
+
+      toast.success("Agent deleted successfully");
+      setDeletingAgent(null);
+      setDeleteConfirmText("");
+      setDeletionReason("");
+      fetchAgents();
+      haptics.success();
+    } catch (error) {
+      console.error("Error deleting agent:", error);
+      toast.error("Failed to delete agent");
+      haptics.error();
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   // Sort and filter portfolio breakdown based on selected options
@@ -1064,6 +1189,7 @@ const ManagerAgents = () => {
                     </TableHead>
                     <TableHead><Bike className="h-4 w-4 inline mr-1" />Motorcycle</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1075,7 +1201,7 @@ const ManagerAgents = () => {
                     </TableRow>
                   ) : agents.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                         No agents found
                       </TableCell>
                     </TableRow>
@@ -1159,6 +1285,24 @@ const ManagerAgents = () => {
                             {agent.tenant_count > 0 ? "Active" : "Inactive"}
                           </Badge>
                         </TableCell>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => handleEditClick(agent, e)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => handleDeleteClick(agent, e)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -1223,6 +1367,117 @@ const ManagerAgents = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Agent Dialog */}
+      <Dialog open={!!editingAgent} onOpenChange={(open) => !open && setEditingAgent(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Agent</DialogTitle>
+            <DialogDescription>
+              Update agent information and settings
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-full-name">Full Name</Label>
+              <Input
+                id="edit-full-name"
+                value={editFullName}
+                onChange={(e) => setEditFullName(e.target.value)}
+                placeholder="Agent full name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone-number">Phone Number</Label>
+              <Input
+                id="edit-phone-number"
+                value={editPhoneNumber}
+                onChange={(e) => setEditPhoneNumber(e.target.value)}
+                placeholder="Phone number"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-portfolio-limit">Portfolio Limit (UGX)</Label>
+              <Input
+                id="edit-portfolio-limit"
+                type="number"
+                value={editPortfolioLimit}
+                onChange={(e) => setEditPortfolioLimit(e.target.value)}
+                placeholder="20000000"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditingAgent(null)}
+              disabled={actionLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={actionLoading || !editFullName || !editPhoneNumber}
+            >
+              {actionLoading ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Agent Dialog */}
+      <AlertDialog open={!!deletingAgent} onOpenChange={(open) => !open && setDeletingAgent(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Agent</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the agent and all their associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="delete-confirm">
+                Type agent name to confirm: <strong>{deletingAgent?.profiles?.full_name}</strong>
+              </Label>
+              <Input
+                id="delete-confirm"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Type agent name here"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="deletion-reason">
+                Reason for deletion <span className="text-destructive">*</span>
+              </Label>
+              <Textarea
+                id="deletion-reason"
+                value={deletionReason}
+                onChange={(e) => setDeletionReason(e.target.value)}
+                placeholder="Provide a detailed reason (minimum 10 characters)"
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                {deletionReason.length}/10 characters minimum
+              </p>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={
+                actionLoading ||
+                deleteConfirmText !== deletingAgent?.profiles?.full_name ||
+                deletionReason.length < 10
+              }
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {actionLoading ? "Deleting..." : "Delete Agent"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ManagerLayout>
   );
 };
