@@ -2,7 +2,7 @@ import AgentLayout from "@/components/AgentLayout";
 import { EarningsSkeleton } from "@/components/TenantDetailSkeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { TrendingUp, Wallet, Target, DollarSign } from "lucide-react";
+import { TrendingUp, Wallet, Target, DollarSign, Award, Calendar, TrendingDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -15,6 +15,10 @@ const AgentEarnings = () => {
     portfolioValue: 0,
     portfolioLimit: 20000000,
     collectionRate: 0,
+    lifetimeCommission: 0,
+    totalPayments: 0,
+    averageCommission: 0,
+    lastThreeMonths: 0,
   });
   const [recentCollections, setRecentCollections] = useState<any[]>([]);
 
@@ -55,8 +59,28 @@ const AgentEarnings = () => {
         .gte('collection_date', firstDayLastMonth.toISOString().split('T')[0])
         .lte('collection_date', lastDayLastMonth.toISOString().split('T')[0]);
 
+      // Get lifetime commission data
+      const { data: allCollections } = await supabase
+        .from('collections')
+        .select('commission')
+        .eq('agent_id', agentData.id)
+        .eq('status', 'verified');
+
+      // Get last 3 months data for trend comparison
+      const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+      const { data: lastThreeMonthsCollections } = await supabase
+        .from('collections')
+        .select('commission')
+        .eq('agent_id', agentData.id)
+        .eq('status', 'verified')
+        .gte('collection_date', threeMonthsAgo.toISOString().split('T')[0]);
+
       const thisMonthTotal = (thisMonthCollections || []).reduce((sum, c) => sum + c.commission, 0);
       const lastMonthTotal = (lastMonthCollections || []).reduce((sum, c) => sum + c.commission, 0);
+      const lifetimeTotal = (allCollections || []).reduce((sum, c) => sum + c.commission, 0);
+      const lastThreeMonthsTotal = (lastThreeMonthsCollections || []).reduce((sum, c) => sum + c.commission, 0);
+      const totalPaymentCount = allCollections?.length || 0;
+      const avgCommission = totalPaymentCount > 0 ? lifetimeTotal / totalPaymentCount : 0;
 
       setEarnings({
         thisMonth: thisMonthTotal,
@@ -65,6 +89,10 @@ const AgentEarnings = () => {
         portfolioValue: agentData.portfolio_value || 0,
         portfolioLimit: agentData.portfolio_limit || 20000000,
         collectionRate: agentData.collection_rate || 0,
+        lifetimeCommission: lifetimeTotal,
+        totalPayments: totalPaymentCount,
+        averageCommission: avgCommission,
+        lastThreeMonths: lastThreeMonthsTotal,
       });
 
       setRecentCollections(thisMonthCollections?.slice(0, 10) || []);
@@ -77,6 +105,11 @@ const AgentEarnings = () => {
 
   const growthRate = earnings.lastMonth > 0 
     ? ((earnings.thisMonth - earnings.lastMonth) / earnings.lastMonth * 100).toFixed(1)
+    : '0';
+
+  const threeMonthAverage = earnings.lastThreeMonths / 3;
+  const vsThreeMonthAverage = threeMonthAverage > 0
+    ? ((earnings.thisMonth - threeMonthAverage) / threeMonthAverage * 100).toFixed(1)
     : '0';
 
   if (loading) {
@@ -94,6 +127,76 @@ const AgentEarnings = () => {
           <h1 className="text-3xl font-bold">Earnings & Portfolio</h1>
           <p className="text-muted-foreground">Track your income and portfolio growth</p>
         </div>
+
+        {/* Lifetime Commission Hero Card */}
+        <Card className="bg-gradient-to-br from-amber-600 via-amber-500 to-yellow-500 text-white overflow-hidden relative shadow-xl">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-32 translate-x-32" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full translate-y-24 -translate-x-24" />
+          
+          <CardContent className="p-8 relative z-10">
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/25 backdrop-blur-sm rounded-2xl">
+                  <Award className="h-10 w-10" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium opacity-95 mb-1">🏆 Lifetime Commission</p>
+                  <h2 className="text-5xl font-black tracking-tight">
+                    UGX {earnings.lifetimeCommission.toLocaleString()}
+                  </h2>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4">
+                  <p className="text-xs opacity-90 mb-1 flex items-center gap-1">
+                    <DollarSign className="h-3 w-3" />
+                    Total Payments
+                  </p>
+                  <p className="text-2xl font-bold">{earnings.totalPayments}</p>
+                </div>
+                <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4">
+                  <p className="text-xs opacity-90 mb-1 flex items-center gap-1">
+                    <Target className="h-3 w-3" />
+                    Avg/Payment
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {(earnings.averageCommission / 1000).toFixed(1)}K
+                  </p>
+                </div>
+                <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4">
+                  <p className="text-xs opacity-90 mb-1 flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    Last 3 Months
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {(earnings.lastThreeMonths / 1000).toFixed(0)}K
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium opacity-95">Growth Trend</p>
+                  {parseFloat(vsThreeMonthAverage) >= 0 ? (
+                    <div className="flex items-center gap-1 bg-green-500/30 px-2 py-1 rounded-full">
+                      <TrendingUp className="h-4 w-4" />
+                      <span className="text-sm font-bold">+{vsThreeMonthAverage}%</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 bg-red-500/30 px-2 py-1 rounded-full">
+                      <TrendingDown className="h-4 w-4" />
+                      <span className="text-sm font-bold">{vsThreeMonthAverage}%</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs opacity-90">
+                  vs 3-month average (UGX {threeMonthAverage.toLocaleString()}/month)
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
