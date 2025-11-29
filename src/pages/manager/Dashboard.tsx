@@ -769,7 +769,19 @@ const ManagerDashboard = () => {
         agentData.paymentCount += 1;
       });
 
-      // Convert to array and calculate preferred payment method + average commission
+      // Fetch tenant counts for each agent
+      const agentIds = Array.from(agentCommissionMap.keys());
+      const { data: agents } = await supabase
+        .from("agents")
+        .select("id, total_tenants")
+        .in("id", agentIds);
+
+      // Create tenant count map
+      const tenantCountMap = new Map(
+        agents?.map(agent => [agent.id, agent.total_tenants || 0]) || []
+      );
+
+      // Convert to array and calculate metrics
       const agentLeaderboard = Array.from(agentCommissionMap.values()).map(agent => {
         const preferredMethod = Object.entries(agent.paymentMethods)
           .sort((a, b) => (b[1] as number) - (a[1] as number))[0][0];
@@ -783,10 +795,17 @@ const ManagerDashboard = () => {
           ? agent.totalCommission / agent.paymentCount 
           : 0;
 
+        const tenantCount = tenantCountMap.get(agent.agentId) || 0;
+        const efficiencyScore = tenantCount > 0 
+          ? agent.totalCommission / tenantCount 
+          : 0;
+
         return {
           ...agent,
           preferredMethod: preferredMethodDisplay,
           averageCommission,
+          tenantCount,
+          efficiencyScore,
         };
       });
 
@@ -2282,7 +2301,7 @@ const ManagerDashboard = () => {
                           <div>
                             <p className="font-semibold text-sm">{agent.agentName}</p>
                             <p className="text-xs text-muted-foreground">
-                              {agent.paymentCount} payment{agent.paymentCount !== 1 ? 's' : ''}
+                              {agent.paymentCount} payment{agent.paymentCount !== 1 ? 's' : ''} • {agent.tenantCount} tenant{agent.tenantCount !== 1 ? 's' : ''}
                             </p>
                           </div>
                         </div>
@@ -2290,7 +2309,12 @@ const ManagerDashboard = () => {
                           <p className="font-bold text-green-700 text-base">
                             UGX {agent.totalCommission.toLocaleString()}
                           </p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">
+                              Efficiency: UGX {agent.efficiencyScore.toLocaleString(undefined, { maximumFractionDigits: 0 })}/tenant
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
                             Avg: UGX {agent.averageCommission.toLocaleString(undefined, { maximumFractionDigits: 0 })} per payment
                           </p>
                           <div className="flex items-center gap-1 mt-1">
