@@ -381,10 +381,37 @@ const PaymentVerifications = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-green-600" />
-            <div>
-              <p className="text-xs text-muted-foreground">Commission</p>
-              <p className="font-semibold">UGX {payment.commission.toLocaleString()}</p>
+            <DollarSign className={`h-5 w-5 ${
+              payment.status === 'verified' ? 'text-green-600' : 
+              payment.status === 'rejected' ? 'text-muted-foreground' : 
+              'text-yellow-600'
+            }`} />
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">Commission</p>
+                {payment.status === 'verified' && (
+                  <Badge variant="secondary" className="bg-green-600/10 text-green-700 text-[10px] px-1.5 py-0">
+                    Applied
+                  </Badge>
+                )}
+                {payment.status === 'pending' && (
+                  <Badge variant="secondary" className="bg-yellow-600/10 text-yellow-700 text-[10px] px-1.5 py-0">
+                    Pending
+                  </Badge>
+                )}
+                {payment.status === 'rejected' && (
+                  <Badge variant="secondary" className="bg-destructive/10 text-destructive text-[10px] px-1.5 py-0">
+                    Not Applied
+                  </Badge>
+                )}
+              </div>
+              <p className={`font-semibold ${
+                payment.status === 'verified' ? 'text-green-700' : 
+                payment.status === 'rejected' ? 'text-muted-foreground line-through' : 
+                ''
+              }`}>
+                UGX {payment.commission.toLocaleString()}
+              </p>
             </div>
           </div>
         </div>
