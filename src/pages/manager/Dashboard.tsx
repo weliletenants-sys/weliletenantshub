@@ -36,6 +36,7 @@ import BatchPaymentDialog from "@/components/BatchPaymentDialog";
 import AgentsList from "@/components/AgentsListWidget";
 import { SkeletonWrapper } from "@/components/SkeletonWrapper";
 import { useDebounce } from "@/hooks/useDebounce";
+import { ManagerCommissionSummaryDialog } from "@/components/ManagerCommissionSummaryDialog";
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -1286,6 +1287,25 @@ const ManagerDashboard = () => {
                     <Save className="h-5 w-5 mr-2" />
                     Batch
                   </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-r from-orange-500/10 to-orange-600/5 border-orange-500/20">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <Target className="h-5 w-5" />
+                      Commission Summaries
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Preview & send daily earnings to agents
+                    </p>
+                  </div>
+                  <div className="ml-2">
+                    <ManagerCommissionSummaryDialog />
+                  </div>
                 </div>
               </CardContent>
             </Card>
