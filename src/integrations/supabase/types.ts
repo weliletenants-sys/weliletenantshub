@@ -391,6 +391,54 @@ export type Database = {
           },
         ]
       }
+      performance_metrics: {
+        Row: {
+          browser: string | null
+          created_at: string | null
+          device_type: string
+          error_message: string | null
+          error_type: string | null
+          id: string
+          load_time_ms: number | null
+          memory_usage_mb: number | null
+          network_latency_ms: number | null
+          os: string | null
+          page_route: string
+          screen_resolution: string | null
+          user_id: string
+        }
+        Insert: {
+          browser?: string | null
+          created_at?: string | null
+          device_type: string
+          error_message?: string | null
+          error_type?: string | null
+          id?: string
+          load_time_ms?: number | null
+          memory_usage_mb?: number | null
+          network_latency_ms?: number | null
+          os?: string | null
+          page_route: string
+          screen_resolution?: string | null
+          user_id: string
+        }
+        Update: {
+          browser?: string | null
+          created_at?: string | null
+          device_type?: string
+          error_message?: string | null
+          error_type?: string | null
+          id?: string
+          load_time_ms?: number | null
+          memory_usage_mb?: number | null
+          network_latency_ms?: number | null
+          os?: string | null
+          page_route?: string
+          screen_resolution?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
