@@ -1,12 +1,16 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Download, Printer } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Download, Printer, Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import { format } from "date-fns";
 import ManagerLayout from "@/components/ManagerLayout";
 
-const ratesData = [
+// Default data for the rates table
+const defaultRatesData = [
   { rent: 100000, d30: 4367, d60: 5283, d90: 6333 },
   { rent: 150000, d30: 6500, d60: 7950, d90: 9500 },
   { rent: 200000, d30: 8633, d60: 10633, d90: 12767 },
@@ -18,7 +22,90 @@ const ratesData = [
   { rent: 1000000, d30: 46600, d60: 58733, d90: 71733 },
 ];
 
+const calculateDailyRate = (rent: number, days: number): number => {
+  const registrationFee = rent <= 200000 ? 10000 : 20000;
+  let totalAmount = rent + registrationFee;
+  const periods = days / 30;
+  for (let i = 0; i < periods; i++) {
+    totalAmount = totalAmount * 1.33;
+  }
+  return Math.round(totalAmount / days);
+};
+
 const PrintableDailyRates = () => {
+  const [ratesData, setRatesData] = useState(() => {
+    const saved = localStorage.getItem("printable-rates-manager");
+    return saved ? JSON.parse(saved) : defaultRatesData;
+  });
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editRent, setEditRent] = useState("");
+
+  useEffect(() => {
+    localStorage.setItem("printable-rates-manager", JSON.stringify(ratesData));
+  }, [ratesData]);
+
+  const handleAddRow = () => {
+    const rent = parseFloat(editRent);
+    if (isNaN(rent) || rent <= 0) {
+      toast.error("Please enter a valid rent amount");
+      return;
+    }
+    
+    const newRow = {
+      rent,
+      d30: calculateDailyRate(rent, 30),
+      d60: calculateDailyRate(rent, 60),
+      d90: calculateDailyRate(rent, 90),
+    };
+    
+    setRatesData([...ratesData, newRow].sort((a, b) => a.rent - b.rent));
+    setEditRent("");
+    setEditDialogOpen(false);
+    toast.success("Row added successfully");
+  };
+
+  const handleEditRow = (index: number) => {
+    setEditingIndex(index);
+    setEditRent(ratesData[index].rent.toString());
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateRow = () => {
+    if (editingIndex === null) return;
+    
+    const rent = parseFloat(editRent);
+    if (isNaN(rent) || rent <= 0) {
+      toast.error("Please enter a valid rent amount");
+      return;
+    }
+    
+    const updatedData = [...ratesData];
+    updatedData[editingIndex] = {
+      rent,
+      d30: calculateDailyRate(rent, 30),
+      d60: calculateDailyRate(rent, 60),
+      d90: calculateDailyRate(rent, 90),
+    };
+    
+    setRatesData(updatedData.sort((a, b) => a.rent - b.rent));
+    setEditingIndex(null);
+    setEditRent("");
+    setEditDialogOpen(false);
+    toast.success("Row updated successfully");
+  };
+
+  const handleDeleteRow = (index: number) => {
+    const updatedData = ratesData.filter((_, i) => i !== index);
+    setRatesData(updatedData);
+    toast.success("Row deleted successfully");
+  };
+
+  const handleResetToDefaults = () => {
+    setRatesData(defaultRatesData);
+    toast.success("Reset to default rates");
+  };
+
   const handlePrint = () => {
     window.print();
     toast.success("Print dialog opened");
@@ -81,7 +168,7 @@ const PrintableDailyRates = () => {
   };
 
   return (
-    <ManagerLayout>
+    <ManagerLayout currentPage="/manager/printable-rates">
       <div className="container max-w-4xl mx-auto p-4 space-y-6">
         <div className="print:hidden space-y-4">
           <div className="flex items-center justify-between">
@@ -91,21 +178,67 @@ const PrintableDailyRates = () => {
             </div>
           </div>
 
-          <div className="flex gap-3">
-            <Button onClick={handleDownloadPDF} className="gap-2" size="lg">
-              <Download className="h-5 w-5" />
+          <div className="flex flex-wrap gap-4">
+            <Button onClick={handleDownloadPDF} size="lg" className="flex-1 min-w-[200px]">
+              <Download className="mr-2 h-5 w-5" />
               Download PDF
             </Button>
-            <Button onClick={handlePrint} variant="outline" className="gap-2" size="lg">
-              <Printer className="h-5 w-5" />
+            <Button onClick={handlePrint} variant="outline" size="lg" className="flex-1 min-w-[200px]">
+              <Printer className="mr-2 h-5 w-5" />
               Print
+            </Button>
+            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+              <DialogTrigger asChild>
+                <Button 
+                  variant="secondary" 
+                  size="lg" 
+                  className="flex-1 min-w-[200px]"
+                  onClick={() => {
+                    setEditingIndex(null);
+                    setEditRent("");
+                  }}
+                >
+                  <Plus className="mr-2 h-5 w-5" />
+                  Add Custom Amount
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{editingIndex !== null ? "Edit" : "Add"} Rent Amount</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Rent Amount (UGX)</label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 750000"
+                      value={editRent}
+                      onChange={(e) => setEditRent(e.target.value)}
+                      className="text-lg"
+                    />
+                  </div>
+                  <Button 
+                    onClick={editingIndex !== null ? handleUpdateRow : handleAddRow}
+                    className="w-full"
+                  >
+                    {editingIndex !== null ? "Update" : "Add"} Row
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Button 
+              onClick={handleResetToDefaults} 
+              variant="ghost" 
+              size="lg"
+              className="flex-1 min-w-[200px]"
+            >
+              Reset to Defaults
             </Button>
           </div>
         </div>
 
         <Card className="printable-content">
           <div className="p-8 space-y-6">
-            {/* Logo Header */}
             <div className="bg-primary px-8 py-4 rounded-lg inline-block print:mb-4">
               <h1 className="font-chewy text-4xl text-primary-foreground">Welile</h1>
             </div>
@@ -115,7 +248,6 @@ const PrintableDailyRates = () => {
               <p className="text-muted-foreground">Generated on {format(new Date(), 'PPP')}</p>
             </div>
 
-            {/* Rates Table */}
             <div className="overflow-hidden border rounded-lg">
               <table className="w-full">
                 <thead className="bg-muted">
@@ -124,11 +256,12 @@ const PrintableDailyRates = () => {
                     <th className="px-6 py-4 text-center font-semibold">30 Days</th>
                     <th className="px-6 py-4 text-center font-semibold">60 Days</th>
                     <th className="px-6 py-4 text-center font-semibold">90 Days</th>
+                    <th className="px-6 py-4 text-center font-semibold no-print">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {ratesData.map((row, index) => (
-                    <tr key={index} className="hover:bg-muted/50 transition-colors">
+                    <tr key={row.rent} className="hover:bg-muted/50 transition-colors">
                       <td className="px-6 py-4 font-medium">
                         UGX {row.rent.toLocaleString()}
                       </td>
@@ -140,6 +273,24 @@ const PrintableDailyRates = () => {
                       </td>
                       <td className="px-6 py-4 text-center font-mono">
                         {row.d90.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 text-center no-print">
+                        <div className="flex gap-2 justify-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditRow(index)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteRow(index)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -158,6 +309,12 @@ const PrintableDailyRates = () => {
 
       <style>{`
         @media print {
+          .no-print {
+            display: none !important;
+          }
+          th:last-child, td:last-child {
+            display: none !important;
+          }
           body * {
             visibility: hidden;
           }
