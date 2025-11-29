@@ -185,8 +185,8 @@ const AgentEarnings = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {recentCollections.map((collection, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 border rounded-lg">
+                 {recentCollections.map((collection, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 border rounded-lg hover:shadow-md transition-shadow">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                         <DollarSign className="h-5 w-5 text-primary" />
@@ -200,11 +200,17 @@ const AgentEarnings = () => {
                             year: 'numeric'
                           })}
                         </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Payment: UGX {collection.amount.toLocaleString()}
+                        </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-success">+UGX {collection.commission.toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground">Commission</p>
+                      <p className="font-bold text-success text-lg">+UGX {collection.commission.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">Commission (5%)</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {((collection.commission / collection.amount) * 100).toFixed(1)}% of payment
+                      </p>
                     </div>
                   </div>
                 ))}

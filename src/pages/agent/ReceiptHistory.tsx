@@ -228,7 +228,7 @@ export default function ReceiptHistory() {
                               Verified
                             </Badge>
                           </div>
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                             <div>
                               <span className="text-muted-foreground">Receipt:</span>
                               <span className="ml-2 font-mono text-xs">
@@ -251,6 +251,15 @@ export default function ReceiptHistory() {
                               <span className="text-muted-foreground">Method:</span>
                               <span className="ml-2 capitalize">
                                 {payment.payment_method.replace("_", " ")}
+                              </span>
+                            </div>
+                            <div className="col-span-2 mt-2 pt-2 border-t">
+                              <span className="text-muted-foreground">Your Commission:</span>
+                              <span className="ml-2 font-bold text-success text-base">
+                                +UGX {payment.commission.toLocaleString()}
+                              </span>
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                (5% of payment)
                               </span>
                             </div>
                           </div>
