@@ -95,6 +95,7 @@ const AppContent = () => {
 
   // Initialize cache cleanup and service worker on app start
   useEffect(() => {
+    // Clear old caches on startup (runs once)
     clearOldCaches();
   }, []);
 
