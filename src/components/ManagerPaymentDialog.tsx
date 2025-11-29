@@ -1,0 +1,293 @@
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { CalendarIcon, Search } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+
+interface Tenant {
+  id: string;
+  tenant_name: string;
+  tenant_phone: string;
+  outstanding_balance: number;
+  rent_amount: number;
+  agent_id: string;
+  agents: {
+    user_id: string;
+    profiles: {
+      full_name: string;
+    };
+  };
+}
+
+interface ManagerPaymentDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaymentDialogProps) {
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [amount, setAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentDate, setPaymentDate] = useState<Date>(new Date());
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (open) {
+      fetchTenants();
+    }
+  }, [open]);
+
+  const fetchTenants = async () => {
+    const { data, error } = await supabase
+      .from("tenants")
+      .select(`
+        id,
+        tenant_name,
+        tenant_phone,
+        outstanding_balance,
+        rent_amount,
+        agent_id,
+        agents!inner(
+          user_id,
+          profiles!inner(full_name)
+        )
+      `)
+      .eq("status", "verified")
+      .order("tenant_name");
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load tenants",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTenants(data || []);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedTenant || !amount) {
+      toast({
+        title: "Missing information",
+        description: "Please select a tenant and enter an amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const paymentAmount = parseFloat(amount);
+      const commission = paymentAmount * 0.05; // 5% commission
+
+      // Insert the collection record
+      const { error: collectionError } = await supabase
+        .from("collections")
+        .insert({
+          tenant_id: selectedTenant.id,
+          agent_id: selectedTenant.agent_id,
+          amount: paymentAmount,
+          commission: commission,
+          payment_method: paymentMethod,
+          collection_date: format(paymentDate, "yyyy-MM-dd"),
+          status: "pending",
+        });
+
+      if (collectionError) throw collectionError;
+
+      // Update tenant balance
+      const newBalance = (selectedTenant.outstanding_balance || 0) - paymentAmount;
+      const { error: updateError } = await supabase
+        .from("tenants")
+        .update({ 
+          outstanding_balance: Math.max(0, newBalance),
+          last_payment_date: new Date().toISOString(),
+        })
+        .eq("id", selectedTenant.id);
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: "Payment recorded",
+        description: `Payment of UGX ${paymentAmount.toLocaleString()} recorded for ${selectedTenant.tenant_name}`,
+      });
+
+      // Reset form
+      setSelectedTenant(null);
+      setAmount("");
+      setPaymentMethod("cash");
+      setPaymentDate(new Date());
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error recording payment:", error);
+      toast({
+        title: "Error",
+        description: "Failed to record payment",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Record Payment</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Select Tenant</Label>
+            <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  className="w-full justify-between"
+                >
+                  {selectedTenant ? selectedTenant.tenant_name : "Select tenant..."}
+                  <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search tenant..." />
+                  <CommandEmpty>No tenant found.</CommandEmpty>
+                  <CommandGroup className="max-h-64 overflow-auto">
+                    {tenants.map((tenant) => (
+                      <CommandItem
+                        key={tenant.id}
+                        value={tenant.tenant_name}
+                        onSelect={() => {
+                          setSelectedTenant(tenant);
+                          setSearchOpen(false);
+                        }}
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{tenant.tenant_name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            Agent: {tenant.agents.profiles.full_name} • Balance: UGX {tenant.outstanding_balance?.toLocaleString()}
+                          </span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {selectedTenant && (
+            <div className="rounded-lg bg-muted p-3 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Outstanding Balance:</span>
+                <span className="font-semibold">UGX {selectedTenant.outstanding_balance?.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Monthly Rent:</span>
+                <span>UGX {selectedTenant.rent_amount?.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Agent:</span>
+                <span>{selectedTenant.agents.profiles.full_name}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="amount">Payment Amount (UGX)</Label>
+            <Input
+              id="amount"
+              type="number"
+              placeholder="Enter amount"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="payment-method">Payment Method</Label>
+            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <SelectTrigger id="payment-method">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="mtn">MTN Mobile Money</SelectItem>
+                <SelectItem value="airtel">Airtel Money</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Payment Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !paymentDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {paymentDate ? format(paymentDate, "PPP") : "Pick a date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={paymentDate}
+                  onSelect={(date) => date && setPaymentDate(date)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {amount && selectedTenant && (
+            <div className="rounded-lg bg-primary/10 p-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Agent Commission (5%):</span>
+                <span className="font-semibold">UGX {(parseFloat(amount) * 0.05).toLocaleString()}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1" disabled={isSubmitting}>
+              {isSubmitting ? "Recording..." : "Record Payment"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

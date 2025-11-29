@@ -30,6 +30,7 @@ import { MessageSquare } from "lucide-react";
 import { PaymentBroadcastWidget } from "@/components/PaymentBroadcastWidget";
 import { DailyRepaymentCalculatorDialog } from "@/components/DailyRepaymentCalculatorDialog";
 import { useManagerTutorial } from "@/hooks/useManagerTutorial";
+import ManagerPaymentDialog from "@/components/ManagerPaymentDialog";
 
 const ManagerDashboard = () => {
   const navigate = useNavigate();
@@ -49,6 +50,7 @@ const ManagerDashboard = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [showTenantSearch, setShowTenantSearch] = useState(false);
   const [showAgentSearch, setShowAgentSearch] = useState(false);
   const [tenantSearchQuery, setTenantSearchQuery] = useState("");
@@ -734,7 +736,7 @@ const ManagerDashboard = () => {
             </div>
 
           {/* Broadcast Messaging Feature */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card id="bulk-messaging" className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -778,11 +780,43 @@ const ManagerDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+
+            <Card className="bg-gradient-to-r from-success/10 to-success/5 border-success/20">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <Wallet className="h-5 w-5" />
+                      Record Payment
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Enter payments for any tenant
+                    </p>
+                  </div>
+                  <Button 
+                    size="lg"
+                    className="bg-success hover:bg-success/90"
+                    onClick={() => {
+                      setPaymentDialogOpen(true);
+                      haptics.light();
+                    }}
+                  >
+                    <Wallet className="h-5 w-5 mr-2" />
+                    Pay
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           <DailyRepaymentCalculatorDialog
             open={calculatorOpen}
             onOpenChange={setCalculatorOpen}
+          />
+
+          <ManagerPaymentDialog
+            open={paymentDialogOpen}
+            onOpenChange={setPaymentDialogOpen}
           />
 
           {/* Quick Search Section */}
