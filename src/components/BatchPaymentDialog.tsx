@@ -196,8 +196,14 @@ export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentD
           .insert({
             sender_id: user.id,
             recipient_id: payment.tenant!.agents.user_id,
-            title: "Payment Recorded by Manager",
-            message: `Manager ${managerProfile?.full_name || "Unknown"} recorded a payment of UGX ${paymentAmount.toLocaleString()} for tenant ${payment.tenant!.tenant_name}.`,
+            title: "💰 Payment Recorded - Commission Earned!",
+            message: `Manager ${managerProfile?.full_name || "Unknown"} recorded a payment of UGX ${paymentAmount.toLocaleString()} for tenant ${payment.tenant!.tenant_name}.
+
+🎉 You earned UGX ${commission.toLocaleString()} commission (5%)!
+
+Tenant Balance: UGX ${previousBalance.toLocaleString()} → UGX ${newBalance.toLocaleString()}
+
+You can generate and share the receipt with your tenant from the payment notification.`,
             priority: "high",
             payment_data: {
               collection_id: collectionData.id,
