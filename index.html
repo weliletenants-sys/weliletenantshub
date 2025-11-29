@@ -23,12 +23,59 @@
     <link rel="dns-prefetch" href="https://vzqtwbyfcovvhzkkmugq.supabase.co" />
     <link rel="preconnect" href="https://vzqtwbyfcovvhzkkmugq.supabase.co" crossorigin />
     
-    <!-- Google Fonts -->
+    <!-- Google Fonts - Optimized for fast loading -->
     <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
     <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Chewy&display=swap" rel="stylesheet" />
+    
+    <!-- Critical Resource Preloading for Instant Load -->
+    <link rel="modulepreload" href="/src/main.tsx" />
+    <link rel="modulepreload" href="/src/App.tsx" />
+    <link rel="preload" href="/pwa-192x192.png" as="image" type="image/png" />
+    <link rel="preload" href="/welile-logo.jpg" as="image" type="image/jpeg" />
+    
+    <!-- Optimize rendering -->
+    <style>
+      /* Critical CSS for instant first paint */
+      #root {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      /* Instant splash screen to prevent white flash */
+      .app-loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        background: #6B2DC5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      .app-loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
     
     <!-- PWA Icons -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
@@ -49,7 +96,24 @@
   </head>
 
   <body>
+    <!-- Instant loading indicator -->
+    <div class="app-loading">
+      <div class="app-loading-spinner"></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Remove loading screen when app is ready
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          const loader = document.querySelector('.app-loading');
+          if (loader) {
+            loader.style.opacity = '0';
+            loader.style.transition = 'opacity 0.3s';
+            setTimeout(() => loader.remove(), 300);
+          }
+        }, 100);
+      });
+    </script>
   </body>
 </html>

@@ -14,6 +14,68 @@ export default defineConfig(({ mode }) => ({
     // Add build timestamp for version tracking
     'import.meta.env.VITE_BUILD_TIME': JSON.stringify(Date.now().toString()),
   },
+  build: {
+    // Optimize bundle for faster smartphone loading
+    target: 'es2015',
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: mode === 'production',
+        drop_debugger: mode === 'production',
+        pure_funcs: mode === 'production' ? ['console.log', 'console.info'] : [],
+      },
+    },
+    rollupOptions: {
+      output: {
+        // Manual chunk splitting for optimal caching
+        manualChunks: {
+          // Core React libraries
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          // UI component library
+          'vendor-ui': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-select',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-toast',
+          ],
+          // Data fetching and state
+          'vendor-query': ['@tanstack/react-query', '@supabase/supabase-js'],
+          // Charts and visualization
+          'vendor-charts': ['recharts'],
+          // Form handling
+          'vendor-forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
+          // Icons
+          'vendor-icons': ['lucide-react'],
+          // Date utilities
+          'vendor-dates': ['date-fns'],
+        },
+        // Optimize chunk naming for better caching
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+      },
+    },
+    // Reduce chunk size warnings threshold
+    chunkSizeWarningLimit: 1000,
+    // Enable CSS code splitting
+    cssCodeSplit: true,
+    // Ensure source maps are generated for debugging (but not in production)
+    sourcemap: mode !== 'production',
+  },
+  // Optimize dependencies for faster cold starts
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      '@tanstack/react-query',
+      '@supabase/supabase-js',
+      'lucide-react',
+      'date-fns',
+    ],
+    exclude: ['@tanstack/react-virtual'],
+  },
   plugins: [
     react(),
     mode === "development" && componentTagger(),
