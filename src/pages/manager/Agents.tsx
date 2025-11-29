@@ -31,6 +31,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { haptics } from "@/utils/haptics";
+import { useOptimisticAgentSuspension, useOptimisticAgentReactivation } from "@/hooks/useOptimisticAgent";
 
 interface AgentWithDetails {
   id: string;
@@ -96,11 +97,15 @@ const ManagerAgents = () => {
   const [deletingAgent, setDeletingAgent] = useState<AgentWithDetails | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletionReason, setDeletionReason] = useState("");
-  const [actionLoading, setActionLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false); // For edit/delete operations
   
   // Suspension state
   const [suspendingAgent, setSuspendingAgent] = useState<AgentWithDetails | null>(null);
   const [suspensionReason, setSuspensionReason] = useState("");
+  
+  // Optimistic mutations
+  const suspendMutation = useOptimisticAgentSuspension();
+  const reactivateMutation = useOptimisticAgentReactivation();
   
   // Enable real-time updates
   useRealtimeAgents();
@@ -650,8 +655,6 @@ const ManagerAgents = () => {
     }
 
     try {
-      setActionLoading(true);
-
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
@@ -662,63 +665,18 @@ const ManagerAgents = () => {
         .eq("id", user.id)
         .single();
 
-      // Update agent suspension status
-      const { error } = await supabase
-        .from("agents")
-        .update({
-          is_suspended: true,
-          suspended_at: new Date().toISOString(),
-          suspended_by: user.id,
-          suspension_reason: suspensionReason
-        })
-        .eq("id", suspendingAgent.id);
-
-      if (error) throw error;
-
-      // Send notification to agent
-      const { error: notificationError } = await supabase
-        .from("notifications")
-        .insert({
-          sender_id: user.id,
-          recipient_id: suspendingAgent.user_id,
-          title: "Account Suspended",
-          message: `Your agent account has been suspended by ${managerProfile?.full_name || "a manager"}.\n\nReason: ${suspensionReason}\n\nPlease contact your manager for more information.`,
-          priority: "high"
-        });
-
-      if (notificationError) {
-        console.error("Error sending notification:", notificationError);
-      }
-
-      // Log suspension in audit trail
-      const { error: auditError } = await supabase.from("audit_logs").insert({
-        user_id: user.id,
-        action: "UPDATE",
-        table_name: "agents",
-        record_id: suspendingAgent.id,
-        old_data: { is_suspended: false } as any,
-        new_data: { 
-          is_suspended: true,
-          suspension_reason: suspensionReason 
-        } as any,
-        changed_fields: ["is_suspended", "suspended_at", "suspended_by", "suspension_reason"],
+      await suspendMutation.mutateAsync({
+        agentId: suspendingAgent.id,
+        userId: suspendingAgent.user_id,
+        suspensionReason,
+        managerId: user.id,
+        managerName: managerProfile?.full_name || "a manager"
       });
 
-      if (auditError) {
-        console.error("Error logging audit:", auditError);
-      }
-
-      toast.success("Agent suspended and notified successfully");
       setSuspendingAgent(null);
       setSuspensionReason("");
-      fetchAgents();
-      haptics.success();
     } catch (error) {
       console.error("Error suspending agent:", error);
-      toast.error("Failed to suspend agent");
-      haptics.error();
-    } finally {
-      setActionLoading(false);
     }
   };
 
@@ -727,8 +685,6 @@ const ManagerAgents = () => {
     e.stopPropagation();
 
     try {
-      setActionLoading(true);
-
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
@@ -739,57 +695,14 @@ const ManagerAgents = () => {
         .eq("id", user.id)
         .single();
 
-      const { error } = await supabase
-        .from("agents")
-        .update({
-          is_suspended: false,
-          suspended_at: null,
-          suspended_by: null,
-          suspension_reason: null
-        })
-        .eq("id", agent.id);
-
-      if (error) throw error;
-
-      // Send notification to agent
-      const { error: notificationError } = await supabase
-        .from("notifications")
-        .insert({
-          sender_id: user.id,
-          recipient_id: agent.user_id,
-          title: "Account Reactivated",
-          message: `Your agent account has been reactivated by ${managerProfile?.full_name || "a manager"}.\n\nYou can now access your account and resume your activities. Welcome back!`,
-          priority: "normal"
-        });
-
-      if (notificationError) {
-        console.error("Error sending notification:", notificationError);
-      }
-
-      // Log unsuspension in audit trail
-      const { error: auditError } = await supabase.from("audit_logs").insert({
-        user_id: user.id,
-        action: "UPDATE",
-        table_name: "agents",
-        record_id: agent.id,
-        old_data: { is_suspended: true } as any,
-        new_data: { is_suspended: false } as any,
-        changed_fields: ["is_suspended"],
+      await reactivateMutation.mutateAsync({
+        agentId: agent.id,
+        userId: agent.user_id,
+        managerId: user.id,
+        managerName: managerProfile?.full_name || "a manager"
       });
-
-      if (auditError) {
-        console.error("Error logging audit:", auditError);
-      }
-
-      toast.success("Agent reactivated and notified successfully");
-      fetchAgents();
-      haptics.success();
     } catch (error) {
       console.error("Error reactivating agent:", error);
-      toast.error("Failed to reactivate agent");
-      haptics.error();
-    } finally {
-      setActionLoading(false);
     }
   };
 
@@ -1468,7 +1381,7 @@ const ManagerAgents = () => {
                                 variant="outline"
                                 size="sm"
                                 onClick={(e) => handleUnsuspend(agent, e)}
-                                disabled={actionLoading}
+                                disabled={reactivateMutation.isPending}
                                 className="text-success"
                               >
                                 Reactivate
@@ -1478,7 +1391,7 @@ const ManagerAgents = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={(e) => handleSuspendClick(agent, e)}
-                                disabled={actionLoading}
+                                disabled={suspendMutation.isPending}
                                 className="text-orange-600"
                               >
                                 Suspend
@@ -1714,10 +1627,10 @@ const ManagerAgents = () => {
             <AlertDialogCancel disabled={actionLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmSuspend}
-              disabled={actionLoading || suspensionReason.length < 10}
+              disabled={suspendMutation.isPending || suspensionReason.length < 10}
               className="bg-orange-600 hover:bg-orange-700"
             >
-              {actionLoading ? "Suspending..." : "Suspend Agent"}
+              {suspendMutation.isPending ? "Suspending..." : "Suspend Agent"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

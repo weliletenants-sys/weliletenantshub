@@ -18,6 +18,7 @@ import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { haptics } from "@/utils/haptics";
 import { useRealtimeAllTenants, useRealtimeAllCollections, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
+import { useOptimisticTenantDeletion } from "@/hooks/useOptimisticTenant";
 
 interface TenantData {
   id: string;
@@ -76,9 +77,11 @@ const ManagerTenantDetail = () => {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleteReason, setDeleteReason] = useState("");
+  
+  // Optimistic mutations
+  const deleteTenantMutation = useOptimisticTenantDeletion();
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [availableAgents, setAvailableAgents] = useState<any[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
@@ -286,55 +289,23 @@ const ManagerTenantDetail = () => {
   };
 
   const handleDelete = async () => {
-    if (!tenant) return;
+    if (!tenant || !tenantId) return;
 
     try {
-      setIsDeleting(true);
-
       // Get current user for audit log
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Create audit log entry before deletion
-      if (user) {
-        const { error: auditError } = await supabase
-          .from("audit_logs")
-          .insert({
-            user_id: user.id,
-            action: "DELETE",
-            table_name: "tenants",
-            record_id: tenantId!,
-            old_data: {
-              tenant_name: tenant.tenant_name,
-              tenant_phone: tenant.tenant_phone,
-              rent_amount: tenant.rent_amount,
-              outstanding_balance: tenant.outstanding_balance,
-              agent_name: tenant.agents?.profiles?.full_name,
-              deletion_reason: deleteReason,
-            },
-            changed_fields: ["deleted"],
-          });
+      await deleteTenantMutation.mutateAsync({
+        tenantId,
+        tenantName: tenant.tenant_name,
+        agentId: tenant.agent_id,
+        deletionReason: deleteReason,
+        managerId: user?.id
+      });
 
-        if (auditError) {
-          console.error("Error creating audit log:", auditError);
-        }
-      }
-
-      const { error } = await supabase
-        .from("tenants")
-        .delete()
-        .eq("id", tenantId);
-
-      if (error) throw error;
-
-      haptics.success();
-      toast.success("Tenant deleted successfully");
       navigate("/manager/dashboard");
     } catch (error: any) {
       console.error("Error deleting tenant:", error);
-      haptics.error();
-      toast.error("Failed to delete tenant");
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -694,7 +665,7 @@ const ManagerTenantDetail = () => {
                             onChange={(e) => setDeleteReason(e.target.value)}
                             placeholder="Explain why you are deleting this tenant..."
                             className="min-h-[80px] resize-none"
-                            disabled={isDeleting}
+                            disabled={deleteTenantMutation.isPending}
                           />
                           <p className="text-xs text-muted-foreground">
                             This will be recorded in the audit log for accountability.
@@ -711,7 +682,7 @@ const ManagerTenantDetail = () => {
                             onChange={(e) => setDeleteConfirmText(e.target.value)}
                             placeholder="Enter tenant name"
                             className="font-mono"
-                            disabled={isDeleting}
+                            disabled={deleteTenantMutation.isPending}
                           />
                         </div>
                       </AlertDialogDescription>
@@ -723,10 +694,10 @@ const ManagerTenantDetail = () => {
                       }}>Cancel</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={handleDelete}
-                        disabled={isDeleting || deleteConfirmText !== tenant.tenant_name || deleteReason.trim().length < 10}
+                        disabled={deleteTenantMutation.isPending || deleteConfirmText !== tenant.tenant_name || deleteReason.trim().length < 10}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
-                        {isDeleting ? "Deleting..." : "Delete Tenant"}
+                        {deleteTenantMutation.isPending ? "Deleting..." : "Delete Tenant"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>

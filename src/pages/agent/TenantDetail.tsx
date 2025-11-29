@@ -29,6 +29,7 @@ import { isOnline } from "@/lib/offlineSync";
 import { haptics } from "@/utils/haptics";
 import { useTenantData, useCollectionsData, useAgentInfo } from "@/hooks/useTenantData";
 import { useOptimisticPayment, useOptimisticTenantUpdate } from "@/hooks/useOptimisticPayment";
+import { useOptimisticTenantDeletion } from "@/hooks/useOptimisticTenant";
 import { useRealtimeCollections } from "@/hooks/useRealtimeSubscription";
 import { useRealtimeSyncStatus } from "@/hooks/useRealtimeSyncStatus";
 
@@ -49,7 +50,6 @@ const AgentTenantDetail = () => {
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [lastPayment, setLastPayment] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("details");
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
@@ -74,6 +74,7 @@ const AgentTenantDetail = () => {
   // Optimistic mutations
   const paymentMutation = useOptimisticPayment();
   const tenantUpdateMutation = useOptimisticTenantUpdate();
+  const deleteTenantMutation = useOptimisticTenantDeletion();
   
   // Enable real-time updates for collections
   useRealtimeCollections(tenantId);
@@ -253,28 +254,22 @@ const AgentTenantDetail = () => {
   };
 
   const handleDeleteTenant = async () => {
-    if (!tenantId) return;
+    if (!tenantId || !tenant) return;
     
-    setIsDeleting(true);
     haptics.heavy();
     
     try {
-      const { error } = await supabase
-        .from('tenants')
-        .delete()
-        .eq('id', tenantId);
+      await deleteTenantMutation.mutateAsync({
+        tenantId,
+        tenantName: tenant.tenant_name,
+        agentId: tenant.agent_id,
+        deletionReason: "Deleted by agent"
+      });
       
-      if (error) throw error;
-      
-      toast.success("Tenant deleted successfully");
-      haptics.success();
       navigate("/agent/tenants");
     } catch (error: any) {
       console.error('Error deleting tenant:', error);
-      toast.error(error.message || "Failed to delete tenant");
-      haptics.error();
     } finally {
-      setIsDeleting(false);
       setDeleteDialogOpen(false);
     }
   };
@@ -1099,13 +1094,13 @@ const AgentTenantDetail = () => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={deleteTenantMutation.isPending}>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDeleteTenant}
-                disabled={isDeleting}
+                disabled={deleteTenantMutation.isPending}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                {isDeleting ? (
+                {deleteTenantMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Deleting...
