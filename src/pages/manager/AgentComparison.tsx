@@ -47,7 +47,7 @@ const ManagerAgentComparison = () => {
             phone_number
           )
         `)
-        .order("active_tenants", { ascending: false });
+        .order("active_tenants", { ascending: false }); // Sort by active tenants (most at top)
 
       if (error) throw error;
       setAgents(data || []);
