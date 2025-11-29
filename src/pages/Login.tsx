@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Session } from "@supabase/supabase-js";
 import { ensureProfileExists } from "@/lib/profileSync";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Shield } from "lucide-react";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -198,6 +198,12 @@ const Login = () => {
                       </button>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                    <Shield className="h-4 w-4 text-primary flex-shrink-0" />
+                    <p className="text-xs text-muted-foreground">
+                      You'll stay logged in on this device permanently
+                    </p>
+                  </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Logging in..." : "Login"}
                   </Button>
@@ -253,6 +259,12 @@ const Login = () => {
                         )}
                       </button>
                     </div>
+                  </div>
+                  <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                    <Shield className="h-4 w-4 text-primary flex-shrink-0" />
+                    <p className="text-xs text-muted-foreground">
+                      You'll stay logged in on this device permanently
+                    </p>
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Creating account..." : "Create Account"}
