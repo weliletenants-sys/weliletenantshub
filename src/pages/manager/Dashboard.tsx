@@ -55,6 +55,7 @@ const ManagerDashboard = () => {
     portfolioWeekChangePercent: 0,
     totalVerifiedCommission: 0,
   });
+  const [commissionByMethod, setCommissionByMethod] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -530,16 +531,31 @@ const ManagerDashboard = () => {
         const verifiedPayments = collectionsData.data?.filter(c => c.status === 'verified').length || 0;
         const rejectedPayments = collectionsData.data?.filter(c => c.status === 'rejected').length || 0;
 
-        // Fetch total verified commission
+        // Fetch total verified commission and breakdown by payment method
         const { data: verifiedCollections } = await supabase
           .from("collections")
-          .select("commission")
+          .select("commission, payment_method")
           .eq("status", "verified");
         
         const totalVerifiedCommission = verifiedCollections?.reduce(
           (sum, c) => sum + parseFloat(c.commission?.toString() || '0'), 
           0
         ) || 0;
+
+        // Calculate commission by payment method
+        const commissionBreakdown = {
+          cash: verifiedCollections?.filter(c => c.payment_method === 'cash').reduce((sum, c) => sum + parseFloat(c.commission?.toString() || '0'), 0) || 0,
+          mtn: verifiedCollections?.filter(c => c.payment_method === 'mtn').reduce((sum, c) => sum + parseFloat(c.commission?.toString() || '0'), 0) || 0,
+          airtel: verifiedCollections?.filter(c => c.payment_method === 'airtel').reduce((sum, c) => sum + parseFloat(c.commission?.toString() || '0'), 0) || 0,
+        };
+
+        const commissionMethodData = [
+          { method: 'Cash', commission: commissionBreakdown.cash, percentage: totalVerifiedCommission > 0 ? (commissionBreakdown.cash / totalVerifiedCommission) * 100 : 0 },
+          { method: 'MTN Mobile Money', commission: commissionBreakdown.mtn, percentage: totalVerifiedCommission > 0 ? (commissionBreakdown.mtn / totalVerifiedCommission) * 100 : 0 },
+          { method: 'Airtel Money', commission: commissionBreakdown.airtel, percentage: totalVerifiedCommission > 0 ? (commissionBreakdown.airtel / totalVerifiedCommission) * 100 : 0 },
+        ].filter(item => item.commission > 0);
+
+        setCommissionByMethod(commissionMethodData);
 
         setStats({
           totalAgents,
@@ -643,16 +659,31 @@ const ManagerDashboard = () => {
     const verifiedPayments = collectionsData.data?.filter(c => c.status === 'verified').length || 0;
     const rejectedPayments = collectionsData.data?.filter(c => c.status === 'rejected').length || 0;
 
-    // Fetch total verified commission for refresh
+    // Fetch total verified commission and breakdown by payment method for refresh
     const { data: verifiedCollections } = await supabase
       .from("collections")
-      .select("commission")
+      .select("commission, payment_method")
       .eq("status", "verified");
     
     const totalVerifiedCommission = verifiedCollections?.reduce(
       (sum, c) => sum + parseFloat(c.commission?.toString() || '0'), 
       0
     ) || 0;
+
+    // Calculate commission by payment method
+    const commissionBreakdown = {
+      cash: verifiedCollections?.filter(c => c.payment_method === 'cash').reduce((sum, c) => sum + parseFloat(c.commission?.toString() || '0'), 0) || 0,
+      mtn: verifiedCollections?.filter(c => c.payment_method === 'mtn').reduce((sum, c) => sum + parseFloat(c.commission?.toString() || '0'), 0) || 0,
+      airtel: verifiedCollections?.filter(c => c.payment_method === 'airtel').reduce((sum, c) => sum + parseFloat(c.commission?.toString() || '0'), 0) || 0,
+    };
+
+    const commissionMethodData = [
+      { method: 'Cash', commission: commissionBreakdown.cash, percentage: totalVerifiedCommission > 0 ? (commissionBreakdown.cash / totalVerifiedCommission) * 100 : 0 },
+      { method: 'MTN Mobile Money', commission: commissionBreakdown.mtn, percentage: totalVerifiedCommission > 0 ? (commissionBreakdown.mtn / totalVerifiedCommission) * 100 : 0 },
+      { method: 'Airtel Money', commission: commissionBreakdown.airtel, percentage: totalVerifiedCommission > 0 ? (commissionBreakdown.airtel / totalVerifiedCommission) * 100 : 0 },
+    ].filter(item => item.commission > 0);
+
+    setCommissionByMethod(commissionMethodData);
 
     setStats(prev => ({
       ...prev,
@@ -1999,6 +2030,72 @@ const ManagerDashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Commission Breakdown by Payment Method */}
+        <Card className="border-green-500/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-600" />
+              Commission Breakdown by Payment Method
+            </CardTitle>
+            <CardDescription>
+              Total verified commissions earned across all payment methods
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {commissionByMethod.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>No commission data available yet</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {commissionByMethod.map((item, index) => (
+                  <div key={item.method} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`h-3 w-3 rounded-full ${
+                          item.method === 'Cash' ? 'bg-blue-500' :
+                          item.method === 'MTN Mobile Money' ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`} />
+                        <span className="font-medium text-sm">{item.method}</span>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-green-700">
+                          UGX {item.commission.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.percentage.toFixed(1)}% of total
+                        </p>
+                      </div>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-3">
+                      <div 
+                        className={`h-3 rounded-full transition-all ${
+                          item.method === 'Cash' ? 'bg-blue-500' :
+                          item.method === 'MTN Mobile Money' ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`}
+                        style={{ width: `${item.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+                
+                {/* Summary */}
+                <div className="pt-4 border-t border-border">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-semibold">Total Commission (All Methods)</span>
+                    <span className="font-bold text-green-700 text-lg">
+                      UGX {stats.totalVerifiedCommission.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Live Activity Feed */}
         <div id="activity-feed">
