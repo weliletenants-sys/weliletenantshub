@@ -24,6 +24,26 @@ interface TransferTenantData {
   managerId: string;
 }
 
+interface UpdateTenantData {
+  tenantId: string;
+  agentId: string;
+  updates: {
+    tenant_name?: string;
+    tenant_phone?: string;
+    landlord_name?: string | null;
+    landlord_phone?: string | null;
+    lc1_name?: string | null;
+    lc1_phone?: string | null;
+    rent_amount?: number;
+    outstanding_balance?: number;
+    registration_fee?: number;
+    status?: string;
+    start_date?: string | null;
+    due_date?: string | null;
+    daily_payment_amount?: number | null;
+  };
+}
+
 /**
  * Hook for optimistic tenant deletion with instant UI feedback
  */
@@ -230,6 +250,80 @@ export const useOptimisticTenantTransfer = () => {
       queryClient.invalidateQueries({ queryKey: ['tenants', data.currentAgentId] });
       queryClient.invalidateQueries({ queryKey: ['tenants', data.newAgentId] });
       queryClient.invalidateQueries({ queryKey: ['tenant', data.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    }
+  });
+};
+
+/**
+ * Hook for optimistic tenant update with instant UI feedback
+ */
+export const useOptimisticTenantUpdate = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: UpdateTenantData) => {
+      const { error } = await supabase
+        .from("tenants")
+        .update(data.updates)
+        .eq("id", data.tenantId);
+
+      if (error) throw error;
+
+      return { success: true };
+    },
+
+    onMutate: async (data) => {
+      // Cancel outgoing queries
+      await queryClient.cancelQueries({ queryKey: ['tenant', data.tenantId] });
+      await queryClient.cancelQueries({ queryKey: ['tenants', data.agentId] });
+
+      // Snapshot previous data
+      const previousTenant = queryClient.getQueryData<Tenant>(['tenant', data.tenantId]);
+      const previousTenants = queryClient.getQueryData<Tenant[]>(['tenants', data.agentId]);
+
+      // Optimistically update tenant detail
+      queryClient.setQueryData<Tenant>(['tenant', data.tenantId], (old) =>
+        old ? { ...old, ...data.updates } : old
+      );
+
+      // Optimistically update in tenants list
+      queryClient.setQueryData<Tenant[]>(['tenants', data.agentId], (old = []) =>
+        old.map((tenant) =>
+          tenant.id === data.tenantId ? { ...tenant, ...data.updates } : tenant
+        )
+      );
+
+      // Instant haptic feedback
+      haptics.light();
+
+      return { previousTenant, previousTenants };
+    },
+
+    onError: (error, data, context) => {
+      // Rollback on error
+      if (context?.previousTenant) {
+        queryClient.setQueryData(['tenant', data.tenantId], context.previousTenant);
+      }
+      if (context?.previousTenants) {
+        queryClient.setQueryData(['tenants', data.agentId], context.previousTenants);
+      }
+
+      haptics.error?.();
+      toast.error('Failed to update tenant', {
+        description: error instanceof Error ? error.message : 'Please try again'
+      });
+    },
+
+    onSuccess: () => {
+      haptics.success();
+      toast.success("Tenant updated successfully");
+    },
+
+    onSettled: (result, error, data) => {
+      // Refetch to ensure sync
+      queryClient.invalidateQueries({ queryKey: ['tenant', data.tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['tenants', data.agentId] });
       queryClient.invalidateQueries({ queryKey: ['agents'] });
     }
   });
