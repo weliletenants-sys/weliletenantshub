@@ -36,28 +36,26 @@ export const useOptimisticPaymentVerification = () => {
     },
 
     onMutate: async (data) => {
-      // Cancel outgoing queries
+      // Cancel all outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['all-payments'] });
 
-      // Snapshot previous data
+      // Snapshot previous value
       const previousPayments = queryClient.getQueryData(['all-payments']);
 
-      // Optimistically update the payment status
+      // Optimistically update to verified status immediately
       queryClient.setQueryData(['all-payments'], (old: any) => {
-        if (!old) return old;
-        if (Array.isArray(old)) {
-          return old.map((payment: any) =>
-            payment.id === data.paymentId
-              ? {
-                  ...payment,
-                  status: 'verified',
-                  verified_by: data.managerId,
-                  verified_at: new Date().toISOString()
-                }
-              : payment
-          );
-        }
-        return old;
+        if (!old || !Array.isArray(old)) return old;
+        
+        return old.map((payment: any) =>
+          payment.id === data.paymentId
+            ? {
+                ...payment,
+                status: 'verified',
+                verified_by: data.managerId,
+                verified_at: new Date().toISOString()
+              }
+            : payment
+        );
       });
 
       // Instant haptic feedback
@@ -83,9 +81,9 @@ export const useOptimisticPaymentVerification = () => {
       toast.success("Payment verified successfully!");
     },
 
-    onSettled: () => {
-      // Refetch to ensure sync
-      queryClient.invalidateQueries({ queryKey: ['all-payments'] });
+    onSettled: async () => {
+      // Refetch in background to sync with server
+      await queryClient.invalidateQueries({ queryKey: ['all-payments'] });
     }
   });
 };
@@ -113,29 +111,27 @@ export const useOptimisticPaymentRejection = () => {
     },
 
     onMutate: async (data) => {
-      // Cancel outgoing queries
+      // Cancel all outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['all-payments'] });
 
-      // Snapshot previous data
+      // Snapshot previous value
       const previousPayments = queryClient.getQueryData(['all-payments']);
 
-      // Optimistically update the payment status
+      // Optimistically update to rejected status immediately
       queryClient.setQueryData(['all-payments'], (old: any) => {
-        if (!old) return old;
-        if (Array.isArray(old)) {
-          return old.map((payment: any) =>
-            payment.id === data.paymentId
-              ? {
-                  ...payment,
-                  status: 'rejected',
-                  verified_by: data.managerId,
-                  verified_at: new Date().toISOString(),
-                  rejection_reason: data.reason
-                }
-              : payment
-          );
-        }
-        return old;
+        if (!old || !Array.isArray(old)) return old;
+        
+        return old.map((payment: any) =>
+          payment.id === data.paymentId
+            ? {
+                ...payment,
+                status: 'rejected',
+                verified_by: data.managerId,
+                verified_at: new Date().toISOString(),
+                rejection_reason: data.reason
+              }
+            : payment
+        );
       });
 
       // Instant haptic feedback
@@ -161,9 +157,9 @@ export const useOptimisticPaymentRejection = () => {
       toast.success("Payment rejected");
     },
 
-    onSettled: () => {
-      // Refetch to ensure sync
-      queryClient.invalidateQueries({ queryKey: ['all-payments'] });
+    onSettled: async () => {
+      // Refetch in background to sync with server
+      await queryClient.invalidateQueries({ queryKey: ['all-payments'] });
     }
   });
 };
