@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Calculator, Copy, ListOrdered, Save, FolderOpen, Trash2, FileDown, Settings } from "lucide-react";
+import { Calculator, Copy, ListOrdered, Save, FolderOpen, Trash2, FileDown, Settings, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 import jsPDF from "jspdf";
@@ -298,44 +298,44 @@ const CalculatorPage = () => {
     haptics.success();
   };
 
-  const downloadBulkPDF = () => {
-    if (bulkResults.length === 0) return;
+  const generatePDF = () => {
+    if (bulkResults.length === 0) return null;
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     
-    // Header with Welile branding
-    doc.setFillColor(107, 45, 197); // Purple #6B2DC5
-    doc.rect(0, 0, pageWidth, 30, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
-    doc.text("Welile", 15, 20);
+    // Load and add Welile logo
+    const img = new Image();
+    img.src = '/welile-logo-pdf.jpg';
+    
+    // Add logo (50x50 size, positioned in top-left)
+    doc.addImage(img, 'JPEG', 15, 5, 40, 40);
     
     // Custom header text if provided
     if (pdfHeader) {
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(14);
       doc.setFont(undefined, 'bold');
-      doc.text(pdfHeader, 15, 40);
+      doc.text(pdfHeader, 60, 20);
     }
     
     // Title
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(16);
-    const titleYPos = pdfHeader ? 50 : 45;
+    const titleYPos = 55;
     doc.text("Daily Repayment Rates - Bulk Calculation", 15, titleYPos);
     
     // Agent name and date
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    const metaYPos = pdfHeader ? 58 : 53;
+    const metaYPos = 63;
     if (pdfName) {
       doc.text(`Prepared by: ${pdfName}`, 15, metaYPos);
     }
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, 15, metaYPos + 6);
     
     // Table headers
-    let yPos = pdfHeader ? 75 : 70;
+    let yPos = 80;
     doc.setFontSize(10);
     doc.setFont(undefined, 'bold');
     doc.text("Rent Amount", 15, yPos);
@@ -350,7 +350,9 @@ const CalculatorPage = () => {
     bulkResults.forEach((result, index) => {
       if (yPos > 270) {
         doc.addPage();
-        yPos = 20;
+        // Add logo on new pages too
+        doc.addImage(img, 'JPEG', 15, 5, 40, 40);
+        yPos = 55;
       }
       
       doc.text(`UGX ${result.rent.toLocaleString()}`, 15, yPos);
@@ -360,9 +362,33 @@ const CalculatorPage = () => {
       yPos += 8;
     });
     
+    return doc;
+  };
+
+  const downloadBulkPDF = () => {
+    const doc = generatePDF();
+    if (!doc) return;
+    
     doc.save(`welile-bulk-rates-${new Date().toISOString().split('T')[0]}.pdf`);
     toast.success("PDF downloaded successfully!");
     haptics.success();
+  };
+
+  const printBulkPDF = () => {
+    const doc = generatePDF();
+    if (!doc) return;
+    
+    // Open PDF in new window for printing
+    const blob = doc.output('blob');
+    const url = URL.createObjectURL(blob);
+    const printWindow = window.open(url);
+    if (printWindow) {
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    }
+    toast.success("Opening print dialog...");
+    haptics.light();
   };
 
   return (
@@ -628,6 +654,14 @@ const CalculatorPage = () => {
                         >
                           <FileDown className="h-4 w-4 mr-2" />
                           Download PDF
+                        </Button>
+                        <Button
+                          onClick={printBulkPDF}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <Printer className="h-4 w-4 mr-2" />
+                          Print PDF
                         </Button>
                         <Button
                           onClick={copyBulkResults}
