@@ -50,24 +50,18 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
   }, [open]);
 
   const fetchTenants = async () => {
-    const { data, error } = await supabase
+    const { data: tenantsData, error: tenantsError } = await supabase
       .from("tenants")
       .select(`
-        id,
-        tenant_name,
-        tenant_phone,
-        outstanding_balance,
-        rent_amount,
-        agent_id,
-        agents!inner(
+        *,
+        agents!inner (
           user_id,
-          profiles:user_id!inner(full_name)
+          profiles!agents_user_id_fkey (full_name)
         )
       `)
-      .eq("status", "verified")
       .order("tenant_name");
 
-    if (error) {
+    if (tenantsError) {
       toast({
         title: "Error",
         description: "Failed to load tenants",
@@ -76,7 +70,7 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
       return;
     }
 
-    setTenants(data || []);
+    setTenants(tenantsData || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
