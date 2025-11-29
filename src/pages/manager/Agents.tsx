@@ -31,7 +31,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { haptics } from "@/utils/haptics";
-import { useOptimisticAgentSuspension, useOptimisticAgentReactivation } from "@/hooks/useOptimisticAgent";
+import { useOptimisticAgentSuspension, useOptimisticAgentReactivation, useOptimisticAgentUpdate, useOptimisticAgentDeletion } from "@/hooks/useOptimisticAgent";
 
 interface AgentWithDetails {
   id: string;
@@ -106,6 +106,8 @@ const ManagerAgents = () => {
   // Optimistic mutations
   const suspendMutation = useOptimisticAgentSuspension();
   const reactivateMutation = useOptimisticAgentReactivation();
+  const updateAgentMutation = useOptimisticAgentUpdate();
+  const deleteAgentMutation = useOptimisticAgentDeletion();
   
   // Enable real-time updates
   useRealtimeAgents();
@@ -545,39 +547,17 @@ const ManagerAgents = () => {
     if (!editingAgent) return;
 
     try {
-      setActionLoading(true);
+      await updateAgentMutation.mutateAsync({
+        agentId: editingAgent.id,
+        userId: editingAgent.user_id,
+        fullName: editFullName,
+        phoneNumber: editPhoneNumber,
+        portfolioLimit: parseFloat(editPortfolioLimit)
+      });
 
-      // Update profile
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({
-          full_name: editFullName,
-          phone_number: editPhoneNumber
-        })
-        .eq("id", editingAgent.user_id);
-
-      if (profileError) throw profileError;
-
-      // Update agent portfolio limit
-      const { error: agentError } = await supabase
-        .from("agents")
-        .update({
-          portfolio_limit: parseFloat(editPortfolioLimit)
-        })
-        .eq("id", editingAgent.id);
-
-      if (agentError) throw agentError;
-
-      toast.success("Agent updated successfully");
       setEditingAgent(null);
-      fetchAgents();
-      haptics.success();
     } catch (error) {
       console.error("Error updating agent:", error);
-      toast.error("Failed to update agent");
-      haptics.error();
-    } finally {
-      setActionLoading(false);
     }
   };
 
@@ -596,48 +576,23 @@ const ManagerAgents = () => {
     }
 
     try {
-      setActionLoading(true);
-
-      // Log deletion in audit trail
+      // Get current user for audit log
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { error: auditError } = await supabase.from("audit_logs").insert({
-          user_id: user.id,
-          action: "DELETE",
-          table_name: "agents",
-          record_id: deletingAgent.id,
-          old_data: {
-            ...deletingAgent,
-            deletion_reason: deletionReason
-          } as any,
-          changed_fields: ["deleted"],
-        });
-        
-        if (auditError) {
-          console.error("Error logging audit:", auditError);
-        }
-      }
+      if (!user) throw new Error("Not authenticated");
 
-      // Delete agent (cascade will handle related records)
-      const { error } = await supabase
-        .from("agents")
-        .delete()
-        .eq("id", deletingAgent.id);
+      await deleteAgentMutation.mutateAsync({
+        agentId: deletingAgent.id,
+        agentName: deletingAgent.profiles?.full_name || '',
+        deletionReason,
+        managerId: user.id,
+        agentData: deletingAgent
+      });
 
-      if (error) throw error;
-
-      toast.success("Agent deleted successfully");
       setDeletingAgent(null);
       setDeleteConfirmText("");
       setDeletionReason("");
-      fetchAgents();
-      haptics.success();
     } catch (error) {
       console.error("Error deleting agent:", error);
-      toast.error("Failed to delete agent");
-      haptics.error();
-    } finally {
-      setActionLoading(false);
     }
   };
 
@@ -1401,7 +1356,7 @@ const ManagerAgents = () => {
                               variant="ghost"
                               size="sm"
                               onClick={(e) => handleEditClick(agent, e)}
-                              disabled={actionLoading}
+                              disabled={updateAgentMutation.isPending || deleteAgentMutation.isPending}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -1409,7 +1364,7 @@ const ManagerAgents = () => {
                               variant="ghost"
                               size="sm"
                               onClick={(e) => handleDeleteClick(agent, e)}
-                              disabled={actionLoading}
+                              disabled={updateAgentMutation.isPending || deleteAgentMutation.isPending}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
@@ -1523,15 +1478,15 @@ const ManagerAgents = () => {
             <Button
               variant="outline"
               onClick={() => setEditingAgent(null)}
-              disabled={actionLoading}
+              disabled={updateAgentMutation.isPending}
             >
               Cancel
             </Button>
             <Button
               onClick={handleSaveEdit}
-              disabled={actionLoading || !editFullName || !editPhoneNumber}
+              disabled={updateAgentMutation.isPending || !editFullName || !editPhoneNumber}
             >
-              {actionLoading ? "Saving..." : "Save Changes"}
+              {updateAgentMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1575,17 +1530,17 @@ const ManagerAgents = () => {
             </div>
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={actionLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteAgentMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
               disabled={
-                actionLoading ||
+                deleteAgentMutation.isPending ||
                 deleteConfirmText !== deletingAgent?.profiles?.full_name ||
                 deletionReason.length < 10
               }
               className="bg-destructive hover:bg-destructive/90"
             >
-              {actionLoading ? "Deleting..." : "Delete Agent"}
+              {deleteAgentMutation.isPending ? "Deleting..." : "Delete Agent"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

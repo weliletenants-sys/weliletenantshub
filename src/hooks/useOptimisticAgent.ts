@@ -18,6 +18,22 @@ interface ReactivateAgentData {
   managerName: string;
 }
 
+interface UpdateAgentData {
+  agentId: string;
+  userId: string;
+  fullName: string;
+  phoneNumber: string;
+  portfolioLimit: number;
+}
+
+interface DeleteAgentData {
+  agentId: string;
+  agentName: string;
+  deletionReason: string;
+  managerId: string;
+  agentData: any;
+}
+
 /**
  * Hook for optimistic agent suspension with instant UI feedback
  */
@@ -225,6 +241,174 @@ export const useOptimisticAgentReactivation = () => {
     onSuccess: () => {
       haptics.success();
       toast.success("Agent reactivated and notified successfully");
+    },
+
+    onSettled: () => {
+      // Refetch to ensure sync
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    }
+  });
+};
+
+/**
+ * Hook for optimistic agent update with instant UI feedback
+ */
+export const useOptimisticAgentUpdate = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: UpdateAgentData) => {
+      // Update profile
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          full_name: data.fullName,
+          phone_number: data.phoneNumber
+        })
+        .eq("id", data.userId);
+
+      if (profileError) throw profileError;
+
+      // Update agent portfolio limit
+      const { error: agentError } = await supabase
+        .from("agents")
+        .update({
+          portfolio_limit: data.portfolioLimit
+        })
+        .eq("id", data.agentId);
+
+      if (agentError) throw agentError;
+
+      return { success: true };
+    },
+
+    onMutate: async (data) => {
+      // Cancel outgoing queries
+      await queryClient.cancelQueries({ queryKey: ['agents'] });
+
+      // Snapshot previous data
+      const previousAgents = queryClient.getQueryData(['agents']);
+
+      // Optimistically update the agent list
+      queryClient.setQueriesData({ queryKey: ['agents'] }, (old: any) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          return old.map((agent: any) =>
+            agent.id === data.agentId
+              ? {
+                  ...agent,
+                  portfolio_limit: data.portfolioLimit,
+                  profiles: {
+                    ...agent.profiles,
+                    full_name: data.fullName,
+                    phone_number: data.phoneNumber
+                  }
+                }
+              : agent
+          );
+        }
+        return old;
+      });
+
+      // Instant haptic feedback
+      haptics.light();
+
+      return { previousAgents };
+    },
+
+    onError: (error, data, context) => {
+      // Rollback on error
+      if (context?.previousAgents) {
+        queryClient.setQueryData(['agents'], context.previousAgents);
+      }
+
+      haptics.error?.();
+      toast.error('Failed to update agent', {
+        description: error instanceof Error ? error.message : 'Please try again'
+      });
+    },
+
+    onSuccess: () => {
+      haptics.success();
+      toast.success("Agent updated successfully");
+    },
+
+    onSettled: () => {
+      // Refetch to ensure sync
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    }
+  });
+};
+
+/**
+ * Hook for optimistic agent deletion with instant UI feedback
+ */
+export const useOptimisticAgentDeletion = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: DeleteAgentData) => {
+      // Log deletion in audit trail
+      await supabase.from("audit_logs").insert({
+        user_id: data.managerId,
+        action: "DELETE",
+        table_name: "agents",
+        record_id: data.agentId,
+        old_data: {
+          ...data.agentData,
+          deletion_reason: data.deletionReason
+        },
+        changed_fields: ["deleted"],
+      });
+
+      // Delete agent (cascade will handle related records)
+      const { error } = await supabase
+        .from("agents")
+        .delete()
+        .eq("id", data.agentId);
+
+      if (error) throw error;
+
+      return { success: true };
+    },
+
+    onMutate: async (data) => {
+      // Cancel outgoing queries
+      await queryClient.cancelQueries({ queryKey: ['agents'] });
+
+      // Snapshot previous data
+      const previousAgents = queryClient.getQueryData(['agents']);
+
+      // Optimistically remove agent from list
+      queryClient.setQueriesData({ queryKey: ['agents'] }, (old: any) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          return old.filter((agent: any) => agent.id !== data.agentId);
+        }
+        return old;
+      });
+
+      // Instant haptic feedback
+      haptics.light();
+
+      return { previousAgents };
+    },
+
+    onError: (error, data, context) => {
+      // Rollback on error
+      if (context?.previousAgents) {
+        queryClient.setQueryData(['agents'], context.previousAgents);
+      }
+
+      haptics.error?.();
+      toast.error('Failed to delete agent', {
+        description: error instanceof Error ? error.message : 'Please try again'
+      });
+    },
+
+    onSuccess: () => {
+      haptics.success();
+      toast.success("Agent deleted successfully");
     },
 
     onSettled: () => {
