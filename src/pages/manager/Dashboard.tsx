@@ -57,6 +57,13 @@ const ManagerDashboard = () => {
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [batchPaymentDialogOpen, setBatchPaymentDialogOpen] = useState(false);
+  const [paymentReportOpen, setPaymentReportOpen] = useState(false);
+  const [paymentReportData, setPaymentReportData] = useState({
+    totalRent: 0,
+    dailyBreakdown: [] as any[],
+    weeklyBreakdown: [] as any[],
+    paymentMethodBreakdown: [] as any[]
+  });
   const [showTenantSearch, setShowTenantSearch] = useState(false);
   const [showAgentSearch, setShowAgentSearch] = useState(false);
   const [tenantSearchQuery, setTenantSearchQuery] = useState("");
@@ -80,6 +87,99 @@ const ManagerDashboard = () => {
   const [agentGrowthComparison, setAgentGrowthComparison] = useState<any[]>([]);
   const [paymentMethodData, setPaymentMethodData] = useState<any[]>([]);
   const [agentPaymentMethodData, setAgentPaymentMethodData] = useState<any[]>([]);
+
+  // Fetch payment report data
+  const fetchPaymentReportData = async () => {
+    try {
+      // Get all verified collections
+      const { data: collections, error } = await supabase
+        .from('collections')
+        .select('amount, collection_date, payment_method')
+        .eq('status', 'verified')
+        .order('collection_date', { ascending: false });
+
+      if (error) throw error;
+
+      // Calculate total rent
+      const totalRent = collections?.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0;
+
+      // Daily breakdown (last 30 days)
+      const dailyMap = new Map();
+      const today = new Date();
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        dailyMap.set(dateStr, 0);
+      }
+
+      collections?.forEach(c => {
+        const dateStr = c.collection_date;
+        if (dailyMap.has(dateStr)) {
+          dailyMap.set(dateStr, dailyMap.get(dateStr) + parseFloat(c.amount.toString()));
+        }
+      });
+
+      const dailyBreakdown = Array.from(dailyMap.entries()).map(([date, amount]) => ({
+        date: format(new Date(date), 'MMM dd'),
+        amount
+      }));
+
+      // Weekly breakdown (last 8 weeks)
+      const weeklyMap = new Map();
+      for (let i = 7; i >= 0; i--) {
+        const weekStart = new Date(today);
+        weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + i * 7));
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        const weekLabel = `${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd')}`;
+        weeklyMap.set(weekLabel, { start: weekStart.toISOString().split('T')[0], end: weekEnd.toISOString().split('T')[0], amount: 0 });
+      }
+
+      collections?.forEach(c => {
+        const collectionDate = new Date(c.collection_date);
+        weeklyMap.forEach((value, key) => {
+          if (c.collection_date >= value.start && c.collection_date <= value.end) {
+            value.amount += parseFloat(c.amount.toString());
+          }
+        });
+      });
+
+      const weeklyBreakdown = Array.from(weeklyMap.entries()).map(([week, data]) => ({
+        week,
+        amount: data.amount
+      }));
+
+      // Payment method breakdown
+      const methodMap = new Map([
+        ['cash', 0],
+        ['mtn', 0],
+        ['airtel', 0]
+      ]);
+
+      collections?.forEach(c => {
+        const method = (c.payment_method || 'cash').toLowerCase();
+        if (methodMap.has(method)) {
+          methodMap.set(method, methodMap.get(method)! + parseFloat(c.amount.toString()));
+        }
+      });
+
+      const paymentMethodBreakdown = Array.from(methodMap.entries()).map(([method, amount]) => ({
+        method: method === 'cash' ? 'Cash' : method === 'mtn' ? 'MTN' : 'Airtel',
+        amount
+      }));
+
+      setPaymentReportData({
+        totalRent,
+        dailyBreakdown,
+        weeklyBreakdown,
+        paymentMethodBreakdown
+      });
+    } catch (error) {
+      console.error('Error fetching payment report:', error);
+      toast.error('Failed to load payment report');
+    }
+  };
 
   // Track previous values for change detection
   const [prevPortfolioValue, setPrevPortfolioValue] = useState<number | null>(null);
@@ -278,6 +378,7 @@ const ManagerDashboard = () => {
             await fetchAgentPaymentMethodBreakdown(agentsCount.data);
           }
           await fetchPaymentMethodBreakdown();
+          await fetchPaymentReportData();
         }, 100);
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
@@ -851,6 +952,31 @@ const ManagerDashboard = () => {
               </CardContent>
             </Card>
 
+            {/* Payment Report Stats Card */}
+            <Card 
+              className="bg-gradient-to-br from-success/10 to-success/5 border-success/20 cursor-pointer hover:border-success/40 transition-all hover:shadow-xl"
+              onClick={() => {
+                fetchPaymentReportData();
+                setPaymentReportOpen(true);
+                haptics.light();
+              }}
+            >
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-success" />
+                  Total Rent Collected
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-success">
+                  UGX {stats.verifiedPayments > 0 ? paymentReportData.totalRent.toLocaleString() : '0'}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Tap to view detailed breakdown
+                </p>
+              </CardContent>
+            </Card>
+
           {/* Broadcast Messaging Feature */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card id="bulk-messaging" className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
@@ -966,6 +1092,175 @@ const ManagerDashboard = () => {
             open={batchPaymentDialogOpen}
             onOpenChange={setBatchPaymentDialogOpen}
           />
+
+          {/* Payment Report Dialog */}
+          <Dialog open={paymentReportOpen} onOpenChange={setPaymentReportOpen}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-success" />
+                  Payment Report - Rent Collection Breakdown
+                </DialogTitle>
+                <DialogDescription>
+                  Detailed analysis of rent payments by day, week, and payment method
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-6 mt-4">
+                {/* Total Summary */}
+                <Card className="bg-gradient-to-br from-success/10 to-success/5 border-success/20">
+                  <CardContent className="p-6">
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground mb-2">Total Rent Collected (All Time)</p>
+                      <p className="text-4xl font-bold text-success">
+                        UGX {paymentReportData.totalRent.toLocaleString()}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Payment Method Breakdown */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Payment Method Breakdown</CardTitle>
+                    <CardDescription>Distribution across payment channels</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer
+                      config={{
+                        amount: {
+                          label: "Amount (UGX)",
+                          color: "hsl(var(--success))",
+                        },
+                      }}
+                      className="h-[250px]"
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={paymentReportData.paymentMethodBreakdown}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis 
+                            dataKey="method" 
+                            className="text-xs"
+                          />
+                          <YAxis 
+                            className="text-xs"
+                            tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                          />
+                          <Tooltip 
+                            content={<ChartTooltipContent />}
+                            formatter={(value: any) => [`UGX ${value.toLocaleString()}`, "Amount"]}
+                          />
+                          <Bar 
+                            dataKey="amount" 
+                            fill="hsl(var(--success))" 
+                            radius={[8, 8, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                    <div className="grid grid-cols-3 gap-4 mt-4">
+                      {paymentReportData.paymentMethodBreakdown.map((item) => (
+                        <div key={item.method} className="text-center p-3 rounded-lg bg-muted/50">
+                          <p className="text-xs text-muted-foreground mb-1">{item.method}</p>
+                          <p className="text-lg font-bold">UGX {item.amount.toLocaleString()}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Daily Breakdown */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Daily Collection Trend</CardTitle>
+                    <CardDescription>Last 30 days of rent collections</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer
+                      config={{
+                        amount: {
+                          label: "Amount (UGX)",
+                          color: "hsl(var(--primary))",
+                        },
+                      }}
+                      className="h-[300px]"
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={paymentReportData.dailyBreakdown}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis 
+                            dataKey="date" 
+                            className="text-xs"
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
+                          />
+                          <YAxis 
+                            className="text-xs"
+                            tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                          />
+                          <Tooltip 
+                            content={<ChartTooltipContent />}
+                            formatter={(value: any) => [`UGX ${value.toLocaleString()}`, "Amount"]}
+                          />
+                          <Bar 
+                            dataKey="amount" 
+                            fill="hsl(var(--primary))" 
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+
+                {/* Weekly Breakdown */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Weekly Collection Trend</CardTitle>
+                    <CardDescription>Last 8 weeks of rent collections</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer
+                      config={{
+                        amount: {
+                          label: "Amount (UGX)",
+                          color: "hsl(var(--chart-2))",
+                        },
+                      }}
+                      className="h-[300px]"
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={paymentReportData.weeklyBreakdown}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis 
+                            dataKey="week" 
+                            className="text-xs"
+                            angle={-15}
+                            textAnchor="end"
+                            height={100}
+                          />
+                          <YAxis 
+                            className="text-xs"
+                            tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                          />
+                          <Tooltip 
+                            content={<ChartTooltipContent />}
+                            formatter={(value: any) => [`UGX ${value.toLocaleString()}`, "Amount"]}
+                          />
+                          <Bar 
+                            dataKey="amount" 
+                            fill="hsl(var(--chart-2))" 
+                            radius={[8, 8, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+              </div>
+            </DialogContent>
+          </Dialog>
 
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
