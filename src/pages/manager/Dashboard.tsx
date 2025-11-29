@@ -826,18 +826,16 @@ const ManagerDashboard = () => {
       const sixtyDaysAgo = new Date();
       sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-      // Fetch current period (last 30 days)
+      // Fetch current period (last 30 days) - ALL payments regardless of status
       const { data: currentPeriod } = await supabase
         .from("collections")
         .select("amount, payment_method")
-        .eq("status", "verified")
         .gte("collection_date", thirtyDaysAgo.toISOString().split('T')[0]);
 
-      // Fetch previous period (30-60 days ago)
+      // Fetch previous period (30-60 days ago) - ALL payments regardless of status
       const { data: previousPeriod } = await supabase
         .from("collections")
         .select("amount, payment_method")
-        .eq("status", "verified")
         .gte("collection_date", sixtyDaysAgo.toISOString().split('T')[0])
         .lt("collection_date", thirtyDaysAgo.toISOString().split('T')[0]);
 
@@ -893,11 +891,10 @@ const ManagerDashboard = () => {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      // Fetch collections for all agents
+      // Fetch collections for all agents - ALL payments regardless of status
       const { data: collections } = await supabase
         .from("collections")
         .select("agent_id, amount, payment_method")
-        .eq("status", "verified")
         .gte("collection_date", thirtyDaysAgo.toISOString().split('T')[0]);
 
       // Calculate payment method breakdown per agent
