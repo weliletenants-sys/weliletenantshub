@@ -94,6 +94,7 @@ const ManagerDashboard = () => {
   const [agentGrowthComparison, setAgentGrowthComparison] = useState<any[]>([]);
   const [paymentMethodData, setPaymentMethodData] = useState<any[]>([]);
   const [agentPaymentMethodData, setAgentPaymentMethodData] = useState<any[]>([]);
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<'all' | 'verified' | 'pending' | 'rejected'>('all');
 
   // Fetch payment report data with date range
   const fetchPaymentReportData = async (startDate?: Date, endDate?: Date) => {
@@ -293,8 +294,100 @@ const ManagerDashboard = () => {
 
     setReportStartDate(start);
     setReportEndDate(end);
+    setPaymentStatusFilter('all'); // Reset status filter
     fetchPaymentReportData(start, end);
     haptics.light();
+  };
+
+  // Filter payment data by status
+  const getFilteredPaymentData = () => {
+    if (paymentStatusFilter === 'all') {
+      return paymentReportData;
+    }
+
+    const filteredDailyBreakdown = paymentReportData.dailyBreakdown.map(day => {
+      const filteredPayments = day.payments.filter((p: any) => p.status === paymentStatusFilter);
+      const filteredAmount = filteredPayments.reduce((sum: number, p: any) => sum + p.amount, 0);
+      return {
+        ...day,
+        payments: filteredPayments,
+        amount: filteredAmount
+      };
+    });
+
+    const filteredTotalRent = filteredDailyBreakdown.reduce((sum, day) => sum + day.amount, 0);
+
+    // Recalculate weekly breakdown based on filtered daily data
+    const weeklyMap = new Map();
+    paymentReportData.weeklyBreakdown.forEach(week => {
+      weeklyMap.set(week.week, 0);
+    });
+
+    filteredDailyBreakdown.forEach(day => {
+      paymentReportData.weeklyBreakdown.forEach(week => {
+        // Find which week this day belongs to by checking the original mapping
+        const originalWeekData = paymentReportData.dailyBreakdown.find(d => d.date === day.date);
+        if (originalWeekData) {
+          weeklyMap.set(week.week, (weeklyMap.get(week.week) || 0) + day.amount);
+        }
+      });
+    });
+
+    const filteredWeeklyBreakdown = Array.from(weeklyMap.entries()).map(([week, amount]) => ({
+      week,
+      amount
+    }));
+
+    // Recalculate payment method breakdown
+    const methodMap = new Map([
+      ['cash', 0],
+      ['mtn', 0],
+      ['airtel', 0]
+    ]);
+
+    filteredDailyBreakdown.forEach(day => {
+      day.payments.forEach((p: any) => {
+        const method = (p.paymentMethod || 'cash').toLowerCase();
+        if (methodMap.has(method)) {
+          methodMap.set(method, methodMap.get(method)! + p.amount);
+        }
+      });
+    });
+
+    const filteredPaymentMethodBreakdown = Array.from(methodMap.entries()).map(([method, amount]) => ({
+      method: method === 'cash' ? 'Cash' : method === 'mtn' ? 'MTN' : 'Airtel',
+      amount
+    }));
+
+    // Filter manager leaderboard - only include managers who verified the filtered payments
+    const managerStatsMap = new Map();
+    filteredDailyBreakdown.forEach(day => {
+      day.payments.forEach((p: any) => {
+        if (p.status === 'verified' && p.managerName && p.managerName !== 'Unknown') {
+          if (!managerStatsMap.has(p.managerName)) {
+            managerStatsMap.set(p.managerName, {
+              managerName: p.managerName,
+              verificationCount: 0,
+              totalAmount: 0
+            });
+          }
+          const stats = managerStatsMap.get(p.managerName);
+          stats.verificationCount += 1;
+          stats.totalAmount += p.amount;
+        }
+      });
+    });
+
+    const filteredManagerLeaderboard = Array.from(managerStatsMap.values())
+      .sort((a, b) => b.totalAmount - a.totalAmount);
+
+    return {
+      totalRent: filteredTotalRent,
+      dailyBreakdown: filteredDailyBreakdown,
+      weeklyBreakdown: filteredWeeklyBreakdown,
+      paymentMethodBreakdown: filteredPaymentMethodBreakdown,
+      managerLeaderboard: filteredManagerLeaderboard
+    };
   };
 
   // Track previous values for change detection
@@ -1340,6 +1433,7 @@ const ManagerDashboard = () => {
                       <Button
                         className="w-full"
                         onClick={() => {
+                          setPaymentStatusFilter('all'); // Reset status filter
                           fetchPaymentReportData();
                           haptics.light();
                         }}
@@ -1347,6 +1441,93 @@ const ManagerDashboard = () => {
                       >
                         Apply Custom Range
                       </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Payment Status Filter */}
+                <Card className="bg-muted/30">
+                  <CardContent className="p-4">
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-sm">Filter by Status</h3>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant={paymentStatusFilter === 'all' ? 'default' : 'outline'}
+                          onClick={() => {
+                            setPaymentStatusFilter('all');
+                            haptics.light();
+                          }}
+                          className="text-xs"
+                        >
+                          All Payments
+                          {paymentStatusFilter === 'all' && (
+                            <Badge variant="secondary" className="ml-2">
+                              {paymentReportData.dailyBreakdown.reduce((sum, day) => sum + day.payments.length, 0)}
+                            </Badge>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={paymentStatusFilter === 'verified' ? 'default' : 'outline'}
+                          onClick={() => {
+                            setPaymentStatusFilter('verified');
+                            haptics.light();
+                          }}
+                          className="text-xs"
+                        >
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Verified
+                          {paymentStatusFilter === 'verified' && (
+                            <Badge variant="secondary" className="ml-2">
+                              {paymentReportData.dailyBreakdown.reduce((sum, day) => 
+                                sum + day.payments.filter((p: any) => p.status === 'verified').length, 0)}
+                            </Badge>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={paymentStatusFilter === 'pending' ? 'default' : 'outline'}
+                          onClick={() => {
+                            setPaymentStatusFilter('pending');
+                            haptics.light();
+                          }}
+                          className="text-xs"
+                        >
+                          <Clock className="h-3 w-3 mr-1" />
+                          Pending
+                          {paymentStatusFilter === 'pending' && (
+                            <Badge variant="secondary" className="ml-2">
+                              {paymentReportData.dailyBreakdown.reduce((sum, day) => 
+                                sum + day.payments.filter((p: any) => p.status === 'pending').length, 0)}
+                            </Badge>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={paymentStatusFilter === 'rejected' ? 'default' : 'outline'}
+                          onClick={() => {
+                            setPaymentStatusFilter('rejected');
+                            haptics.light();
+                          }}
+                          className="text-xs"
+                        >
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Rejected
+                          {paymentStatusFilter === 'rejected' && (
+                            <Badge variant="secondary" className="ml-2">
+                              {paymentReportData.dailyBreakdown.reduce((sum, day) => 
+                                sum + day.payments.filter((p: any) => p.status === 'rejected').length, 0)}
+                            </Badge>
+                          )}
+                        </Button>
+                      </div>
+                      {paymentStatusFilter !== 'all' && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-background p-2 rounded border">
+                          <AlertCircle className="h-3 w-3" />
+                          <span>Showing only {paymentStatusFilter} payments</span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1363,7 +1544,7 @@ const ManagerDashboard = () => {
                         )}
                       </p>
                       <p className="text-4xl font-bold text-success">
-                        UGX {paymentReportData.totalRent.toLocaleString()}
+                        UGX {getFilteredPaymentData().totalRent.toLocaleString()}
                       </p>
                     </div>
                   </CardContent>
@@ -1379,9 +1560,9 @@ const ManagerDashboard = () => {
                     <CardDescription>Top managers by verification volume for selected period</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {paymentReportData.managerLeaderboard.length > 0 ? (
+                    {getFilteredPaymentData().managerLeaderboard.length > 0 ? (
                       <div className="space-y-3">
-                        {paymentReportData.managerLeaderboard.map((manager, index) => (
+                        {getFilteredPaymentData().managerLeaderboard.map((manager, index) => (
                           <div 
                             key={manager.managerId}
                             className={cn(
@@ -1431,20 +1612,20 @@ const ManagerDashboard = () => {
                     )}
 
                     {/* Summary Stats */}
-                    {paymentReportData.managerLeaderboard.length > 0 && (
+                    {getFilteredPaymentData().managerLeaderboard.length > 0 && (
                       <div className="mt-6 pt-6 border-t border-border">
                         <div className="grid grid-cols-3 gap-4 text-center">
                           <div className="space-y-1">
                             <p className="text-xs text-muted-foreground">Active Managers</p>
                             <p className="text-2xl font-bold text-primary">
-                              {paymentReportData.managerLeaderboard.length}
+                              {getFilteredPaymentData().managerLeaderboard.length}
                             </p>
                           </div>
                           <div className="space-y-1">
                             <p className="text-xs text-muted-foreground">Avg per Manager</p>
                             <p className="text-2xl font-bold text-primary">
-                              {paymentReportData.managerLeaderboard.length > 0 
-                                ? (paymentReportData.totalRent / paymentReportData.managerLeaderboard.length).toLocaleString(undefined, { maximumFractionDigits: 0 })
+                              {getFilteredPaymentData().managerLeaderboard.length > 0 
+                                ? (getFilteredPaymentData().totalRent / getFilteredPaymentData().managerLeaderboard.length).toLocaleString(undefined, { maximumFractionDigits: 0 })
                                 : '0'
                               }
                             </p>
@@ -1452,8 +1633,8 @@ const ManagerDashboard = () => {
                           <div className="space-y-1">
                             <p className="text-xs text-muted-foreground">Top Manager</p>
                             <p className="text-2xl font-bold text-primary">
-                              {paymentReportData.managerLeaderboard.length > 0 
-                                ? ((paymentReportData.managerLeaderboard[0].totalAmount / paymentReportData.totalRent) * 100).toFixed(0)
+                              {getFilteredPaymentData().managerLeaderboard.length > 0 
+                                ? ((getFilteredPaymentData().managerLeaderboard[0].totalAmount / getFilteredPaymentData().totalRent) * 100).toFixed(0)
                                 : '0'
                               }%
                             </p>
@@ -1481,7 +1662,7 @@ const ManagerDashboard = () => {
                       className="h-[250px]"
                     >
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={paymentReportData.paymentMethodBreakdown}>
+                        <BarChart data={getFilteredPaymentData().paymentMethodBreakdown}>
                           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                           <XAxis 
                             dataKey="method" 
@@ -1504,7 +1685,7 @@ const ManagerDashboard = () => {
                       </ResponsiveContainer>
                     </ChartContainer>
                     <div className="grid grid-cols-3 gap-4 mt-4">
-                      {paymentReportData.paymentMethodBreakdown.map((item) => (
+                      {getFilteredPaymentData().paymentMethodBreakdown.map((item) => (
                         <div key={item.method} className="text-center p-3 rounded-lg bg-muted/50">
                           <p className="text-xs text-muted-foreground mb-1">{item.method}</p>
                           <p className="text-lg font-bold">UGX {item.amount.toLocaleString()}</p>
@@ -1531,7 +1712,7 @@ const ManagerDashboard = () => {
                       className="h-[300px]"
                     >
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={paymentReportData.dailyBreakdown}>
+                        <BarChart data={getFilteredPaymentData().dailyBreakdown}>
                           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                           <XAxis 
                             dataKey="date" 
@@ -1561,7 +1742,7 @@ const ManagerDashboard = () => {
                     <div className="mt-6 space-y-4">
                       <h4 className="font-semibold text-sm">All Payments by Day</h4>
                       <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                        {paymentReportData.dailyBreakdown.filter(day => day.payments && day.payments.length > 0).map((day, idx) => (
+                        {getFilteredPaymentData().dailyBreakdown.filter(day => day.payments && day.payments.length > 0).map((day, idx) => (
                           <div key={idx} className="border rounded-lg p-4 bg-muted/30">
                             <div className="flex items-center justify-between mb-3">
                               <div>
@@ -1642,7 +1823,7 @@ const ManagerDashboard = () => {
                       className="h-[300px]"
                     >
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={paymentReportData.weeklyBreakdown}>
+                        <BarChart data={getFilteredPaymentData().weeklyBreakdown}>
                           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                           <XAxis 
                             dataKey="week" 
