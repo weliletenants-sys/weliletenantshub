@@ -18,7 +18,7 @@ import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { haptics } from "@/utils/haptics";
 import { useRealtimeAllTenants, useRealtimeAllCollections, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
-import { useOptimisticTenantDeletion, useOptimisticTenantTransfer } from "@/hooks/useOptimisticTenant";
+import { useOptimisticTenantDeletion, useOptimisticTenantTransfer, useOptimisticTenantUpdate } from "@/hooks/useOptimisticTenant";
 
 interface TenantData {
   id: string;
@@ -76,13 +76,13 @@ const ManagerTenantDetail = () => {
   const [transferHistory, setTransferHistory] = useState<TransferHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleteReason, setDeleteReason] = useState("");
   
   // Optimistic mutations
   const deleteTenantMutation = useOptimisticTenantDeletion();
   const transferTenantMutation = useOptimisticTenantTransfer();
+  const updateTenantMutation = useOptimisticTenantUpdate();
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [availableAgents, setAvailableAgents] = useState<any[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
@@ -238,8 +238,6 @@ const ManagerTenantDetail = () => {
     if (!tenant) return;
 
     try {
-      setIsSaving(true);
-
       const rentAmount = parseFloat(editForm.rentAmount) || 0;
       const startDate = editForm.startDate;
       const dueDate = editForm.dueDate;
@@ -254,9 +252,10 @@ const ManagerTenantDetail = () => {
         }
       }
 
-      const { error } = await supabase
-        .from("tenants")
-        .update({
+      await updateTenantMutation.mutateAsync({
+        tenantId: tenantId!,
+        agentId: tenant.agent_id,
+        updates: {
           tenant_name: editForm.tenantName,
           tenant_phone: editForm.tenantPhone,
           landlord_name: editForm.landlordName || null,
@@ -270,21 +269,13 @@ const ManagerTenantDetail = () => {
           start_date: startDate || null,
           due_date: dueDate || null,
           daily_payment_amount: dailyPaymentAmount,
-        })
-        .eq("id", tenantId);
+        }
+      });
 
-      if (error) throw error;
-
-      haptics.success();
-      toast.success("Tenant updated successfully");
       setIsEditing(false);
       await fetchTenantData();
     } catch (error: any) {
       console.error("Error updating tenant:", error);
-      haptics.error();
-      toast.error("Failed to update tenant");
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -664,9 +655,9 @@ const ManagerTenantDetail = () => {
               </>
             ) : (
               <>
-                <Button onClick={handleSave} disabled={isSaving} size="lg">
+                <Button onClick={handleSave} disabled={updateTenantMutation.isPending} size="lg">
                   <Save className="h-4 w-4 mr-2" />
-                  {isSaving ? "Saving..." : "Save Changes"}
+                  {updateTenantMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
                 <Button variant="outline" onClick={() => {
                   setIsEditing(false);
