@@ -8,12 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { User, Phone, Shield, Loader2, MapPin, Lock, Eye, EyeOff, RefreshCw, CheckCircle, FileText } from "lucide-react";
+import { User, Phone, Shield, Loader2, MapPin, Lock, Eye, EyeOff, RefreshCw, CheckCircle, FileText, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { ChangelogDialog } from "@/components/ChangelogDialog";
 import { changelog } from "@/data/changelog";
+import { useManagerTutorial } from "@/hooks/useManagerTutorial";
 
 const ManagerSettings = () => {
   const navigate = useNavigate();
@@ -42,6 +43,9 @@ const ManagerSettings = () => {
   const { isChecking, checkVersion, currentVersion } = useVersionCheck();
   const [manualCheckLoading, setManualCheckLoading] = useState(false);
   const [showChangelogDialog, setShowChangelogDialog] = useState(false);
+
+  // Tutorial/onboarding
+  const { startTutorial } = useManagerTutorial();
 
   useEffect(() => {
     fetchProfile();
@@ -490,6 +494,38 @@ const ManagerSettings = () => {
               <FileText className="h-4 w-4 mr-2" />
               View Release Notes
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <HelpCircle className="h-5 w-5" />
+              Dashboard Tutorial
+            </CardTitle>
+            <CardDescription>Get a guided tour of key features</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Need a refresher on how to use the manager dashboard? Click below to replay the interactive tutorial that walks you through the main features.
+              </p>
+              <Button 
+                onClick={() => {
+                  toast.success("Starting tutorial...");
+                  // Navigate to dashboard and start tutorial
+                  navigate("/manager/dashboard");
+                  setTimeout(() => {
+                    startTutorial();
+                  }, 500);
+                }}
+                className="w-full"
+                variant="default"
+              >
+                <HelpCircle className="h-4 w-4 mr-2" />
+                Start Dashboard Tutorial
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

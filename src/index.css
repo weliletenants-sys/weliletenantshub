@@ -493,4 +493,68 @@ All colors MUST be HSL.
   .animate-pulse-slow {
     animation: pulse-slow 3s ease-in-out infinite;
   }
+
+  /* Driver.js Tutorial Styling */
+  .driver-popover-custom {
+    background: hsl(var(--card)) !important;
+    color: hsl(var(--card-foreground)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    border-radius: var(--radius) !important;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+  }
+
+  .driver-popover-custom .driver-popover-title {
+    font-size: 1.125rem !important;
+    font-weight: 600 !important;
+    color: hsl(var(--foreground)) !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  .driver-popover-custom .driver-popover-description {
+    font-size: 0.875rem !important;
+    color: hsl(var(--muted-foreground)) !important;
+    line-height: 1.5 !important;
+  }
+
+  .driver-popover-custom .driver-popover-progress-text {
+    color: hsl(var(--primary)) !important;
+    font-weight: 500 !important;
+  }
+
+  .driver-popover-custom button {
+    background: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+    border: none !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: calc(var(--radius) - 2px) !important;
+    font-weight: 500 !important;
+    transition: all 0.2s !important;
+  }
+
+  .driver-popover-custom button:hover {
+    opacity: 0.9 !important;
+    transform: scale(1.02) !important;
+  }
+
+  .driver-popover-custom .driver-popover-close-btn {
+    background: transparent !important;
+    color: hsl(var(--muted-foreground)) !important;
+    width: 2rem !important;
+    height: 2rem !important;
+    padding: 0 !important;
+  }
+
+  .driver-popover-custom .driver-popover-navigation-btns {
+    gap: 0.5rem !important;
+  }
+
+  /* Highlighted element styling */
+  .driver-active-element {
+    border-radius: var(--radius) !important;
+  }
+
+  /* Overlay styling */
+  .driver-overlay {
+    background: rgba(0, 0, 0, 0.5) !important;
+  }
 }
