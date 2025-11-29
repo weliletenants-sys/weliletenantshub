@@ -31,6 +31,9 @@ export const useRealtimeTenants = (agentId: string | null | undefined) => {
   useEffect(() => {
     if (!agentId) return;
 
+    let isMounted = true;
+    let isSubscribed = false;
+
     const channel = supabase
       .channel('tenants-changes')
       .on(
@@ -42,6 +45,8 @@ export const useRealtimeTenants = (agentId: string | null | undefined) => {
           filter: `agent_id=eq.${agentId}`,
         },
         (payload: RealtimePostgresChangesPayload<Tenant>) => {
+          if (!isMounted || !isSubscribed) return;
+          
           console.log('Realtime tenant change:', payload);
 
           // Notify sync indicators
@@ -64,12 +69,16 @@ export const useRealtimeTenants = (agentId: string | null | undefined) => {
         }
       )
       .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
+        if (status === 'SUBSCRIBED') {
+          isSubscribed = true;
+        } else if (status === 'CHANNEL_ERROR') {
           console.error('Realtime subscription error for tenants');
         }
       });
 
     return () => {
+      isMounted = false;
+      isSubscribed = false;
       channel.unsubscribe().then(() => {
         supabase.removeChannel(channel).catch((error) => {
           console.error('Error removing tenants channel:', error);
@@ -89,6 +98,9 @@ export const useRealtimeCollections = (tenantId: string | undefined) => {
   useEffect(() => {
     if (!tenantId) return;
 
+    let isMounted = true;
+    let isSubscribed = false;
+
     const channel = supabase
       .channel('collections-changes')
       .on(
@@ -100,6 +112,8 @@ export const useRealtimeCollections = (tenantId: string | undefined) => {
           filter: `tenant_id=eq.${tenantId}`,
         },
         (payload: RealtimePostgresChangesPayload<Collection>) => {
+          if (!isMounted || !isSubscribed) return;
+          
           console.log('Realtime collection change:', payload);
 
           // Notify sync indicators
@@ -113,12 +127,16 @@ export const useRealtimeCollections = (tenantId: string | undefined) => {
         }
       )
       .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR') {
+        if (status === 'SUBSCRIBED') {
+          isSubscribed = true;
+        } else if (status === 'CHANNEL_ERROR') {
           console.error('Realtime subscription error for collections');
         }
       });
 
     return () => {
+      isMounted = false;
+      isSubscribed = false;
       channel.unsubscribe().then(() => {
         supabase.removeChannel(channel).catch((error) => {
           console.error('Error removing collections channel:', error);
@@ -136,6 +154,9 @@ export const useRealtimeAllTenants = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    let isMounted = true;
+    let isSubscribed = false;
+
     const channel = supabase
       .channel('all-tenants-changes')
       .on(
@@ -146,6 +167,8 @@ export const useRealtimeAllTenants = () => {
           table: 'tenants',
         },
         (payload: RealtimePostgresChangesPayload<Tenant>) => {
+          if (!isMounted || !isSubscribed) return;
+          
           console.log('Realtime tenant change (manager):', payload);
 
           // Notify sync indicators
@@ -160,9 +183,15 @@ export const useRealtimeAllTenants = () => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          isSubscribed = true;
+        }
+      });
 
     return () => {
+      isMounted = false;
+      isSubscribed = false;
       channel.unsubscribe().then(() => {
         supabase.removeChannel(channel).catch(console.error);
       });
@@ -178,6 +207,9 @@ export const useRealtimeAllCollections = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    let isMounted = true;
+    let isSubscribed = false;
+
     const channel = supabase
       .channel('all-collections-changes')
       .on(
@@ -188,6 +220,8 @@ export const useRealtimeAllCollections = () => {
           table: 'collections',
         },
         (payload: RealtimePostgresChangesPayload<Collection>) => {
+          if (!isMounted || !isSubscribed) return;
+          
           console.log('Realtime collection change (manager):', payload);
 
           // Notify sync indicators
@@ -197,9 +231,15 @@ export const useRealtimeAllCollections = () => {
           queryClient.invalidateQueries({ queryKey: ['collections'] });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          isSubscribed = true;
+        }
+      });
 
     return () => {
+      isMounted = false;
+      isSubscribed = false;
       channel.unsubscribe().then(() => {
         supabase.removeChannel(channel).catch(console.error);
       });
@@ -215,6 +255,9 @@ export const useRealtimeAgents = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    let isMounted = true;
+    let isSubscribed = false;
+
     const channel = supabase
       .channel('agents-changes')
       .on(
@@ -225,6 +268,8 @@ export const useRealtimeAgents = () => {
           table: 'agents',
         },
         (payload: RealtimePostgresChangesPayload<Agent>) => {
+          if (!isMounted || !isSubscribed) return;
+          
           console.log('Realtime agent change:', payload);
 
           // Notify sync indicators
@@ -239,9 +284,15 @@ export const useRealtimeAgents = () => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          isSubscribed = true;
+        }
+      });
 
     return () => {
+      isMounted = false;
+      isSubscribed = false;
       channel.unsubscribe().then(() => {
         supabase.removeChannel(channel).catch(console.error);
       });
@@ -257,6 +308,9 @@ export const useRealtimeProfiles = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    let isMounted = true;
+    let isSubscribed = false;
+
     const channel = supabase
       .channel('profiles-changes')
       .on(
@@ -267,6 +321,8 @@ export const useRealtimeProfiles = () => {
           table: 'profiles',
         },
         (payload: RealtimePostgresChangesPayload<Profile>) => {
+          if (!isMounted || !isSubscribed) return;
+          
           console.log('Realtime profile change:', payload);
 
           // Notify sync indicators
@@ -282,9 +338,15 @@ export const useRealtimeProfiles = () => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          isSubscribed = true;
+        }
+      });
 
     return () => {
+      isMounted = false;
+      isSubscribed = false;
       channel.unsubscribe().then(() => {
         supabase.removeChannel(channel).catch(console.error);
       });
@@ -300,6 +362,9 @@ export const useRealtimeNotifications = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    let isMounted = true;
+    let isSubscribed = false;
+
     const channel = supabase
       .channel('notifications-changes')
       .on(
@@ -310,6 +375,8 @@ export const useRealtimeNotifications = () => {
           table: 'notifications',
         },
         (payload) => {
+          if (!isMounted || !isSubscribed) return;
+          
           console.log('Realtime notification change:', payload);
           
           // Notify sync indicators
@@ -319,9 +386,15 @@ export const useRealtimeNotifications = () => {
           queryClient.invalidateQueries({ queryKey: ['notifications'] });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          isSubscribed = true;
+        }
+      });
 
     return () => {
+      isMounted = false;
+      isSubscribed = false;
       channel.unsubscribe().then(() => {
         supabase.removeChannel(channel).catch(console.error);
       });
