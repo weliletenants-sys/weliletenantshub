@@ -8,7 +8,7 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -53,6 +53,7 @@ const ManagerDashboard = () => {
     portfolioDayChangePercent: 0,
     portfolioWeekChange: 0,
     portfolioWeekChangePercent: 0,
+    totalVerifiedCommission: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
@@ -529,6 +530,17 @@ const ManagerDashboard = () => {
         const verifiedPayments = collectionsData.data?.filter(c => c.status === 'verified').length || 0;
         const rejectedPayments = collectionsData.data?.filter(c => c.status === 'rejected').length || 0;
 
+        // Fetch total verified commission
+        const { data: verifiedCollections } = await supabase
+          .from("collections")
+          .select("commission")
+          .eq("status", "verified");
+        
+        const totalVerifiedCommission = verifiedCollections?.reduce(
+          (sum, c) => sum + parseFloat(c.commission?.toString() || '0'), 
+          0
+        ) || 0;
+
         setStats({
           totalAgents,
           activeAgents: totalAgents,
@@ -542,6 +554,7 @@ const ManagerDashboard = () => {
           portfolioDayChangePercent: 0,
           portfolioWeekChange: 0,
           portfolioWeekChangePercent: 0,
+          totalVerifiedCommission,
         });
 
         // Load secondary data in background (non-blocking)
@@ -630,6 +643,17 @@ const ManagerDashboard = () => {
     const verifiedPayments = collectionsData.data?.filter(c => c.status === 'verified').length || 0;
     const rejectedPayments = collectionsData.data?.filter(c => c.status === 'rejected').length || 0;
 
+    // Fetch total verified commission for refresh
+    const { data: verifiedCollections } = await supabase
+      .from("collections")
+      .select("commission")
+      .eq("status", "verified");
+    
+    const totalVerifiedCommission = verifiedCollections?.reduce(
+      (sum, c) => sum + parseFloat(c.commission?.toString() || '0'), 
+      0
+    ) || 0;
+
     setStats(prev => ({
       ...prev,
       totalAgents,
@@ -640,6 +664,7 @@ const ManagerDashboard = () => {
       verifiedPayments,
       rejectedPayments,
       totalPortfolioValue,
+      totalVerifiedCommission,
     }));
 
     toast.success("Dashboard refreshed");
@@ -1947,6 +1972,29 @@ const ManagerDashboard = () => {
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Combined outstanding balances • Tap for breakdown
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card 
+            className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20 cursor-pointer hover:border-green-500/40 transition-all hover:shadow-lg"
+            onClick={() => {
+              haptics.light();
+              navigate("/manager/payment-verifications");
+            }}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-green-600" />
+                Total Verified Commissions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-700">
+                UGX {stats.totalVerifiedCommission.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Applied on {stats.verifiedPayments} verified payment{stats.verifiedPayments !== 1 ? 's' : ''}
               </p>
             </CardContent>
           </Card>
