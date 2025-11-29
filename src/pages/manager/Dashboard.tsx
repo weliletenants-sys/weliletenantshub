@@ -769,7 +769,7 @@ const ManagerDashboard = () => {
         agentData.paymentCount += 1;
       });
 
-      // Convert to array and calculate preferred payment method
+      // Convert to array and calculate preferred payment method + average commission
       const agentLeaderboard = Array.from(agentCommissionMap.values()).map(agent => {
         const preferredMethod = Object.entries(agent.paymentMethods)
           .sort((a, b) => (b[1] as number) - (a[1] as number))[0][0];
@@ -779,9 +779,14 @@ const ManagerDashboard = () => {
           preferredMethod === 'mtn' ? 'MTN Mobile Money' :
           'Airtel Money';
 
+        const averageCommission = agent.paymentCount > 0 
+          ? agent.totalCommission / agent.paymentCount 
+          : 0;
+
         return {
           ...agent,
           preferredMethod: preferredMethodDisplay,
+          averageCommission,
         };
       });
 
@@ -2282,8 +2287,11 @@ const ManagerDashboard = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-green-700">
+                          <p className="font-bold text-green-700 text-base">
                             UGX {agent.totalCommission.toLocaleString()}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Avg: UGX {agent.averageCommission.toLocaleString(undefined, { maximumFractionDigits: 0 })} per payment
                           </p>
                           <div className="flex items-center gap-1 mt-1">
                             <div className={`h-2 w-2 rounded-full ${
