@@ -3,12 +3,15 @@ import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, XCircle, Phone, Calendar, User, Search, Filter } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CheckCircle2, XCircle, Phone, Calendar, User, Search, Filter, Download, FileText, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRealtimeAllTenants, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
 interface VerificationRecord {
   id: string;
@@ -165,6 +168,147 @@ const ManagerVerificationHistory = () => {
   const verifiedCount = verifications.filter(v => v.status === "verified").length;
   const rejectedCount = verifications.filter(v => v.status === "rejected").length;
 
+  // Export to CSV
+  const exportToCSV = () => {
+    try {
+      // Prepare CSV headers
+      const headers = [
+        "Tenant Name",
+        "Tenant Phone",
+        "Landlord Name",
+        "Landlord Phone",
+        "LC1 Name",
+        "LC1 Phone",
+        "Rent Amount",
+        "Status",
+        "Agent Name",
+        "Verified/Rejected By",
+        "Submitted Date",
+        "Verification Date"
+      ];
+
+      // Prepare CSV rows
+      const rows = filteredVerifications.map(record => [
+        record.tenant_name,
+        record.tenant_phone,
+        record.landlord_name || "N/A",
+        record.landlord_phone || "N/A",
+        record.lc1_name || "N/A",
+        record.lc1_phone || "N/A",
+        record.rent_amount.toString(),
+        record.status.toUpperCase(),
+        record.agents?.profiles?.full_name || "Unknown",
+        record.verifier?.full_name || "N/A",
+        format(new Date(record.created_at), "yyyy-MM-dd HH:mm"),
+        record.verified_at ? format(new Date(record.verified_at), "yyyy-MM-dd HH:mm") : "N/A"
+      ]);
+
+      // Combine headers and rows
+      const csvContent = [
+        headers.join(","),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+      ].join("\n");
+
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `tenant_verification_history_${format(new Date(), "yyyy-MM-dd")}.csv`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success("CSV exported successfully");
+    } catch (error) {
+      console.error("Error exporting to CSV:", error);
+      toast.error("Failed to export CSV");
+    }
+  };
+
+  // Export to PDF
+  const exportToPDF = () => {
+    try {
+      const doc = new jsPDF();
+      
+      // Add header with purple background
+      doc.setFillColor(107, 45, 197); // #6B2DC5
+      doc.rect(0, 0, 210, 30, "F");
+      
+      // Add Welile logo text
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont("helvetica", "bold");
+      doc.text("Welile", 14, 20);
+      
+      // Add title
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "normal");
+      doc.text("Tenant Verification History", 14, 45);
+      
+      // Add export date
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Generated: ${format(new Date(), "MMMM dd, yyyy HH:mm")}`, 14, 52);
+      
+      // Add summary stats
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Total Records: ${filteredVerifications.length}`, 14, 60);
+      doc.text(`Verified: ${verifiedCount}`, 60, 60);
+      doc.text(`Rejected: ${rejectedCount}`, 100, 60);
+      
+      // Prepare table data
+      const tableData = filteredVerifications.map(record => [
+        record.tenant_name,
+        record.tenant_phone,
+        `UGX ${record.rent_amount.toLocaleString()}`,
+        record.status.toUpperCase(),
+        record.agents?.profiles?.full_name || "Unknown",
+        record.verifier?.full_name || "N/A",
+        format(new Date(record.created_at), "MMM dd, yyyy"),
+        record.verified_at ? format(new Date(record.verified_at), "MMM dd, yyyy") : "N/A"
+      ]);
+
+      // Add table
+      (doc as any).autoTable({
+        startY: 68,
+        head: [["Tenant", "Phone", "Rent", "Status", "Agent", "Verified By", "Submitted", "Verified"]],
+        body: tableData,
+        theme: "striped",
+        headStyles: {
+          fillColor: [107, 45, 197],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          fontSize: 9
+        },
+        bodyStyles: {
+          fontSize: 8
+        },
+        columnStyles: {
+          0: { cellWidth: 25 },
+          1: { cellWidth: 22 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 18 },
+          4: { cellWidth: 25 },
+          5: { cellWidth: 25 },
+          6: { cellWidth: 20 },
+          7: { cellWidth: 20 }
+        },
+        margin: { left: 14, right: 14 }
+      });
+
+      // Save PDF
+      doc.save(`tenant_verification_history_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      
+      toast.success("PDF exported successfully");
+    } catch (error) {
+      console.error("Error exporting to PDF:", error);
+      toast.error("Failed to export PDF");
+    }
+  };
+
   return (
     <ManagerLayout currentPage="/manager/verification-history">
       <div className="space-y-6">
@@ -173,26 +317,49 @@ const ManagerVerificationHistory = () => {
           <p className="text-muted-foreground">Complete history of all tenant verifications</p>
         </div>
 
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold">{verifications.length}</div>
-              <p className="text-sm text-muted-foreground">Total Processed</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold text-success">{verifiedCount}</div>
-              <p className="text-sm text-muted-foreground">Verified</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold text-destructive">{rejectedCount}</div>
-              <p className="text-sm text-muted-foreground">Rejected</p>
-            </CardContent>
-          </Card>
+        {/* Summary Stats and Export Buttons */}
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-3 justify-end">
+            <Button
+              variant="outline"
+              onClick={exportToCSV}
+              disabled={filteredVerifications.length === 0}
+              className="gap-2"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Export CSV
+            </Button>
+            <Button
+              variant="outline"
+              onClick={exportToPDF}
+              disabled={filteredVerifications.length === 0}
+              className="gap-2"
+            >
+              <FileText className="h-4 w-4" />
+              Export PDF
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{verifications.length}</div>
+                <p className="text-sm text-muted-foreground">Total Processed</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold text-success">{verifiedCount}</div>
+                <p className="text-sm text-muted-foreground">Verified</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold text-destructive">{rejectedCount}</div>
+                <p className="text-sm text-muted-foreground">Rejected</p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Search and Filters */}
