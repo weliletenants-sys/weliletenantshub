@@ -25,7 +25,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import PaymentReceipt from "@/components/PaymentReceipt";
 import { useOptimisticPaymentVerification, useOptimisticPaymentRejection, useUndoPaymentAction } from "@/hooks/useOptimisticPaymentVerification";
 import { haptics } from "@/utils/haptics";
-import { Undo2 } from "lucide-react";
+import { Undo2, History } from "lucide-react";
+import { UndoHistoryDialog, UndoHistoryEntry } from "@/components/UndoHistoryDialog";
 
 interface Payment {
   id: string;
@@ -63,6 +64,12 @@ const PaymentVerifications = () => {
   const [loadingTenant, setLoadingTenant] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [activeTab, setActiveTab] = useState<string>("pending");
+  const [showUndoHistory, setShowUndoHistory] = useState(false);
+  const [undoHistory, setUndoHistory] = useState<UndoHistoryEntry[]>(() => {
+    // Load undo history from localStorage on mount
+    const saved = localStorage.getItem('payment-undo-history');
+    return saved ? JSON.parse(saved) : [];
+  });
   
   // Optimistic mutations
   const verifyMutation = useOptimisticPaymentVerification();
@@ -291,8 +298,31 @@ const PaymentVerifications = () => {
       // Dismiss the original toast
       toast.dismiss(actionData.toastId);
 
+      // Determine action type from the undoData
+      const wasVerified = actionData.undoData.previousStatus === 'pending' && 
+                         payments?.find((p: Payment) => p.id === paymentId)?.status === 'verified';
+      const wasRejected = actionData.undoData.previousStatus === 'pending' && 
+                         payments?.find((p: Payment) => p.id === paymentId)?.status === 'rejected';
+
       // Perform undo
       await undoMutation.mutateAsync(actionData.undoData);
+
+      // Add to undo history
+      const historyEntry: UndoHistoryEntry = {
+        id: `${paymentId}-${Date.now()}`,
+        paymentId: paymentId,
+        tenantName: actionData.undoData.tenantName,
+        actionType: wasVerified ? 'verify' : 'reject',
+        undoneAt: new Date(),
+        previousStatus: actionData.undoData.previousStatus,
+        rejectionReason: wasRejected ? actionData.undoData.previousRejectionReason : undefined
+      };
+
+      const newHistory = [...undoHistory, historyEntry];
+      setUndoHistory(newHistory);
+      
+      // Save to localStorage
+      localStorage.setItem('payment-undo-history', JSON.stringify(newHistory));
 
       // Remove from recent actions
       setRecentActions(prev => {
@@ -303,6 +333,12 @@ const PaymentVerifications = () => {
     } catch (error) {
       console.error("Error undoing action:", error);
     }
+  };
+
+  const handleClearUndoHistory = () => {
+    setUndoHistory([]);
+    localStorage.removeItem('payment-undo-history');
+    toast.success("Undo history cleared");
   };
 
   const pendingPayments = payments?.filter(p => p.status === "pending") || [];
@@ -420,8 +456,25 @@ const PaymentVerifications = () => {
   return (
     <ManagerLayout currentPage="/manager/payment-verifications">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Payment Verifications</h1>
-        <p className="text-muted-foreground">Review and verify agent payment submissions</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Payment Verifications</h1>
+            <p className="text-muted-foreground">Review and verify agent payment submissions</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setShowUndoHistory(true)}
+            className="flex items-center gap-2"
+          >
+            <History className="h-4 w-4" />
+            Undo History
+            {undoHistory.length > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {undoHistory.length}
+              </Badge>
+            )}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -556,6 +609,14 @@ const PaymentVerifications = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Undo History Dialog */}
+      <UndoHistoryDialog
+        open={showUndoHistory}
+        onOpenChange={setShowUndoHistory}
+        history={undoHistory}
+        onClearHistory={handleClearUndoHistory}
+      />
 
       {/* Receipt Preview Dialog */}
       <Dialog open={showReceiptPreview} onOpenChange={setShowReceiptPreview}>
