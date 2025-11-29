@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import WelileLogo from "./WelileLogo";
@@ -21,21 +21,8 @@ interface AgentLayoutProps {
 
 const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
   const createRipple = useRipple();
   const { swipeProgress } = useSwipeBack();
-
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      navigate("/login?role=agent");
-    }
-    setIsLoading(false);
-  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -60,10 +47,6 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
     { icon: BookOpen, label: "Training", path: "/agent/training" },
     { icon: Settings, label: "Settings", path: "/agent/settings" },
   ];
-
-  if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
