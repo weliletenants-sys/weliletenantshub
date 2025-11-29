@@ -29,26 +29,37 @@ interface Tenant {
 
 const ManagerVerifications = () => {
   const [pendingVerifications, setPendingVerifications] = useState<Tenant[]>([]);
+  const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
+  const [isLoading, setIsLoading] = useState(true);
   
   // Enable real-time updates
   useRealtimeAllTenants();
 
   const fetchPendingVerifications = async () => {
-    const { data } = await supabase
-      .from("tenants")
-      .select(`
-        *,
-        agents (
-          profiles:user_id (
-            full_name,
-            phone_number
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from("tenants")
+        .select(`
+          *,
+          agents (
+            profiles:user_id (
+              full_name,
+              phone_number
+            )
           )
-        )
-      `)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false });
+        `)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
 
-    setPendingVerifications(data || []);
+      if (error) throw error;
+      setPendingVerifications(data || []);
+    } catch (error) {
+      console.error("Error fetching verifications:", error);
+      toast.error("Failed to load verifications");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -68,43 +79,69 @@ const ManagerVerifications = () => {
   }, []);
 
   const handleApprove = async (tenantId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error("Not authenticated");
-      return;
-    }
+    try {
+      setLoadingStates(prev => ({ ...prev, [tenantId]: true }));
 
-    const { error } = await supabase
-      .from("tenants")
-      .update({ 
-        status: "verified", 
-        verified_at: new Date().toISOString()
-      })
-      .eq("id", tenantId);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Not authenticated");
+        return;
+      }
 
-    if (error) {
-      toast.error("Failed to approve verification");
-    } else {
+      const { error } = await supabase
+        .from("tenants")
+        .update({ 
+          status: "verified", 
+          verified_at: new Date().toISOString()
+        })
+        .eq("id", tenantId);
+
+      if (error) throw error;
+
+      // Optimistically remove from list
+      setPendingVerifications(prev => prev.filter(t => t.id !== tenantId));
+      
       toast.success("Tenant verified successfully");
+      
+      // Refetch to ensure consistency
+      await fetchPendingVerifications();
+    } catch (error) {
+      console.error("Error approving verification:", error);
+      toast.error("Failed to approve verification. Please try again.");
+    } finally {
+      setLoadingStates(prev => ({ ...prev, [tenantId]: false }));
     }
   };
 
   const handleReject = async (tenantId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error("Not authenticated");
-      return;
-    }
+    try {
+      setLoadingStates(prev => ({ ...prev, [tenantId]: true }));
 
-    const { error } = await supabase
-      .from("tenants")
-      .update({ status: "rejected" })
-      .eq("id", tenantId);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Not authenticated");
+        return;
+      }
 
-    if (error) {
-      toast.error("Failed to reject verification");
-    } else {
+      const { error } = await supabase
+        .from("tenants")
+        .update({ status: "rejected" })
+        .eq("id", tenantId);
+
+      if (error) throw error;
+
+      // Optimistically remove from list
+      setPendingVerifications(prev => prev.filter(t => t.id !== tenantId));
+      
       toast.success("Verification rejected");
+      
+      // Refetch to ensure consistency
+      await fetchPendingVerifications();
+    } catch (error) {
+      console.error("Error rejecting verification:", error);
+      toast.error("Failed to reject verification. Please try again.");
+    } finally {
+      setLoadingStates(prev => ({ ...prev, [tenantId]: false }));
     }
   };
 
@@ -116,7 +153,14 @@ const ManagerVerifications = () => {
           <p className="text-muted-foreground">Review and approve pending verifications</p>
         </div>
 
-        {pendingVerifications.length === 0 ? (
+        {isLoading ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <div className="animate-spin h-12 w-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading verifications...</p>
+            </CardContent>
+          </Card>
+        ) : pendingVerifications.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-4" />
@@ -174,17 +218,37 @@ const ManagerVerifications = () => {
                       variant="default" 
                       className="flex-1"
                       onClick={() => handleApprove(verification.id)}
+                      disabled={loadingStates[verification.id]}
                     >
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Approve & Verify
+                      {loadingStates[verification.id] ? (
+                        <>
+                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                          Verifying...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          Approve & Verify
+                        </>
+                      )}
                     </Button>
                     <Button 
                       variant="destructive" 
                       className="flex-1"
                       onClick={() => handleReject(verification.id)}
+                      disabled={loadingStates[verification.id]}
                     >
-                      <XCircle className="h-4 w-4 mr-2" />
-                      Reject
+                      {loadingStates[verification.id] ? (
+                        <>
+                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                          Rejecting...
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Reject
+                        </>
+                      )}
                     </Button>
                     <Button variant="outline" asChild>
                       <a href={`tel:${verification.landlord_phone}`}>
