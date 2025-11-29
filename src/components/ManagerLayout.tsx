@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import WelileLogo from "./WelileLogo";
@@ -10,6 +10,16 @@ import { useRipple } from "@/hooks/useRipple";
 import { useSwipeBack } from "@/hooks/useSwipeBack";
 import SwipeBackIndicator from "./SwipeBackIndicator";
 import BottomNavigation from "./BottomNavigation";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 interface ManagerLayoutProps {
   children: ReactNode;
@@ -20,6 +30,7 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
   const navigate = useNavigate();
   const createRipple = useRipple();
   const { swipeProgress } = useSwipeBack();
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -47,11 +58,28 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
       
       <header className="bg-card border-b border-border p-6 flex justify-between items-center">
         <WelileLogo />
-        <Button variant="ghost" size="default" onClick={handleLogout}>
+        <Button variant="ghost" size="default" onClick={() => setShowLogoutDialog(true)}>
           <LogOut className="h-5 w-5 mr-2" />
           Logout
         </Button>
       </header>
+
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to log out? You'll need to log in again to access your manager dashboard.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLogout}>
+              Logout
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="flex-1 flex flex-col md:flex-row">
         {/* Sidebar - Desktop only */}
