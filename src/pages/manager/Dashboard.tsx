@@ -109,7 +109,7 @@ const ManagerDashboard = () => {
       const startDateStr = start.toISOString().split('T')[0];
       const endDateStr = end.toISOString().split('T')[0];
 
-      // Get verified collections within date range with manager details
+      // Get all collections within date range (including pending verification)
       const { data: collections, error } = await supabase
         .from('collections')
         .select(`
@@ -118,6 +118,7 @@ const ManagerDashboard = () => {
           payment_method,
           verified_at,
           verified_by,
+          status,
           tenants (
             tenant_name
           ),
@@ -127,7 +128,6 @@ const ManagerDashboard = () => {
             )
           )
         `)
-        .eq('status', 'verified')
         .gte('collection_date', startDateStr)
         .lte('collection_date', endDateStr)
         .order('collection_date', { ascending: true });
@@ -170,9 +170,10 @@ const ManagerDashboard = () => {
           amount: parseFloat(c.amount.toString()),
           tenantName: c.tenants?.tenant_name || 'Unknown',
           agentName: c.agents?.profiles?.full_name || 'Unknown',
-          managerName: c.verified_by ? (managerMap.get(c.verified_by) || 'Unknown') : 'Unknown',
+          managerName: c.verified_by ? (managerMap.get(c.verified_by) || 'Unknown') : 'Pending Verification',
           verifiedAt: c.verified_at,
-          paymentMethod: c.payment_method
+          paymentMethod: c.payment_method,
+          status: c.status || 'pending'
         })) || []
       }));
 
@@ -1558,7 +1559,7 @@ const ManagerDashboard = () => {
 
                     {/* Detailed Payment Breakdown by Day */}
                     <div className="mt-6 space-y-4">
-                      <h4 className="font-semibold text-sm">Verified Payments by Day</h4>
+                      <h4 className="font-semibold text-sm">All Payments by Day</h4>
                       <div className="space-y-3 max-h-[400px] overflow-y-auto">
                         {paymentReportData.dailyBreakdown.filter(day => day.payments && day.payments.length > 0).map((day, idx) => (
                           <div key={idx} className="border rounded-lg p-4 bg-muted/30">
@@ -1575,18 +1576,40 @@ const ManagerDashboard = () => {
                               {day.payments.map((payment: any, pIdx: number) => (
                                 <div key={pIdx} className="flex items-start justify-between text-xs p-2 bg-background rounded border">
                                   <div className="space-y-1 flex-1">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                       <span className="font-medium">{payment.tenantName}</span>
                                       <Badge variant="secondary" className="text-xs">
                                         {payment.paymentMethod?.toUpperCase() || 'CASH'}
                                       </Badge>
+                                      <Badge 
+                                        variant={
+                                          payment.status === 'verified' ? 'default' : 
+                                          payment.status === 'rejected' ? 'destructive' : 
+                                          'outline'
+                                        }
+                                        className="text-xs"
+                                      >
+                                        {payment.status === 'verified' ? '✓ Verified' : 
+                                         payment.status === 'rejected' ? '✗ Rejected' : 
+                                         '⏱ Pending'}
+                                      </Badge>
                                     </div>
                                     <p className="text-muted-foreground">Agent: {payment.agentName}</p>
-                                    <p className="text-success font-medium">Verified by: {payment.managerName}</p>
-                                    {payment.verifiedAt && (
-                                      <p className="text-muted-foreground">
-                                        {format(new Date(payment.verifiedAt), 'MMM dd, yyyy HH:mm')}
-                                      </p>
+                                    {payment.status === 'verified' && (
+                                      <>
+                                        <p className="text-success font-medium">Verified by: {payment.managerName}</p>
+                                        {payment.verifiedAt && (
+                                          <p className="text-muted-foreground">
+                                            {format(new Date(payment.verifiedAt), 'MMM dd, yyyy HH:mm')}
+                                          </p>
+                                        )}
+                                      </>
+                                    )}
+                                    {payment.status === 'pending' && (
+                                      <p className="text-warning font-medium">⏱ Awaiting verification</p>
+                                    )}
+                                    {payment.status === 'rejected' && (
+                                      <p className="text-destructive font-medium">✗ Rejected by manager</p>
                                     )}
                                   </div>
                                   <div className="font-bold text-right">
