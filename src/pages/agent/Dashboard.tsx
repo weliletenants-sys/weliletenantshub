@@ -39,6 +39,8 @@ const AgentDashboard = () => {
   const [verifiedPayments, setVerifiedPayments] = useState(0);
   const [rejectedPayments, setRejectedPayments] = useState(0);
   const [paymentMethodBreakdown, setPaymentMethodBreakdown] = useState<any[]>([]);
+  const [totalCommission, setTotalCommission] = useState(0);
+  const [thisMonthCommission, setThisMonthCommission] = useState(0);
   const [managerNotifications, setManagerNotifications] = useState<any[]>([]);
   const [dismissedNotifications, setDismissedNotifications] = useState<string[]>([]);
   const [previousNotificationCount, setPreviousNotificationCount] = useState(0);
@@ -144,7 +146,9 @@ const AgentDashboard = () => {
         pendingResult,
         verifiedResult,
         rejectedResult,
-        paymentMethodResult
+        paymentMethodResult,
+        commissionResult,
+        thisMonthCommissionResult
       ] = await Promise.all([
         supabase
           .from("collections")
@@ -189,7 +193,20 @@ const AgentDashboard = () => {
           .from("collections")
           .select("amount, payment_method")
           .eq("agent_id", agentId)
-          .gte("collection_date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+          .gte("collection_date", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+        
+        supabase
+          .from("collections")
+          .select("commission")
+          .eq("agent_id", agentId)
+          .eq("status", "verified"),
+        
+        supabase
+          .from("collections")
+          .select("commission")
+          .eq("agent_id", agentId)
+          .eq("status", "verified")
+          .gte("collection_date", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0])
       ]);
 
       // Process results
@@ -230,6 +247,13 @@ const AgentDashboard = () => {
 
         setPaymentMethodBreakdown(breakdownData);
       }
+
+      // Process commission data
+      const totalComm = commissionResult.data?.reduce((sum, col) => sum + parseFloat(col.commission?.toString() || '0'), 0) || 0;
+      setTotalCommission(totalComm);
+
+      const monthComm = thisMonthCommissionResult.data?.reduce((sum, col) => sum + parseFloat(col.commission?.toString() || '0'), 0) || 0;
+      setThisMonthCommission(monthComm);
     } catch (error) {
       console.error("Error in fetchAgentData:", error);
       toast.error("Failed to load dashboard");
@@ -643,6 +667,50 @@ const AgentDashboard = () => {
             open={calculatorOpen}
             onOpenChange={setCalculatorOpen}
           />
+
+          {/* Commission Hero Card - PRIORITY DISPLAY */}
+          <Card className="bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 text-white overflow-hidden relative hover:shadow-2xl transition-all border-4 border-emerald-400/50">
+            <div className="absolute top-0 right-0 w-72 h-72 bg-white/10 rounded-full -translate-y-32 translate-x-32" />
+            <div className="absolute bottom-0 left-0 w-56 h-56 bg-white/10 rounded-full translate-y-28 -translate-x-28" />
+            <CardContent className="p-8 relative z-10">
+              <div className="space-y-5">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/25 backdrop-blur-sm rounded-2xl">
+                    <DollarSign className="h-10 w-10" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium opacity-95 mb-1">💰 Total Commission Earned</p>
+                    <h2 className="text-5xl font-black tracking-tight">
+                      {(totalCommission / 1000).toFixed(0)}K
+                    </h2>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4">
+                    <p className="text-xs opacity-90 mb-1">This Month</p>
+                    <p className="text-2xl font-bold">
+                      {(thisMonthCommission / 1000).toFixed(0)}K
+                    </p>
+                  </div>
+                  <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4">
+                    <p className="text-xs opacity-90 mb-1">All Time</p>
+                    <p className="text-2xl font-bold">
+                      UGX {totalCommission.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+
+                <Button 
+                  variant="secondary"
+                  className="w-full font-bold text-base py-6 bg-white text-emerald-600 hover:bg-white/90"
+                  onClick={() => navigate("/agent/earnings")}
+                >
+                  View Full Earnings →
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Overdue Payment Notifications */}
           {overdueTenants.length > 0 && (
