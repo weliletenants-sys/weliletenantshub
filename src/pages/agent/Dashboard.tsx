@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 import QuickPaymentDialog from "@/components/QuickPaymentDialog";
 import { DailyRepaymentCalculatorDialog } from "@/components/DailyRepaymentCalculatorDialog";
+import { CommissionCalculatorDialog } from "@/components/CommissionCalculatorDialog";
 import { clearOldCaches, getCacheSize } from "@/lib/cacheManager";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,6 +37,7 @@ const AgentDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
+  const [commissionCalculatorOpen, setCommissionCalculatorOpen] = useState(false);
   const [pendingVerifications, setPendingVerifications] = useState(0);
   const [verifiedPayments, setVerifiedPayments] = useState(0);
   const [rejectedPayments, setRejectedPayments] = useState(0);
@@ -759,6 +761,36 @@ const AgentDashboard = () => {
             </Button>
           </div>
 
+          {/* Secondary Actions Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <Button 
+              size="lg" 
+              variant="outline"
+              className="h-20 text-sm font-semibold shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95 border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+              onClick={() => {
+                setCommissionCalculatorOpen(true);
+                haptics.light();
+              }}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <DollarSign className="h-6 w-6" />
+                <span className="text-xs">Commission Calculator</span>
+              </div>
+            </Button>
+
+            <Button 
+              size="lg" 
+              variant="outline"
+              className="h-20 text-sm font-semibold shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95 border-2"
+              onClick={() => navigate("/agent/earnings")}
+            >
+              <div className="flex flex-col items-center gap-1">
+                <TrendingUp className="h-6 w-6" />
+                <span className="text-xs">View Earnings</span>
+              </div>
+            </Button>
+          </div>
+
           <QuickPaymentDialog
             open={quickPaymentOpen}
             onOpenChange={setQuickPaymentOpen}
@@ -768,6 +800,11 @@ const AgentDashboard = () => {
           <DailyRepaymentCalculatorDialog
             open={calculatorOpen}
             onOpenChange={setCalculatorOpen}
+          />
+
+          <CommissionCalculatorDialog
+            open={commissionCalculatorOpen}
+            onOpenChange={setCommissionCalculatorOpen}
           />
 
           {/* Overdue Payment Notifications */}
