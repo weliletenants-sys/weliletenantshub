@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Calculator, Copy, ListOrdered, Save, FolderOpen, Trash2, FileDown, Settings, Printer } from "lucide-react";
+import { Calculator, Copy, ListOrdered, Save, FolderOpen, Trash2, FileDown, Settings, Printer, Download } from "lucide-react";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 import jsPDF from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface BulkResult {
   rent: number;
@@ -53,6 +54,7 @@ const CalculatorPage = () => {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [templateName, setTemplateName] = useState("");
+  const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
 
   // PDF customization state
   const [pdfSettingsOpen, setPdfSettingsOpen] = useState(false);
@@ -285,8 +287,141 @@ const CalculatorPage = () => {
   const deleteTemplate = (id: string) => {
     const template = savedTemplates.find(t => t.id === id);
     setSavedTemplates(savedTemplates.filter(t => t.id !== id));
+    setSelectedTemplates(selectedTemplates.filter(tId => tId !== id));
     toast.success(`Template "${template?.name}" deleted`);
     haptics.light();
+  };
+
+  const toggleTemplateSelection = (id: string) => {
+    setSelectedTemplates(prev => 
+      prev.includes(id) 
+        ? prev.filter(tId => tId !== id)
+        : [...prev, id]
+    );
+  };
+
+  const bulkExportPDFs = async () => {
+    if (selectedTemplates.length === 0) {
+      toast.error("Please select templates to export");
+      return;
+    }
+
+    toast.info(`Generating ${selectedTemplates.length} PDFs...`);
+    haptics.light();
+
+    for (const templateId of selectedTemplates) {
+      const template = savedTemplates.find(t => t.id === templateId);
+      if (!template) continue;
+
+      // Parse template amounts
+      const inputs = template.amounts
+        .split(/[,\n\s]+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      const results: BulkResult[] = [];
+      inputs.forEach(input => {
+        const rent = parseFloat(input);
+        if (!isNaN(rent) && rent > 0 && rent <= 50000000) {
+          results.push({
+            rent,
+            day30: calculateDailyRate(rent, 30),
+            day60: calculateDailyRate(rent, 60),
+            day90: calculateDailyRate(rent, 90),
+          });
+        }
+      });
+
+      if (results.length === 0) continue;
+
+      // Generate PDF for this template
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      // Add purple header with logo
+      doc.setFillColor(107, 45, 197);
+      doc.rect(0, 0, pageWidth, 50, 'F');
+      
+      const img = new Image();
+      img.src = '/welile-logo-pdf.jpg';
+      doc.addImage(img, 'JPEG', 15, 5, 40, 40);
+
+      if (pdfHeader) {
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text(pdfHeader, 60, 25);
+      }
+
+      // Title
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(16);
+      doc.setFont(undefined, 'bold');
+      doc.text(`${template.name}`, 15, 65);
+      
+      doc.setFontSize(14);
+      doc.text("Daily Repayment Rates", 15, 73);
+
+      // Agent name and date
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      if (pdfName) {
+        doc.text(`Prepared by: ${pdfName}`, 15, 81);
+      }
+      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 15, 87);
+
+      // Table headers
+      let yPos = 100;
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text("Rent Amount", 15, yPos);
+      doc.text("30 Days", 70, yPos);
+      doc.text("60 Days", 110, yPos);
+      doc.text("90 Days", 150, yPos);
+
+      // Table data
+      doc.setFont(undefined, 'normal');
+      yPos += 8;
+
+      results.forEach((result) => {
+        if (yPos > (pdfFooter ? pageHeight - 25 : pageHeight - 15)) {
+          doc.addPage();
+          doc.setFillColor(107, 45, 197);
+          doc.rect(0, 0, pageWidth, 50, 'F');
+          doc.addImage(img, 'JPEG', 15, 5, 40, 40);
+          yPos = 65;
+        }
+
+        doc.text(`UGX ${result.rent.toLocaleString()}`, 15, yPos);
+        doc.text(result.day30.toLocaleString(), 70, yPos);
+        doc.text(result.day60.toLocaleString(), 110, yPos);
+        doc.text(result.day90.toLocaleString(), 150, yPos);
+        yPos += 8;
+      });
+
+      // Add footer if configured
+      if (pdfFooter) {
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'italic');
+        doc.setTextColor(100, 100, 100);
+        const footerLines = doc.splitTextToSize(pdfFooter, pageWidth - 30);
+        const footerStartY = pageHeight - 15 - (footerLines.length * 3);
+        footerLines.forEach((line: string, index: number) => {
+          doc.text(line, 15, footerStartY + (index * 3));
+        });
+      }
+
+      // Download PDF
+      doc.save(`welile-${template.name.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.pdf`);
+      
+      // Add delay between downloads to prevent browser blocking
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    toast.success(`Successfully exported ${selectedTemplates.length} PDFs!`);
+    haptics.success();
+    setSelectedTemplates([]);
   };
 
   const savePdfSettings = () => {
@@ -547,45 +682,67 @@ const CalculatorPage = () => {
                             Load Template
                           </Button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="max-w-2xl">
                           <DialogHeader>
                             <DialogTitle>Load Saved Template</DialogTitle>
                           </DialogHeader>
-                          <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                          <div className="space-y-3">
                             {savedTemplates.length === 0 ? (
                               <p className="text-sm text-muted-foreground text-center py-8">
                                 No saved templates yet. Save your first template to reuse rent amount sets.
                               </p>
                             ) : (
-                              savedTemplates.map((template) => (
-                                <div
-                                  key={template.id}
-                                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium truncate">{template.name}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {new Date(template.createdAt).toLocaleDateString()}
-                                    </p>
-                                  </div>
-                                  <div className="flex gap-2 ml-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => loadTemplate(template)}
-                                    >
-                                      Load
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => deleteTemplate(template.id)}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                  </div>
+                              <>
+                                <div className="flex items-center justify-between mb-4">
+                                  <p className="text-sm text-muted-foreground">
+                                    {selectedTemplates.length > 0 && `${selectedTemplates.length} selected`}
+                                  </p>
+                                  <Button
+                                    onClick={bulkExportPDFs}
+                                    disabled={selectedTemplates.length === 0}
+                                    size="sm"
+                                    variant="default"
+                                  >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Export Selected ({selectedTemplates.length})
+                                  </Button>
                                 </div>
-                              ))
+                                <div className="max-h-[400px] overflow-y-auto space-y-2">
+                                  {savedTemplates.map((template) => (
+                                    <div
+                                      key={template.id}
+                                      className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                                    >
+                                      <Checkbox
+                                        checked={selectedTemplates.includes(template.id)}
+                                        onCheckedChange={() => toggleTemplateSelection(template.id)}
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-medium truncate">{template.name}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {new Date(template.createdAt).toLocaleDateString()}
+                                        </p>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => loadTemplate(template)}
+                                        >
+                                          Load
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => deleteTemplate(template.id)}
+                                        >
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
                             )}
                           </div>
                         </DialogContent>
