@@ -38,8 +38,10 @@ const AgentReceiptHistory = lazy(() => import("./pages/agent/ReceiptHistory"));
 const AgentNotifications = lazy(() => import("./pages/agent/Notifications"));
 const AgentPrintableDailyRates = lazy(() => import("./pages/agent/PrintableDailyRates"));
 const AgentTrainingMaterials = lazy(() => import("./pages/agent/TrainingMaterials"));
+const AgentCalculator = lazy(() => import("./pages/agent/Calculator"));
 const ManagerDashboard = lazy(() => import("./pages/manager/Dashboard"));
 const ManagerPrintableDailyRates = lazy(() => import("./pages/manager/PrintableDailyRates"));
+const ManagerCalculator = lazy(() => import("./pages/manager/Calculator"));
 const ManagerAgents = lazy(() => import("./pages/manager/Agents"));
 const ManagerAgentDetail = lazy(() => import("./pages/manager/AgentDetail"));
 const ManagerTenantDetail = lazy(() => import("./pages/manager/TenantDetail"));
@@ -190,6 +192,11 @@ const AppContent = () => {
                 <AgentTrainingMaterials />
               </ProtectedRoute>
             } />
+            <Route path="/agent/calculator" element={
+              <ProtectedRoute requiredRole="agent">
+                <AgentCalculator />
+              </ProtectedRoute>
+            } />
             <Route path="/manager/dashboard" element={
               <ProtectedRoute requiredRole="manager">
                 <ManagerDashboard />
@@ -258,6 +265,11 @@ const AppContent = () => {
             <Route path="/manager/printable-rates" element={
               <ProtectedRoute requiredRole="manager">
                 <ManagerPrintableDailyRates />
+              </ProtectedRoute>
+            } />
+            <Route path="/manager/calculator" element={
+              <ProtectedRoute requiredRole="manager">
+                <ManagerCalculator />
               </ProtectedRoute>
             } />
             <Route path="/admin" element={<AdminDashboard />} />
