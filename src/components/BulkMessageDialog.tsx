@@ -210,7 +210,7 @@ export function BulkMessageDialog({ selectedAgentIds = [], agentNames = [], send
           tenant_name,
           tenant_phone,
           agents!inner(
-            profiles!inner(full_name)
+            profiles:user_id!inner(full_name)
           )
         `)
         .order("tenant_name");

@@ -98,6 +98,10 @@ const ManagerAgents = () => {
   const [deletionReason, setDeletionReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   
+  // Suspension state
+  const [suspendingAgent, setSuspendingAgent] = useState<AgentWithDetails | null>(null);
+  const [suspensionReason, setSuspensionReason] = useState("");
+  
   // Enable real-time updates
   useRealtimeAgents();
   useRealtimeAllTenants();
@@ -626,6 +630,119 @@ const ManagerAgents = () => {
     } catch (error) {
       console.error("Error deleting agent:", error);
       toast.error("Failed to delete agent");
+      haptics.error();
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Suspend Agent Handler
+  const handleSuspendClick = (agent: AgentWithDetails, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSuspendingAgent(agent);
+    setSuspensionReason("");
+    haptics.light();
+  };
+
+  const handleConfirmSuspend = async () => {
+    if (!suspendingAgent || suspensionReason.length < 10) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Update agent suspension status
+      const { error } = await supabase
+        .from("agents")
+        .update({
+          is_suspended: true,
+          suspended_at: new Date().toISOString(),
+          suspended_by: user.id,
+          suspension_reason: suspensionReason
+        })
+        .eq("id", suspendingAgent.id);
+
+      if (error) throw error;
+
+      // Log suspension in audit trail
+      const { error: auditError } = await supabase.from("audit_logs").insert({
+        user_id: user.id,
+        action: "UPDATE",
+        table_name: "agents",
+        record_id: suspendingAgent.id,
+        old_data: { is_suspended: false } as any,
+        new_data: { 
+          is_suspended: true,
+          suspension_reason: suspensionReason 
+        } as any,
+        changed_fields: ["is_suspended", "suspended_at", "suspended_by", "suspension_reason"],
+      });
+
+      if (auditError) {
+        console.error("Error logging audit:", auditError);
+      }
+
+      toast.success("Agent suspended successfully");
+      setSuspendingAgent(null);
+      setSuspensionReason("");
+      fetchAgents();
+      haptics.success();
+    } catch (error) {
+      console.error("Error suspending agent:", error);
+      toast.error("Failed to suspend agent");
+      haptics.error();
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Unsuspend Agent Handler
+  const handleUnsuspend = async (agent: AgentWithDetails, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    try {
+      setActionLoading(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("agents")
+        .update({
+          is_suspended: false,
+          suspended_at: null,
+          suspended_by: null,
+          suspension_reason: null
+        })
+        .eq("id", agent.id);
+
+      if (error) throw error;
+
+      // Log unsuspension in audit trail
+      const { error: auditError } = await supabase.from("audit_logs").insert({
+        user_id: user.id,
+        action: "UPDATE",
+        table_name: "agents",
+        record_id: agent.id,
+        old_data: { is_suspended: true } as any,
+        new_data: { is_suspended: false } as any,
+        changed_fields: ["is_suspended"],
+      });
+
+      if (auditError) {
+        console.error("Error logging audit:", auditError);
+      }
+
+      toast.success("Agent reactivated successfully");
+      fetchAgents();
+      haptics.success();
+    } catch (error) {
+      console.error("Error reactivating agent:", error);
+      toast.error("Failed to reactivate agent");
       haptics.error();
     } finally {
       setActionLoading(false);
@@ -1281,16 +1398,46 @@ const ManagerAgents = () => {
                           className="cursor-pointer"
                           onClick={() => navigate(`/manager/agents/${agent.id}`)}
                         >
-                          <Badge variant={agent.tenant_count > 0 ? "default" : "secondary"}>
-                            {agent.tenant_count > 0 ? "Active" : "Inactive"}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            {(agent as any).is_suspended ? (
+                              <Badge variant="destructive" className="w-fit">
+                                Suspended
+                              </Badge>
+                            ) : (
+                              <Badge variant={agent.tenant_count > 0 ? "default" : "secondary"}>
+                                {agent.tenant_count > 0 ? "Active" : "Inactive"}
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-2">
+                            {(agent as any).is_suspended ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => handleUnsuspend(agent, e)}
+                                disabled={actionLoading}
+                                className="text-success"
+                              >
+                                Reactivate
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => handleSuspendClick(agent, e)}
+                                disabled={actionLoading}
+                                className="text-orange-600"
+                              >
+                                Suspend
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={(e) => handleEditClick(agent, e)}
+                              disabled={actionLoading}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -1298,6 +1445,7 @@ const ManagerAgents = () => {
                               variant="ghost"
                               size="sm"
                               onClick={(e) => handleDeleteClick(agent, e)}
+                              disabled={actionLoading}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
@@ -1474,6 +1622,51 @@ const ManagerAgents = () => {
               className="bg-destructive hover:bg-destructive/90"
             >
               {actionLoading ? "Deleting..." : "Delete Agent"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Suspend Agent Dialog */}
+      <AlertDialog open={!!suspendingAgent} onOpenChange={(open) => !open && setSuspendingAgent(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Suspend Agent</AlertDialogTitle>
+            <AlertDialogDescription>
+              Suspending an agent will temporarily disable their account. They won't be able to log in or perform any actions until reactivated.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <p className="text-sm font-medium mb-2">Agent: {suspendingAgent?.profiles?.full_name}</p>
+              <p className="text-sm text-muted-foreground">
+                This action is reversible. You can reactivate the agent at any time.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="suspension-reason">
+                Reason for suspension <span className="text-destructive">*</span>
+              </Label>
+              <Textarea
+                id="suspension-reason"
+                value={suspensionReason}
+                onChange={(e) => setSuspensionReason(e.target.value)}
+                placeholder="Provide a detailed reason (minimum 10 characters)"
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                {suspensionReason.length}/10 characters minimum
+              </p>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSuspend}
+              disabled={actionLoading || suspensionReason.length < 10}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {actionLoading ? "Suspending..." : "Suspend Agent"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

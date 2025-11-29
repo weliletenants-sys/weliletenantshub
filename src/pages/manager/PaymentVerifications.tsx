@@ -71,7 +71,7 @@ const PaymentVerifications = () => {
           *,
           agent:agents!inner(
             user_id,
-            profiles:profiles!inner(full_name, phone_number)
+            profiles:user_id!inner(full_name, phone_number)
           ),
           tenants!inner(tenant_name, tenant_phone)
         `)

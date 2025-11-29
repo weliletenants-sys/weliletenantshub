@@ -20,11 +20,15 @@ export type Database = {
           collection_rate: number | null
           created_at: string
           id: string
+          is_suspended: boolean | null
           monthly_earnings: number | null
           motorcycle_applied: boolean | null
           motorcycle_eligible: boolean | null
           portfolio_limit: number | null
           portfolio_value: number | null
+          suspended_at: string | null
+          suspended_by: string | null
+          suspension_reason: string | null
           total_tenants: number | null
           updated_at: string
           user_id: string
@@ -34,11 +38,15 @@ export type Database = {
           collection_rate?: number | null
           created_at?: string
           id?: string
+          is_suspended?: boolean | null
           monthly_earnings?: number | null
           motorcycle_applied?: boolean | null
           motorcycle_eligible?: boolean | null
           portfolio_limit?: number | null
           portfolio_value?: number | null
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspension_reason?: string | null
           total_tenants?: number | null
           updated_at?: string
           user_id: string
@@ -48,16 +56,27 @@ export type Database = {
           collection_rate?: number | null
           created_at?: string
           id?: string
+          is_suspended?: boolean | null
           monthly_earnings?: number | null
           motorcycle_applied?: boolean | null
           motorcycle_eligible?: boolean | null
           portfolio_limit?: number | null
           portfolio_value?: number | null
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspension_reason?: string | null
           total_tenants?: number | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "agents_suspended_by_fkey"
+            columns: ["suspended_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "agents_user_id_fkey"
             columns: ["user_id"]

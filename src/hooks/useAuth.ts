@@ -34,13 +34,21 @@ export const useAuth = (): AuthData => {
 
       // Get agent ID if user is an agent
       let agentId: string | undefined;
+      let isSuspended = false;
       if (role === "agent") {
         const { data: agent } = await supabase
           .from("agents")
-          .select("id")
+          .select("id, is_suspended")
           .eq("user_id", user.id)
           .maybeSingle();
         agentId = agent?.id;
+        isSuspended = agent?.is_suspended || false;
+
+        // If agent is suspended, log them out
+        if (isSuspended) {
+          await supabase.auth.signOut();
+          throw new Error("Your account has been suspended. Please contact your manager.");
+        }
       }
 
       return { user, role, agentId };

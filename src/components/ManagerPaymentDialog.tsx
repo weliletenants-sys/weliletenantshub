@@ -61,7 +61,7 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
         agent_id,
         agents!inner(
           user_id,
-          profiles!inner(full_name)
+          profiles:user_id!inner(full_name)
         )
       `)
       .eq("status", "verified")
