@@ -58,6 +58,12 @@ const ManagerDashboard = () => {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [batchPaymentDialogOpen, setBatchPaymentDialogOpen] = useState(false);
   const [paymentReportOpen, setPaymentReportOpen] = useState(false);
+  const [reportStartDate, setReportStartDate] = useState<Date | undefined>(() => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday;
+  });
+  const [reportEndDate, setReportEndDate] = useState<Date | undefined>(new Date());
   const [paymentReportData, setPaymentReportData] = useState({
     totalRent: 0,
     dailyBreakdown: [] as any[],
@@ -88,29 +94,41 @@ const ManagerDashboard = () => {
   const [paymentMethodData, setPaymentMethodData] = useState<any[]>([]);
   const [agentPaymentMethodData, setAgentPaymentMethodData] = useState<any[]>([]);
 
-  // Fetch payment report data
-  const fetchPaymentReportData = async () => {
+  // Fetch payment report data with date range
+  const fetchPaymentReportData = async (startDate?: Date, endDate?: Date) => {
     try {
-      // Get all verified collections
+      const start = startDate || reportStartDate;
+      const end = endDate || reportEndDate;
+
+      if (!start || !end) {
+        toast.error('Please select a date range');
+        return;
+      }
+
+      const startDateStr = start.toISOString().split('T')[0];
+      const endDateStr = end.toISOString().split('T')[0];
+
+      // Get verified collections within date range
       const { data: collections, error } = await supabase
         .from('collections')
         .select('amount, collection_date, payment_method')
         .eq('status', 'verified')
-        .order('collection_date', { ascending: false });
+        .gte('collection_date', startDateStr)
+        .lte('collection_date', endDateStr)
+        .order('collection_date', { ascending: true });
 
       if (error) throw error;
 
       // Calculate total rent
       const totalRent = collections?.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0;
 
-      // Daily breakdown (last 30 days)
+      // Daily breakdown
       const dailyMap = new Map();
-      const today = new Date();
-      for (let i = 29; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
+      const currentDate = new Date(start);
+      while (currentDate <= end) {
+        const dateStr = currentDate.toISOString().split('T')[0];
         dailyMap.set(dateStr, 0);
+        currentDate.setDate(currentDate.getDate() + 1);
       }
 
       collections?.forEach(c => {
@@ -122,22 +140,35 @@ const ManagerDashboard = () => {
 
       const dailyBreakdown = Array.from(dailyMap.entries()).map(([date, amount]) => ({
         date: format(new Date(date), 'MMM dd'),
+        fullDate: date,
         amount
       }));
 
-      // Weekly breakdown (last 8 weeks)
+      // Weekly breakdown - group by weeks within the selected range
       const weeklyMap = new Map();
-      for (let i = 7; i >= 0; i--) {
-        const weekStart = new Date(today);
-        weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + i * 7));
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      const weeksCount = Math.min(Math.ceil(daysDiff / 7), 8);
+
+      for (let i = 0; i < weeksCount; i++) {
+        const weekStart = new Date(start);
+        weekStart.setDate(weekStart.getDate() + (i * 7));
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekEnd.getDate() + 6);
+        
+        // Don't exceed the end date
+        if (weekEnd > end) {
+          weekEnd.setTime(end.getTime());
+        }
+
         const weekLabel = `${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd')}`;
-        weeklyMap.set(weekLabel, { start: weekStart.toISOString().split('T')[0], end: weekEnd.toISOString().split('T')[0], amount: 0 });
+        weeklyMap.set(weekLabel, { 
+          start: weekStart.toISOString().split('T')[0], 
+          end: weekEnd.toISOString().split('T')[0], 
+          amount: 0 
+        });
       }
 
       collections?.forEach(c => {
-        const collectionDate = new Date(c.collection_date);
         weeklyMap.forEach((value, key) => {
           if (c.collection_date >= value.start && c.collection_date <= value.end) {
             value.amount += parseFloat(c.amount.toString());
@@ -179,6 +210,32 @@ const ManagerDashboard = () => {
       console.error('Error fetching payment report:', error);
       toast.error('Failed to load payment report');
     }
+  };
+
+  // Quick filter handlers
+  const handleQuickFilter = (type: 'last24h' | 'last7d' | 'last30d' | 'last90d') => {
+    const end = new Date();
+    const start = new Date();
+
+    switch (type) {
+      case 'last24h':
+        start.setDate(start.getDate() - 1);
+        break;
+      case 'last7d':
+        start.setDate(start.getDate() - 7);
+        break;
+      case 'last30d':
+        start.setDate(start.getDate() - 30);
+        break;
+      case 'last90d':
+        start.setDate(start.getDate() - 90);
+        break;
+    }
+
+    setReportStartDate(start);
+    setReportEndDate(end);
+    fetchPaymentReportData(start, end);
+    haptics.light();
   };
 
   // Track previous values for change detection
@@ -378,7 +435,6 @@ const ManagerDashboard = () => {
             await fetchAgentPaymentMethodBreakdown(agentsCount.data);
           }
           await fetchPaymentMethodBreakdown();
-          await fetchPaymentReportData();
         }, 100);
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
@@ -956,7 +1012,12 @@ const ManagerDashboard = () => {
             <Card 
               className="bg-gradient-to-br from-success/10 to-success/5 border-success/20 cursor-pointer hover:border-success/40 transition-all hover:shadow-xl"
               onClick={() => {
-                fetchPaymentReportData();
+                // Reset to last 24 hours
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                setReportStartDate(yesterday);
+                setReportEndDate(new Date());
+                fetchPaymentReportData(yesterday, new Date());
                 setPaymentReportOpen(true);
                 haptics.light();
               }}
@@ -969,7 +1030,7 @@ const ManagerDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-success">
-                  UGX {stats.verifiedPayments > 0 ? paymentReportData.totalRent.toLocaleString() : '0'}
+                  Last 24 Hours
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Tap to view detailed breakdown
@@ -1107,11 +1168,141 @@ const ManagerDashboard = () => {
               </DialogHeader>
 
               <div className="space-y-6 mt-4">
+                {/* Date Range Filters */}
+                <Card className="bg-muted/30">
+                  <CardContent className="p-4">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-sm">Select Date Range</h3>
+                        <Badge variant="outline" className="text-xs">
+                          {reportStartDate && reportEndDate && (
+                            <>
+                              {format(reportStartDate, 'MMM dd, yyyy')} - {format(reportEndDate, 'MMM dd, yyyy')}
+                            </>
+                          )}
+                        </Badge>
+                      </div>
+
+                      {/* Quick Filter Buttons */}
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleQuickFilter('last24h')}
+                          className="text-xs"
+                        >
+                          Last 24 Hours
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleQuickFilter('last7d')}
+                          className="text-xs"
+                        >
+                          Last 7 Days
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleQuickFilter('last30d')}
+                          className="text-xs"
+                        >
+                          Last 30 Days
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleQuickFilter('last90d')}
+                          className="text-xs"
+                        >
+                          Last 90 Days
+                        </Button>
+                      </div>
+
+                      {/* Custom Date Range Pickers */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-muted-foreground">Start Date</label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !reportStartDate && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {reportStartDate ? format(reportStartDate, "PPP") : <span>Pick start date</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={reportStartDate}
+                                onSelect={setReportStartDate}
+                                initialFocus
+                                className={cn("p-3 pointer-events-auto")}
+                                disabled={(date) => date > new Date()}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-muted-foreground">End Date</label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !reportEndDate && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {reportEndDate ? format(reportEndDate, "PPP") : <span>Pick end date</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={reportEndDate}
+                                onSelect={setReportEndDate}
+                                initialFocus
+                                className={cn("p-3 pointer-events-auto")}
+                                disabled={(date) => date > new Date() || (reportStartDate ? date < reportStartDate : false)}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+
+                      <Button
+                        className="w-full"
+                        onClick={() => {
+                          fetchPaymentReportData();
+                          haptics.light();
+                        }}
+                        disabled={!reportStartDate || !reportEndDate}
+                      >
+                        Apply Custom Range
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
                 {/* Total Summary */}
                 <Card className="bg-gradient-to-br from-success/10 to-success/5 border-success/20">
                   <CardContent className="p-6">
                     <div className="text-center">
-                      <p className="text-sm text-muted-foreground mb-2">Total Rent Collected (All Time)</p>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Total Rent Collected
+                        {reportStartDate && reportEndDate && (
+                          <span className="block text-xs mt-1">
+                            ({format(reportStartDate, 'MMM dd, yyyy')} - {format(reportEndDate, 'MMM dd, yyyy')})
+                          </span>
+                        )}
+                      </p>
                       <p className="text-4xl font-bold text-success">
                         UGX {paymentReportData.totalRent.toLocaleString()}
                       </p>
@@ -1173,7 +1364,7 @@ const ManagerDashboard = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">Daily Collection Trend</CardTitle>
-                    <CardDescription>Last 30 days of rent collections</CardDescription>
+                    <CardDescription>Day-by-day breakdown for selected period</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <ChartContainer
@@ -1218,7 +1409,7 @@ const ManagerDashboard = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">Weekly Collection Trend</CardTitle>
-                    <CardDescription>Last 8 weeks of rent collections</CardDescription>
+                    <CardDescription>Week-by-week breakdown for selected period</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <ChartContainer
