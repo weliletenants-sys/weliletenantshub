@@ -473,8 +473,52 @@ const AgentDashboard = () => {
               <p className="text-sm text-muted-foreground">Your stats at a glance</p>
             </div>
 
+          {/* Commission Hero Card - PRIORITY DISPLAY */}
+          <Card className="bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 text-white overflow-hidden relative hover:shadow-2xl transition-all border-4 border-emerald-400/50">
+            <div className="absolute top-0 right-0 w-72 h-72 bg-white/10 rounded-full -translate-y-32 translate-x-32" />
+            <div className="absolute bottom-0 left-0 w-56 h-56 bg-white/10 rounded-full translate-y-28 -translate-x-28" />
+            <CardContent className="p-8 relative z-10">
+              <div className="space-y-5">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/25 backdrop-blur-sm rounded-2xl">
+                    <DollarSign className="h-10 w-10" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium opacity-95 mb-1">💰 Total Commission Earned</p>
+                    <h2 className="text-5xl font-black tracking-tight">
+                      {(totalCommission / 1000).toFixed(0)}K
+                    </h2>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4">
+                    <p className="text-xs opacity-90 mb-1">This Month</p>
+                    <p className="text-2xl font-bold">
+                      {(thisMonthCommission / 1000).toFixed(0)}K
+                    </p>
+                  </div>
+                  <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4">
+                    <p className="text-xs opacity-90 mb-1">All Time</p>
+                    <p className="text-2xl font-bold">
+                      UGX {totalCommission.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+
+                <Button 
+                  variant="secondary"
+                  className="w-full font-bold text-base py-6 bg-white text-emerald-600 hover:bg-white/90"
+                  onClick={() => navigate("/agent/earnings")}
+                >
+                  View Full Earnings →
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Manager Messages - ULTRA PROMINENT DISPLAY */}
-          <Card 
+          <Card
             ref={managerMessagesRef}
             className="border-[6px] border-primary bg-gradient-to-br from-primary/30 via-primary/20 to-primary/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] animate-pulse-slow scroll-mt-4 sticky top-0 z-10 backdrop-blur-sm"
           >
@@ -702,50 +746,6 @@ const AgentDashboard = () => {
             open={calculatorOpen}
             onOpenChange={setCalculatorOpen}
           />
-
-          {/* Commission Hero Card - PRIORITY DISPLAY */}
-          <Card className="bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 text-white overflow-hidden relative hover:shadow-2xl transition-all border-4 border-emerald-400/50">
-            <div className="absolute top-0 right-0 w-72 h-72 bg-white/10 rounded-full -translate-y-32 translate-x-32" />
-            <div className="absolute bottom-0 left-0 w-56 h-56 bg-white/10 rounded-full translate-y-28 -translate-x-28" />
-            <CardContent className="p-8 relative z-10">
-              <div className="space-y-5">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-white/25 backdrop-blur-sm rounded-2xl">
-                    <DollarSign className="h-10 w-10" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium opacity-95 mb-1">💰 Total Commission Earned</p>
-                    <h2 className="text-5xl font-black tracking-tight">
-                      {(totalCommission / 1000).toFixed(0)}K
-                    </h2>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4">
-                    <p className="text-xs opacity-90 mb-1">This Month</p>
-                    <p className="text-2xl font-bold">
-                      {(thisMonthCommission / 1000).toFixed(0)}K
-                    </p>
-                  </div>
-                  <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4">
-                    <p className="text-xs opacity-90 mb-1">All Time</p>
-                    <p className="text-2xl font-bold">
-                      UGX {totalCommission.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-
-                <Button 
-                  variant="secondary"
-                  className="w-full font-bold text-base py-6 bg-white text-emerald-600 hover:bg-white/90"
-                  onClick={() => navigate("/agent/earnings")}
-                >
-                  View Full Earnings →
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Overdue Payment Notifications */}
           {overdueTenants.length > 0 && (
