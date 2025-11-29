@@ -39,12 +39,19 @@ interface Notification {
   created_at: string;
   parent_notification_id: string | null;
   payment_data?: {
+    collection_id?: string;
     tenant_id: string;
     tenant_name: string;
+    tenant_phone?: string;
     amount: number;
     payment_method: string;
     payment_date: string;
-    applied: boolean;
+    previous_balance?: number;
+    new_balance?: number;
+    commission?: number;
+    recorded_by?: string;
+    manager_name?: string;
+    applied?: boolean;
   };
   profiles?: {
     full_name: string | null;
@@ -724,7 +731,9 @@ const Notifications = () => {
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-lg">UGX {notification.payment_data.amount.toLocaleString()}</span>
                 <Badge variant={notification.payment_data.applied ? "default" : "secondary"}>
-                  {notification.payment_data.applied ? "Applied" : "Pending"}
+                  {notification.payment_data.recorded_by === "manager" 
+                    ? "Manager Payment"
+                    : notification.payment_data.applied ? "Applied" : "Pending"}
                 </Badge>
               </div>
               <div className="text-sm space-y-1">
@@ -746,9 +755,81 @@ const Notifications = () => {
                   <span className="text-muted-foreground">Date:</span>
                   <span className="font-medium">{format(new Date(notification.payment_data.payment_date), "MMM d, yyyy")}</span>
                 </div>
+                {notification.payment_data.recorded_by === "manager" && notification.payment_data.manager_name && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Recorded By:</span>
+                    <span className="font-medium">{notification.payment_data.manager_name}</span>
+                  </div>
+                )}
+                {notification.payment_data.previous_balance !== undefined && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Previous Balance:</span>
+                      <span className="font-medium">UGX {notification.payment_data.previous_balance.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">New Balance:</span>
+                      <span className="font-semibold text-success">UGX {notification.payment_data.new_balance?.toLocaleString() || 0}</span>
+                    </div>
+                  </>
+                )}
               </div>
               {getStatusBadge(notification.payment_data.tenant_id)}
-              {!notification.payment_data.applied && (
+              
+              {/* Show different buttons based on payment type */}
+              {notification.payment_data.recorded_by === "manager" ? (
+                <Button
+                  className="w-full mt-3 bg-success hover:bg-success/90"
+                  onClick={async () => {
+                    haptics.light();
+                    try {
+                      // Fetch agent data
+                      const { data: { user } } = await supabase.auth.getUser();
+                      if (!user) throw new Error("Not authenticated");
+
+                      const { data: agentData } = await supabase
+                        .from("agents")
+                        .select("user_id, profiles!agents_user_id_fkey(full_name, phone_number)")
+                        .eq("user_id", user.id)
+                        .single();
+
+                      if (!agentData) throw new Error("Agent not found");
+
+                      // Set receipt data and show receipt
+                      setReceiptData({
+                        paymentData: {
+                          amount: notification.payment_data!.amount,
+                          commission: notification.payment_data!.commission || notification.payment_data!.amount * 0.05,
+                          collectionDate: notification.payment_data!.payment_date,
+                          paymentMethod: notification.payment_data!.payment_method,
+                        },
+                        tenantData: {
+                          tenant_name: notification.payment_data!.tenant_name,
+                          tenant_phone: notification.payment_data!.tenant_phone || "",
+                          rent_amount: 0,
+                          outstanding_balance: notification.payment_data!.new_balance || 0,
+                        },
+                        agentData: {
+                          agent_name: (agentData.profiles as any)?.full_name || "Agent",
+                          agent_phone: (agentData.profiles as any)?.phone_number || "",
+                        },
+                        receiptNumber: `REC-${notification.payment_data!.collection_id || Date.now()}`,
+                      });
+
+                      setShowReceipt(true);
+                      toast.success("Receipt generated!");
+                      haptics.success();
+                    } catch (error) {
+                      console.error("Error generating receipt:", error);
+                      toast.error("Failed to generate receipt");
+                      haptics.error();
+                    }
+                  }}
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Generate Receipt
+                </Button>
+              ) : !notification.payment_data.applied && (
                 <Button
                   className="w-full mt-3"
                   onClick={() => handleApplyPayment(notification)}

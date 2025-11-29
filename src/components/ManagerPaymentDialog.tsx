@@ -96,9 +96,21 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
     try {
       const paymentAmount = parseFloat(amount);
       const commission = paymentAmount * 0.05; // 5% commission
+      const previousBalance = selectedTenant.outstanding_balance || 0;
+      const newBalance = Math.max(0, previousBalance - paymentAmount);
+
+      // Get current manager info
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: managerProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
 
       // Insert the collection record
-      const { error: collectionError } = await supabase
+      const { data: collectionData, error: collectionError } = await supabase
         .from("collections")
         .insert({
           tenant_id: selectedTenant.id,
@@ -108,21 +120,51 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
           payment_method: paymentMethod,
           collection_date: format(paymentDate, "yyyy-MM-dd"),
           status: "pending",
-        });
+        })
+        .select()
+        .single();
 
       if (collectionError) throw collectionError;
 
       // Update tenant balance
-      const newBalance = (selectedTenant.outstanding_balance || 0) - paymentAmount;
       const { error: updateError } = await supabase
         .from("tenants")
         .update({ 
-          outstanding_balance: Math.max(0, newBalance),
+          outstanding_balance: newBalance,
           last_payment_date: new Date().toISOString(),
         })
         .eq("id", selectedTenant.id);
 
       if (updateError) throw updateError;
+
+      // Send notification to agent with payment receipt data
+      const { error: notificationError } = await supabase
+        .from("notifications")
+        .insert({
+          sender_id: user.id,
+          recipient_id: selectedTenant.agents.user_id,
+          title: "Payment Recorded by Manager",
+          message: `Manager ${managerProfile?.full_name || "Unknown"} recorded a payment of UGX ${paymentAmount.toLocaleString()} for tenant ${selectedTenant.tenant_name}. You can generate and share the receipt with your tenant.`,
+          priority: "high",
+          payment_data: {
+            collection_id: collectionData.id,
+            tenant_id: selectedTenant.id,
+            tenant_name: selectedTenant.tenant_name,
+            tenant_phone: selectedTenant.tenant_phone,
+            amount: paymentAmount,
+            payment_method: paymentMethod,
+            payment_date: format(paymentDate, "yyyy-MM-dd"),
+            previous_balance: previousBalance,
+            new_balance: newBalance,
+            commission: commission,
+            recorded_by: "manager",
+            manager_name: managerProfile?.full_name || "Unknown Manager",
+          },
+        });
+
+      if (notificationError) {
+        console.error("Error sending notification:", notificationError);
+      }
 
       toast({
         title: "Payment recorded",
