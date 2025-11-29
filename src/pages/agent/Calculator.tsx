@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Calculator, Copy, ListOrdered, Save, FolderOpen, Trash2 } from "lucide-react";
+import { Calculator, Copy, ListOrdered, Save, FolderOpen, Trash2, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
+import jsPDF from "jspdf";
 
 interface BulkResult {
   rent: number;
@@ -250,6 +251,59 @@ const CalculatorPage = () => {
     haptics.light();
   };
 
+  const downloadBulkPDF = () => {
+    if (bulkResults.length === 0) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // Header with Welile branding
+    doc.setFillColor(107, 45, 197); // Purple #6B2DC5
+    doc.rect(0, 0, pageWidth, 30, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.text("Welile", 15, 20);
+    
+    // Title
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16);
+    doc.text("Daily Repayment Rates - Bulk Calculation", 15, 45);
+    
+    // Date
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 15, 55);
+    
+    // Table headers
+    let yPos = 70;
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text("Rent Amount", 15, yPos);
+    doc.text("30 Days", 70, yPos);
+    doc.text("60 Days", 110, yPos);
+    doc.text("90 Days", 150, yPos);
+    
+    // Table data
+    doc.setFont(undefined, 'normal');
+    yPos += 8;
+    
+    bulkResults.forEach((result, index) => {
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      doc.text(`UGX ${result.rent.toLocaleString()}`, 15, yPos);
+      doc.text(result.day30.toLocaleString(), 70, yPos);
+      doc.text(result.day60.toLocaleString(), 110, yPos);
+      doc.text(result.day90.toLocaleString(), 150, yPos);
+      yPos += 8;
+    });
+    
+    doc.save(`welile-bulk-rates-${new Date().toISOString().split('T')[0]}.pdf`);
+    toast.success("PDF downloaded successfully!");
+    haptics.success();
+  };
+
   return (
     <AgentLayout currentPage="/agent/calculator">
       <div className="max-w-4xl mx-auto">
@@ -458,14 +512,24 @@ const CalculatorPage = () => {
                       <h3 className="text-lg font-semibold">
                         Calculated Rates ({bulkResults.length})
                       </h3>
-                      <Button
-                        onClick={copyBulkResults}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy All
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={downloadBulkPDF}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <FileDown className="h-4 w-4 mr-2" />
+                          Download PDF
+                        </Button>
+                        <Button
+                          onClick={copyBulkResults}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy All
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="border rounded-lg overflow-hidden">
