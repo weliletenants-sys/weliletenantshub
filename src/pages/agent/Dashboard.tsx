@@ -41,6 +41,7 @@ const AgentDashboard = () => {
   const [paymentMethodBreakdown, setPaymentMethodBreakdown] = useState<any[]>([]);
   const [totalCommission, setTotalCommission] = useState(0);
   const [thisMonthCommission, setThisMonthCommission] = useState(0);
+  const [commissionTrend, setCommissionTrend] = useState<any[]>([]);
   const [managerNotifications, setManagerNotifications] = useState<any[]>([]);
   const [dismissedNotifications, setDismissedNotifications] = useState<string[]>([]);
   const [previousNotificationCount, setPreviousNotificationCount] = useState(0);
@@ -254,6 +255,40 @@ const AgentDashboard = () => {
 
       const monthComm = thisMonthCommissionResult.data?.reduce((sum, col) => sum + parseFloat(col.commission?.toString() || '0'), 0) || 0;
       setThisMonthCommission(monthComm);
+
+      // Fetch commission trend for last 7 days
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const { data: trendData } = await supabase
+        .from("collections")
+        .select("collection_date, commission")
+        .eq("agent_id", agentId)
+        .eq("status", "verified")
+        .gte("collection_date", sevenDaysAgo)
+        .order("collection_date", { ascending: true });
+
+      if (trendData) {
+        // Group by date and sum commissions
+        const dailyCommission = trendData.reduce((acc: any, col: any) => {
+          const date = col.collection_date;
+          acc[date] = (acc[date] || 0) + parseFloat(col.commission?.toString() || '0');
+          return acc;
+        }, {});
+
+        // Create array with all 7 days (including days with 0 commission)
+        const last7Days = [];
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+          const dateStr = date.toISOString().split('T')[0];
+          const dayName = format(date, 'EEE');
+          last7Days.push({
+            date: dayName,
+            commission: dailyCommission[dateStr] || 0,
+            fullDate: dateStr
+          });
+        }
+
+        setCommissionTrend(last7Days);
+      }
     } catch (error) {
       console.error("Error in fetchAgentData:", error);
       toast.error("Failed to load dashboard");
@@ -867,6 +902,70 @@ const AgentDashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Commission Growth Trend Chart */}
+        <Card className="hover:shadow-lg transition-shadow border-2 border-emerald-500/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-emerald-500" />
+              💰 Commission Trend
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Last 7 days earnings momentum
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={commissionTrend}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                <XAxis 
+                  dataKey="date" 
+                  tick={{ fill: 'hsl(var(--foreground))', fontSize: 12 }}
+                  axisLine={{ stroke: 'hsl(var(--border))' }}
+                />
+                <YAxis 
+                  tick={{ fill: 'hsl(var(--foreground))', fontSize: 12 }}
+                  axisLine={{ stroke: 'hsl(var(--border))' }}
+                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                />
+                <Tooltip 
+                  formatter={(value: any) => [`UGX ${parseFloat(value).toLocaleString()}`, 'Commission']}
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--popover))',
+                    borderColor: 'hsl(var(--border))',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                  }}
+                />
+                <Bar dataKey="commission" fill="hsl(142 76% 36%)" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <div className="text-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <div className="text-lg font-bold text-emerald-600">
+                  {commissionTrend.length > 0 ? (commissionTrend[commissionTrend.length - 1].commission / 1000).toFixed(0) : 0}K
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">Today</p>
+              </div>
+              <div className="text-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <div className="text-lg font-bold text-emerald-600">
+                  {commissionTrend.reduce((sum, day) => sum + day.commission, 0) / 1000 > 0 
+                    ? (commissionTrend.reduce((sum, day) => sum + day.commission, 0) / 1000).toFixed(0) 
+                    : 0}K
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">7-Day Total</p>
+              </div>
+              <div className="text-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <div className="text-lg font-bold text-emerald-600">
+                  {commissionTrend.length > 0 
+                    ? (commissionTrend.reduce((sum, day) => sum + day.commission, 0) / commissionTrend.filter(d => d.commission > 0).length / 1000 || 0).toFixed(0)
+                    : 0}K
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">Daily Avg</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Payment Method Breakdown Chart */}
         <Card className="hover:shadow-lg transition-shadow">
