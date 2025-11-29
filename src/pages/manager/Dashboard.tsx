@@ -6,6 +6,7 @@ import { ManagerDashboardSkeleton } from "@/components/TenantDetailSkeleton";
 import { ContentTransition } from "@/components/ContentTransition";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -504,11 +505,6 @@ const ManagerDashboard = () => {
   };
 
   const handleTenantSearch = async () => {
-    if (!tenantSearchQuery.trim()) {
-      toast.error("Please enter a search term");
-      return;
-    }
-
     try {
       let query = supabase
         .from("tenants")
@@ -520,8 +516,12 @@ const ManagerDashboard = () => {
               phone_number
             )
           )
-        `)
-        .or(`tenant_name.ilike.%${tenantSearchQuery}%,tenant_phone.ilike.%${tenantSearchQuery}%`);
+        `);
+
+      // Apply text search if query is provided
+      if (tenantSearchQuery.trim()) {
+        query = query.or(`tenant_name.ilike.%${tenantSearchQuery}%,tenant_phone.ilike.%${tenantSearchQuery}%`);
+      }
 
       // Apply status filter
       if (tenantStatusFilter !== "all") {
@@ -544,7 +544,10 @@ const ManagerDashboard = () => {
         query = query.lte("created_at", format(endDateFilter, "yyyy-MM-dd"));
       }
 
-      const { data, error } = await query.limit(20);
+      // Order by name for easier browsing
+      query = query.order("tenant_name", { ascending: true });
+
+      const { data, error } = await query.limit(50);
 
       if (error) throw error;
 
@@ -552,6 +555,9 @@ const ManagerDashboard = () => {
       
       if (!data || data.length === 0) {
         toast.info("No tenants found matching your search");
+      } else {
+        toast.success(`Found ${data.length} tenant${data.length > 1 ? 's' : ''}`);
+        haptics.success();
       }
     } catch (error) {
       console.error("Search error:", error);
@@ -830,7 +836,7 @@ const ManagerDashboard = () => {
                   Search Tenants
                 </CardTitle>
                 <CardDescription>
-                  Find tenants by name or phone number
+                  Find tenants by name, phone, or browse all tenants
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1578,13 +1584,13 @@ const ManagerDashboard = () => {
           <DialogHeader>
             <DialogTitle>Search Tenants</DialogTitle>
             <DialogDescription>
-              Search for tenants by name or phone number across all agents
+              Enter tenant name or phone to search, or click Search to browse all tenants
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex gap-2">
               <Input
-                placeholder="Enter tenant name or phone number..."
+                placeholder="Enter tenant name or phone number (or leave empty to browse all)..."
                 value={tenantSearchQuery}
                 onChange={(e) => setTenantSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -1592,10 +1598,11 @@ const ManagerDashboard = () => {
                     handleTenantSearch();
                   }
                 }}
+                className="flex-1"
               />
               <Button onClick={handleTenantSearch}>
                 <Search className="h-4 w-4 mr-2" />
-                Search
+                {tenantSearchQuery.trim() ? "Search" : "Browse All"}
               </Button>
             </div>
 
@@ -1721,27 +1728,40 @@ const ManagerDashboard = () => {
 
             {searchResults.length > 0 && (
               <div className="space-y-2">
-                <h3 className="font-medium text-sm text-muted-foreground">Search Results ({searchResults.length})</h3>
+                <h3 className="font-medium text-sm text-muted-foreground">
+                  Search Results ({searchResults.length})
+                  {tenantSearchQuery.trim() && (
+                    <span className="ml-2 text-primary">for "{tenantSearchQuery}"</span>
+                  )}
+                </h3>
                 {searchResults.map((tenant: any) => (
                   <Card 
                     key={tenant.id}
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-all"
                     onClick={() => {
-                      navigate(`/agent/tenants/${tenant.id}`);
+                      haptics.light();
+                      navigate(`/manager/tenants/${tenant.id}`);
                       setShowTenantSearch(false);
                     }}
                   >
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-semibold">{tenant.tenant_name}</h4>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-lg text-primary hover:underline">
+                            {tenant.tenant_name}
+                          </h4>
                           <p className="text-sm text-muted-foreground">{tenant.tenant_phone}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Agent: {tenant.agents?.profiles?.full_name || 'Unknown'}
-                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-xs text-muted-foreground">
+                              Agent: {tenant.agents?.profiles?.full_name || 'Unknown'}
+                            </p>
+                            <Badge variant={tenant.status === 'verified' ? 'default' : 'secondary'} className="text-xs">
+                              {tenant.status || 'pending'}
+                            </Badge>
+                          </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold">UGX {Number(tenant.outstanding_balance || 0).toLocaleString()}</p>
+                          <p className="font-semibold text-lg">UGX {Number(tenant.outstanding_balance || 0).toLocaleString()}</p>
                           <p className="text-xs text-muted-foreground">Outstanding</p>
                         </div>
                       </div>
