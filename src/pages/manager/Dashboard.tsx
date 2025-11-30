@@ -2878,6 +2878,77 @@ const ManagerDashboard = () => {
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="end">
                       <div className="p-4 space-y-4">
+                        {/* Quick Presets */}
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-muted-foreground">Quick Presets</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const now = new Date();
+                                const startOfWeek = new Date(now);
+                                startOfWeek.setDate(now.getDate() - now.getDay());
+                                const endOfWeek = new Date(now);
+                                setPaymentMethodCustomStartDate(startOfWeek);
+                                setPaymentMethodCustomEndDate(endOfWeek);
+                                haptics.light();
+                              }}
+                              className="text-xs"
+                            >
+                              This Week
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const now = new Date();
+                                const startOfLastWeek = new Date(now);
+                                startOfLastWeek.setDate(now.getDate() - now.getDay() - 7);
+                                const endOfLastWeek = new Date(now);
+                                endOfLastWeek.setDate(now.getDate() - now.getDay() - 1);
+                                setPaymentMethodCustomStartDate(startOfLastWeek);
+                                setPaymentMethodCustomEndDate(endOfLastWeek);
+                                haptics.light();
+                              }}
+                              className="text-xs"
+                            >
+                              Last Week
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const now = new Date();
+                                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                                const endOfMonth = new Date(now);
+                                setPaymentMethodCustomStartDate(startOfMonth);
+                                setPaymentMethodCustomEndDate(endOfMonth);
+                                haptics.light();
+                              }}
+                              className="text-xs"
+                            >
+                              This Month
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const now = new Date();
+                                const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                                const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+                                setPaymentMethodCustomStartDate(startOfLastMonth);
+                                setPaymentMethodCustomEndDate(endOfLastMonth);
+                                haptics.light();
+                              }}
+                              className="text-xs"
+                            >
+                              Last Month
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        <div className="border-t pt-4">
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Start Date</label>
                           <Popover>
@@ -2933,6 +3004,7 @@ const ManagerDashboard = () => {
                               />
                             </PopoverContent>
                           </Popover>
+                        </div>
                         </div>
                         
                         <Button
