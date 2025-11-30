@@ -8,7 +8,7 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save, DollarSign, Download, FileText } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save, DollarSign, Download, FileText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -2751,6 +2751,37 @@ const ManagerDashboard = () => {
                        ? `${format(paymentMethodCustomStartDate, 'MMM dd, yyyy')} - ${format(paymentMethodCustomEndDate, 'MMM dd, yyyy')}`
                        : 'All time'})
                   </CardDescription>
+                  
+                  {/* Custom Date Range Badge */}
+                  {paymentMethodTimePeriod === 'custom' && paymentMethodCustomStartDate && paymentMethodCustomEndDate && (
+                    <div className="flex items-center gap-2 mt-3">
+                      <Badge 
+                        variant="secondary" 
+                        className="bg-primary/10 text-primary border-primary/20 flex items-center gap-2 px-3 py-1.5"
+                      >
+                        <CalendarIcon className="h-3 w-3" />
+                        <span className="text-xs font-medium">
+                          Custom Range: {format(paymentMethodCustomStartDate, 'MMM dd')} - {format(paymentMethodCustomEndDate, 'MMM dd, yyyy')}
+                        </span>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setPaymentMethodTimePeriod('30d');
+                            setPaymentMethodCustomStartDate(undefined);
+                            setPaymentMethodCustomEndDate(undefined);
+                            await fetchPaymentMethodBreakdown('30d');
+                            const { data: agents } = await supabase.from("agents").select("*");
+                            if (agents) await fetchAgentPaymentMethodBreakdown(agents, '30d');
+                            haptics.light();
+                            toast.success('Returned to 30-day view');
+                          }}
+                          className="ml-1 hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   {/* Export Buttons */}
