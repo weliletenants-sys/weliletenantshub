@@ -2762,6 +2762,7 @@ const ManagerDashboard = () => {
                         <CalendarIcon className="h-3 w-3" />
                         <span className="text-xs font-medium">
                           Custom Range: {format(paymentMethodCustomStartDate, 'MMM dd')} - {format(paymentMethodCustomEndDate, 'MMM dd, yyyy')}
+                          {' '}({Math.ceil((paymentMethodCustomEndDate.getTime() - paymentMethodCustomStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1} days)
                         </span>
                         <button
                           onClick={async (e) => {
