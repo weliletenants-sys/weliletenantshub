@@ -102,7 +102,9 @@ const ManagerDashboard = () => {
   const [paymentMethodData, setPaymentMethodData] = useState<any[]>([]);
   const [agentPaymentMethodData, setAgentPaymentMethodData] = useState<any[]>([]);
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<'all' | 'verified' | 'pending' | 'rejected'>('all');
-  const [paymentMethodTimePeriod, setPaymentMethodTimePeriod] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
+  const [paymentMethodTimePeriod, setPaymentMethodTimePeriod] = useState<'7d' | '30d' | '90d' | 'all' | 'custom'>('30d');
+  const [paymentMethodCustomStartDate, setPaymentMethodCustomStartDate] = useState<Date | undefined>();
+  const [paymentMethodCustomEndDate, setPaymentMethodCustomEndDate] = useState<Date | undefined>();
 
   // Fetch payment report data with date range
   const fetchPaymentReportData = async (startDate?: Date, endDate?: Date) => {
@@ -821,7 +823,7 @@ const ManagerDashboard = () => {
     }
   };
 
-  const fetchPaymentMethodBreakdown = async (timePeriod: '7d' | '30d' | '90d' | 'all' = '30d') => {
+  const fetchPaymentMethodBreakdown = async (timePeriod: '7d' | '30d' | '90d' | 'all' | 'custom' = '30d', customStart?: Date, customEnd?: Date) => {
     try {
       const now = new Date();
       let currentPeriodStart: Date;
@@ -829,36 +831,49 @@ const ManagerDashboard = () => {
       let previousPeriodEnd: Date;
       
       // Calculate date ranges based on time period
-      switch (timePeriod) {
-        case '7d':
-          currentPeriodStart = new Date(now);
-          currentPeriodStart.setDate(currentPeriodStart.getDate() - 7);
-          previousPeriodStart = new Date(now);
-          previousPeriodStart.setDate(previousPeriodStart.getDate() - 14);
-          previousPeriodEnd = new Date(currentPeriodStart);
-          break;
-        case '90d':
-          currentPeriodStart = new Date(now);
-          currentPeriodStart.setDate(currentPeriodStart.getDate() - 90);
-          previousPeriodStart = new Date(now);
-          previousPeriodStart.setDate(previousPeriodStart.getDate() - 180);
-          previousPeriodEnd = new Date(currentPeriodStart);
-          break;
-        case 'all':
-          // For "all time", compare current data vs data from 90 days ago
-          currentPeriodStart = new Date('2000-01-01'); // Far back enough to get all data
-          previousPeriodStart = new Date(now);
-          previousPeriodStart.setDate(previousPeriodStart.getDate() - 180);
-          previousPeriodEnd = new Date(now);
-          previousPeriodEnd.setDate(previousPeriodEnd.getDate() - 90);
-          break;
-        default: // 30d
-          currentPeriodStart = new Date(now);
-          currentPeriodStart.setDate(currentPeriodStart.getDate() - 30);
-          previousPeriodStart = new Date(now);
-          previousPeriodStart.setDate(previousPeriodStart.getDate() - 60);
-          previousPeriodEnd = new Date(currentPeriodStart);
-          break;
+      if (timePeriod === 'custom') {
+        if (!customStart || !customEnd) {
+          toast.error('Please select both start and end dates');
+          return;
+        }
+        currentPeriodStart = customStart;
+        // For custom range, compare with same-length period before
+        const daysDiff = Math.ceil((customEnd.getTime() - customStart.getTime()) / (1000 * 60 * 60 * 24));
+        previousPeriodStart = new Date(customStart);
+        previousPeriodStart.setDate(previousPeriodStart.getDate() - daysDiff);
+        previousPeriodEnd = new Date(customStart);
+      } else {
+        switch (timePeriod) {
+          case '7d':
+            currentPeriodStart = new Date(now);
+            currentPeriodStart.setDate(currentPeriodStart.getDate() - 7);
+            previousPeriodStart = new Date(now);
+            previousPeriodStart.setDate(previousPeriodStart.getDate() - 14);
+            previousPeriodEnd = new Date(currentPeriodStart);
+            break;
+          case '90d':
+            currentPeriodStart = new Date(now);
+            currentPeriodStart.setDate(currentPeriodStart.getDate() - 90);
+            previousPeriodStart = new Date(now);
+            previousPeriodStart.setDate(previousPeriodStart.getDate() - 180);
+            previousPeriodEnd = new Date(currentPeriodStart);
+            break;
+          case 'all':
+            // For "all time", compare current data vs data from 90 days ago
+            currentPeriodStart = new Date('2000-01-01'); // Far back enough to get all data
+            previousPeriodStart = new Date(now);
+            previousPeriodStart.setDate(previousPeriodStart.getDate() - 180);
+            previousPeriodEnd = new Date(now);
+            previousPeriodEnd.setDate(previousPeriodEnd.getDate() - 90);
+            break;
+          default: // 30d
+            currentPeriodStart = new Date(now);
+            currentPeriodStart.setDate(currentPeriodStart.getDate() - 30);
+            previousPeriodStart = new Date(now);
+            previousPeriodStart.setDate(previousPeriodStart.getDate() - 60);
+            previousPeriodEnd = new Date(currentPeriodStart);
+            break;
+        }
       }
 
       // Fetch current period - ALL payments regardless of status
@@ -866,7 +881,11 @@ const ManagerDashboard = () => {
         .from("collections")
         .select("amount, payment_method");
       
-      if (timePeriod !== 'all') {
+      if (timePeriod === 'custom') {
+        currentQuery = currentQuery
+          .gte("collection_date", currentPeriodStart.toISOString().split('T')[0])
+          .lte("collection_date", (customEnd || now).toISOString().split('T')[0]);
+      } else if (timePeriod !== 'all') {
         currentQuery = currentQuery.gte("collection_date", currentPeriodStart.toISOString().split('T')[0]);
       }
       
@@ -921,7 +940,7 @@ const ManagerDashboard = () => {
     }
   };
 
-  const fetchAgentPaymentMethodBreakdown = async (agents: any[], timePeriod: '7d' | '30d' | '90d' | 'all' = '30d') => {
+  const fetchAgentPaymentMethodBreakdown = async (agents: any[], timePeriod: '7d' | '30d' | '90d' | 'all' | 'custom' = '30d', customStart?: Date, customEnd?: Date) => {
     if (!agents || agents.length === 0) {
       setAgentPaymentMethodData([]);
       return;
@@ -930,24 +949,34 @@ const ManagerDashboard = () => {
     try {
       const now = new Date();
       let startDate: Date;
+      let endDate: Date = now;
       
       // Calculate start date based on time period
-      switch (timePeriod) {
-        case '7d':
-          startDate = new Date(now);
-          startDate.setDate(startDate.getDate() - 7);
-          break;
-        case '90d':
-          startDate = new Date(now);
-          startDate.setDate(startDate.getDate() - 90);
-          break;
-        case 'all':
-          startDate = new Date('2000-01-01'); // Far back enough to get all data
-          break;
-        default: // 30d
-          startDate = new Date(now);
-          startDate.setDate(startDate.getDate() - 30);
-          break;
+      if (timePeriod === 'custom') {
+        if (!customStart || !customEnd) {
+          toast.error('Please select both start and end dates');
+          return;
+        }
+        startDate = customStart;
+        endDate = customEnd;
+      } else {
+        switch (timePeriod) {
+          case '7d':
+            startDate = new Date(now);
+            startDate.setDate(startDate.getDate() - 7);
+            break;
+          case '90d':
+            startDate = new Date(now);
+            startDate.setDate(startDate.getDate() - 90);
+            break;
+          case 'all':
+            startDate = new Date('2000-01-01'); // Far back enough to get all data
+            break;
+          default: // 30d
+            startDate = new Date(now);
+            startDate.setDate(startDate.getDate() - 30);
+            break;
+        }
       }
 
       // Fetch collections for all agents - ALL payments regardless of status
@@ -955,7 +984,11 @@ const ManagerDashboard = () => {
         .from("collections")
         .select("agent_id, amount, payment_method");
       
-      if (timePeriod !== 'all') {
+      if (timePeriod === 'custom') {
+        query = query
+          .gte("collection_date", startDate.toISOString().split('T')[0])
+          .lte("collection_date", endDate.toISOString().split('T')[0]);
+      } else if (timePeriod !== 'all') {
         query = query.gte("collection_date", startDate.toISOString().split('T')[0]);
       }
       
@@ -1032,7 +1065,7 @@ const ManagerDashboard = () => {
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `payment-method-breakdown-${paymentMethodTimePeriod}-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      link.setAttribute('download', `payment-method-breakdown-${paymentMethodTimePeriod === 'custom' ? 'custom' : paymentMethodTimePeriod}-${format(new Date(), 'yyyy-MM-dd')}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
@@ -1054,7 +1087,9 @@ const ManagerDashboard = () => {
         paymentMethodTimePeriod === '7d' ? 'Last 7 Days' :
         paymentMethodTimePeriod === '30d' ? 'Last 30 Days' :
         paymentMethodTimePeriod === '90d' ? 'Last 90 Days' :
-        'All Time';
+        paymentMethodTimePeriod === 'custom' && paymentMethodCustomStartDate && paymentMethodCustomEndDate
+          ? `${format(paymentMethodCustomStartDate, 'MMM dd, yyyy')} - ${format(paymentMethodCustomEndDate, 'MMM dd, yyyy')}`
+          : 'All Time';
 
       // Header with purple background
       doc.setFillColor(107, 45, 197); // #6B2DC5
@@ -1126,7 +1161,7 @@ const ManagerDashboard = () => {
         );
       }
       
-      doc.save(`payment-method-breakdown-${paymentMethodTimePeriod}-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      doc.save(`payment-method-breakdown-${paymentMethodTimePeriod === 'custom' ? 'custom' : paymentMethodTimePeriod}-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
       toast.success('PDF exported successfully');
       haptics.success();
     } catch (error) {
@@ -2712,7 +2747,9 @@ const ManagerDashboard = () => {
                     {paymentMethodTimePeriod === '7d' ? 'Last 7 days' :
                      paymentMethodTimePeriod === '30d' ? 'Last 30 days' :
                      paymentMethodTimePeriod === '90d' ? 'Last 90 days' :
-                     'All time'})
+                     paymentMethodTimePeriod === 'custom' && paymentMethodCustomStartDate && paymentMethodCustomEndDate
+                       ? `${format(paymentMethodCustomStartDate, 'MMM dd, yyyy')} - ${format(paymentMethodCustomEndDate, 'MMM dd, yyyy')}`
+                       : 'All time'})
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -2794,6 +2831,99 @@ const ManagerDashboard = () => {
                   >
                     All Time
                   </Button>
+                  
+                  {/* Custom Date Range Picker */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant={paymentMethodTimePeriod === 'custom' ? 'default' : 'outline'}
+                        className="text-xs"
+                      >
+                        <CalendarIcon className="h-3 w-3 mr-1" />
+                        Custom
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <div className="p-4 space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Start Date</label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !paymentMethodCustomStartDate && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {paymentMethodCustomStartDate ? format(paymentMethodCustomStartDate, "PPP") : "Pick start date"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={paymentMethodCustomStartDate}
+                                onSelect={setPaymentMethodCustomStartDate}
+                                initialFocus
+                                className="pointer-events-auto"
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">End Date</label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !paymentMethodCustomEndDate && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {paymentMethodCustomEndDate ? format(paymentMethodCustomEndDate, "PPP") : "Pick end date"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={paymentMethodCustomEndDate}
+                                onSelect={setPaymentMethodCustomEndDate}
+                                disabled={(date) => 
+                                  paymentMethodCustomStartDate ? date < paymentMethodCustomStartDate : false
+                                }
+                                initialFocus
+                                className="pointer-events-auto"
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        
+                        <Button
+                          className="w-full"
+                          onClick={async () => {
+                            if (!paymentMethodCustomStartDate || !paymentMethodCustomEndDate) {
+                              toast.error('Please select both start and end dates');
+                              return;
+                            }
+                            setPaymentMethodTimePeriod('custom');
+                            await fetchPaymentMethodBreakdown('custom', paymentMethodCustomStartDate, paymentMethodCustomEndDate);
+                            const { data: agents } = await supabase.from("agents").select("*");
+                            if (agents) await fetchAgentPaymentMethodBreakdown(agents, paymentMethodTimePeriod, paymentMethodCustomStartDate, paymentMethodCustomEndDate);
+                            haptics.light();
+                            toast.success('Custom date range applied');
+                          }}
+                          disabled={!paymentMethodCustomStartDate || !paymentMethodCustomEndDate}
+                        >
+                          Apply Date Range
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                   </div>
                 </div>
               </div>
@@ -2868,6 +2998,7 @@ const ManagerDashboard = () => {
                         paymentMethodTimePeriod === '7d' ? '7 days' :
                         paymentMethodTimePeriod === '30d' ? '30 days' :
                         paymentMethodTimePeriod === '90d' ? '90 days' :
+                        paymentMethodTimePeriod === 'custom' ? 'period' :
                         '90 days'
                       }
                     </p>
