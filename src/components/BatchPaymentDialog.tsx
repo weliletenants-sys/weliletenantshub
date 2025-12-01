@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { CalendarIcon, Search, Plus, Trash2, Save } from "lucide-react";
+import { CalendarIcon, Search, Plus, Trash2, Save, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Progress } from "@/components/ui/progress";
@@ -39,6 +39,8 @@ interface PaymentEntry {
   paymentId: string;
   paymentDate: Date;
   paymentTime: { hours: string; minutes: string };
+  tidExists?: boolean;
+  checkingTid?: boolean;
 }
 
 interface BatchPaymentDialogProps {
@@ -63,6 +65,64 @@ export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentD
       setProcessingSummary(null);
     }
   }, [open]);
+
+  // Real-time TID duplicate check for all payments
+  useEffect(() => {
+    const checkAllTids = async () => {
+      const updatedPayments = [...payments];
+      let hasChanges = false;
+
+      for (let i = 0; i < updatedPayments.length; i++) {
+        const payment = updatedPayments[i];
+        
+        if (!payment.paymentId || payment.paymentId.length < 3) {
+          if (payment.tidExists !== false || payment.checkingTid !== false) {
+            updatedPayments[i] = { ...payment, tidExists: false, checkingTid: false };
+            hasChanges = true;
+          }
+          continue;
+        }
+
+        // Mark as checking
+        if (!payment.checkingTid) {
+          updatedPayments[i] = { ...payment, checkingTid: true };
+          hasChanges = true;
+        }
+
+        try {
+          const { data, error } = await supabase
+            .from("collections")
+            .select("id")
+            .eq("payment_id", payment.paymentId)
+            .maybeSingle();
+
+          if (error && error.code !== 'PGRST116') {
+            console.error("Error checking TID:", error);
+          }
+
+          const exists = !!data;
+          if (payment.tidExists !== exists || payment.checkingTid !== false) {
+            updatedPayments[i] = { ...payment, tidExists: exists, checkingTid: false };
+            hasChanges = true;
+          }
+        } catch (error) {
+          console.error("Error checking TID:", error);
+          if (payment.checkingTid !== false) {
+            updatedPayments[i] = { ...payment, checkingTid: false };
+            hasChanges = true;
+          }
+        }
+      }
+
+      if (hasChanges) {
+        setPayments(updatedPayments);
+      }
+    };
+
+    // Debounce the check by 500ms
+    const timeoutId = setTimeout(checkAllTids, 500);
+    return () => clearTimeout(timeoutId);
+  }, [payments.map(p => p.paymentId).join(',')]); // Only re-run when TIDs change
 
   const fetchTenants = async () => {
     const { data, error } = await supabase
@@ -129,6 +189,17 @@ export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentD
       return;
     }
 
+    // Check for any duplicate TIDs detected
+    const duplicateEntries = payments.filter(p => p.tidExists);
+    if (duplicateEntries.length > 0) {
+      toast({
+        title: "Duplicate Transaction IDs",
+        description: `${duplicateEntries.length} payment(s) have duplicate TIDs. Please use unique TIDs for all entries.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Check for duplicate TIDs within batch
     const tidSet = new Set();
     const duplicateTids: string[] = [];
@@ -143,22 +214,6 @@ export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentD
       toast({
         title: "Duplicate Transaction IDs",
         description: `Found duplicate TIDs in batch: ${duplicateTids.join(", ")}. Each TID must be unique.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Check for existing TIDs in database
-    const { data: existingPayments } = await supabase
-      .from("collections")
-      .select("payment_id")
-      .in("payment_id", payments.map(p => p.paymentId).filter(Boolean));
-
-    if (existingPayments && existingPayments.length > 0) {
-      const existingTids = existingPayments.map(p => p.payment_id).join(", ");
-      toast({
-        title: "Transaction IDs Already Exist",
-        description: `These TIDs already exist in the system: ${existingTids}. Please use unique TIDs.`,
         variant: "destructive",
       });
       return;
@@ -411,15 +466,42 @@ You can generate and share the receipt with your tenant from the payment notific
 
                       <div className="space-y-2">
                         <Label>Transaction ID (TID) *</Label>
-                        <Input
-                          type="text"
-                          placeholder="Enter unique transaction ID"
-                          value={payment.paymentId}
-                          onChange={(e) => updatePaymentEntry(payment.id, "paymentId", e.target.value)}
-                          disabled={isProcessing}
-                          required
-                        />
-                        <p className="text-xs text-muted-foreground">Required to prevent double entry</p>
+                        <div className="relative">
+                          <Input
+                            type="text"
+                            placeholder="Enter unique transaction ID"
+                            value={payment.paymentId}
+                            onChange={(e) => updatePaymentEntry(payment.id, "paymentId", e.target.value)}
+                            disabled={isProcessing}
+                            required
+                            className={cn(
+                              payment.tidExists && "border-destructive focus-visible:ring-destructive",
+                              payment.checkingTid && "pr-10"
+                            )}
+                          />
+                          {payment.checkingTid && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                        {payment.tidExists && (
+                          <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                            <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-destructive font-medium">
+                              This Transaction ID already exists in the system. Please use a different TID.
+                            </p>
+                          </div>
+                        )}
+                        {!payment.tidExists && payment.paymentId && !payment.checkingTid && payment.paymentId.length >= 3 && (
+                          <div className="flex items-center gap-2 text-xs text-success">
+                            <CheckCircle2 className="h-3 w-3" />
+                            TID available
+                          </div>
+                        )}
+                        {!payment.tidExists && (
+                          <p className="text-xs text-muted-foreground">Required to prevent double entry</p>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -547,7 +629,7 @@ You can generate and share the receipt with your tenant from the payment notific
           <Button 
             onClick={processPayments} 
             className="flex-1"
-            disabled={isProcessing}
+            disabled={isProcessing || payments.some(p => p.tidExists || p.checkingTid)}
           >
             <Save className="h-4 w-4 mr-2" />
             {isProcessing ? "Processing..." : `Record ${payments.length} Payment${payments.length > 1 ? 's' : ''}`}

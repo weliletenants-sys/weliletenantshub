@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Search, Zap, CalendarIcon } from "lucide-react";
+import { Loader2, Search, Zap, CalendarIcon, AlertCircle, CheckCircle2 } from "lucide-react";
 import { haptics } from "@/utils/haptics";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -41,6 +41,8 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
   const [paymentTime, setPaymentTime] = useState({ hours: new Date().getHours().toString().padStart(2, '0'), minutes: new Date().getMinutes().toString().padStart(2, '0') });
   const [searchOpen, setSearchOpen] = useState(false);
   const [agentId, setAgentId] = useState<string>("");
+  const [tidExists, setTidExists] = useState(false);
+  const [checkingTid, setCheckingTid] = useState(false);
   
   // Optimistic mutation hook
   const paymentMutation = useOptimisticPayment();
@@ -52,8 +54,46 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
       if (preselectedTenant) {
         setSelectedTenant(preselectedTenant);
       }
+      // Reset TID validation
+      setTidExists(false);
+      setCheckingTid(false);
     }
   }, [open, preselectedTenant]);
+
+  // Real-time TID duplicate check with debouncing
+  useEffect(() => {
+    const checkTidDuplicate = async () => {
+      if (!paymentId || paymentId.length < 3) {
+        setTidExists(false);
+        setCheckingTid(false);
+        return;
+      }
+
+      setCheckingTid(true);
+      
+      try {
+        const { data, error } = await supabase
+          .from("collections")
+          .select("id")
+          .eq("payment_id", paymentId)
+          .maybeSingle();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          console.error("Error checking TID:", error);
+        }
+
+        setTidExists(!!data);
+      } catch (error) {
+        console.error("Error checking TID:", error);
+      } finally {
+        setCheckingTid(false);
+      }
+    };
+
+    // Debounce the check by 500ms
+    const timeoutId = setTimeout(checkTidDuplicate, 500);
+    return () => clearTimeout(timeoutId);
+  }, [paymentId]);
 
   const fetchAgentAndTenants = async () => {
     try {
@@ -96,23 +136,16 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
       return;
     }
 
+    if (tidExists) {
+      haptics.error();
+      toast.error("This Transaction ID (TID) already exists. Please use a unique TID to avoid double entry.");
+      return;
+    }
+
     const paymentAmount = parseFloat(amount);
     if (isNaN(paymentAmount) || paymentAmount <= 0) {
       haptics.error(); // Validation error
       toast.error("Please enter a valid amount");
-      return;
-    }
-
-    // Check for duplicate Transaction ID
-    const { data: existingPayment } = await supabase
-      .from("collections")
-      .select("id")
-      .eq("payment_id", paymentId)
-      .single();
-
-    if (existingPayment) {
-      haptics.error();
-      toast.error("This Transaction ID (TID) already exists. Please use a unique TID to avoid double entry.");
       return;
     }
 
@@ -241,15 +274,42 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
           {/* Transaction ID */}
           <div className="space-y-2">
             <Label htmlFor="payment-id">Transaction ID (TID) *</Label>
-            <Input
-              id="payment-id"
-              type="text"
-              placeholder="Enter unique transaction ID"
-              value={paymentId}
-              onChange={(e) => setPaymentId(e.target.value)}
-              required
-            />
-            <p className="text-xs text-muted-foreground">Required to prevent double entry</p>
+            <div className="relative">
+              <Input
+                id="payment-id"
+                type="text"
+                placeholder="Enter unique transaction ID"
+                value={paymentId}
+                onChange={(e) => setPaymentId(e.target.value)}
+                required
+                className={cn(
+                  tidExists && "border-destructive focus-visible:ring-destructive",
+                  checkingTid && "pr-10"
+                )}
+              />
+              {checkingTid && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </div>
+            {tidExists && (
+              <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-destructive font-medium">
+                  This Transaction ID already exists in the system. Please use a different TID to avoid double entry.
+                </p>
+              </div>
+            )}
+            {!tidExists && paymentId && !checkingTid && (
+              <div className="flex items-center gap-2 text-xs text-success">
+                <CheckCircle2 className="h-3 w-3" />
+                TID available
+              </div>
+            )}
+            {!tidExists && (
+              <p className="text-xs text-muted-foreground">Required to prevent double entry</p>
+            )}
           </div>
 
           {/* Payment Method */}
@@ -355,7 +415,7 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
             <Button
               type="submit"
               className="flex-1 gap-2"
-              disabled={paymentMutation.isPending || !selectedTenant || !amount || !paymentId}
+              disabled={paymentMutation.isPending || !selectedTenant || !amount || !paymentId || tidExists || checkingTid}
             >
               {paymentMutation.isPending ? (
                 <>
