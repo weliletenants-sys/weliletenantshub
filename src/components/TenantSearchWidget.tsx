@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, User, Phone, DollarSign, ChevronRight, Clock, X } from "lucide-react";
+import { Search, User, Phone, DollarSign, ChevronRight, Clock, X, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
@@ -307,6 +307,79 @@ export const TenantSearchWidget = ({ agentId }: TenantSearchWidgetProps) => {
                     <ChevronRight className="h-5 w-5 text-blue-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Empty State with Tips */}
+          {showRecent && searchQuery.length === 0 && recentSearches.length === 0 && (
+            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border-2 border-blue-200">
+              <div className="p-6 space-y-4">
+                <div className="text-center">
+                  <div className="inline-flex p-4 bg-gradient-to-br from-blue-100 to-cyan-100 rounded-full mb-3">
+                    <Search className="h-8 w-8 text-blue-600" />
+                  </div>
+                  <h4 className="font-bold text-blue-900 text-lg mb-2">Quick Search Tips</h4>
+                  <p className="text-sm text-blue-600">Find tenants instantly with these search methods</p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <User className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h5 className="font-semibold text-blue-900 text-sm mb-1">Search by Name</h5>
+                      <p className="text-xs text-blue-600">Type any part of the tenant's name</p>
+                      <p className="text-xs text-blue-400 mt-1 font-mono">Example: "John" or "Mary"</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-cyan-50 rounded-xl">
+                    <div className="p-2 bg-cyan-100 rounded-lg">
+                      <Phone className="h-4 w-4 text-cyan-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h5 className="font-semibold text-blue-900 text-sm mb-1">Search by Phone</h5>
+                      <p className="text-xs text-blue-600">Enter phone number or last digits</p>
+                      <p className="text-xs text-blue-400 mt-1 font-mono">Example: "0700" or "256700"</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-xl">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <Clock className="h-4 w-4 text-purple-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h5 className="font-semibold text-blue-900 text-sm mb-1">Fast Results</h5>
+                      <p className="text-xs text-blue-600">Start typing - suggestions appear after just 1 character!</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-blue-100">
+                  <p className="text-xs text-center text-blue-500 mb-3 font-medium">Quick Actions</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-9 border-blue-200 hover:bg-blue-50 hover:border-blue-300"
+                      onClick={() => navigate("/agent/tenants")}
+                    >
+                      <Users className="h-3 w-3 mr-1" />
+                      All Tenants
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-9 border-blue-200 hover:bg-blue-50 hover:border-blue-300"
+                      onClick={() => navigate("/agent/register-tenant")}
+                    >
+                      <User className="h-3 w-3 mr-1" />
+                      Add Tenant
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
