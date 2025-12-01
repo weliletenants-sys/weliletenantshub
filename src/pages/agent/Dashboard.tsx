@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X, Reply, Send, MessageCircle, Calculator, Wallet, UserPlus, UserCheck, ArrowDownToLine, ArrowRightLeft } from "lucide-react";
+import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X, Reply, Send, MessageCircle, Calculator, Wallet, UserPlus, UserCheck, ArrowDownToLine, ArrowRightLeft, CheckCircle2 } from "lucide-react";
 import { TenantSearchWidget } from "@/components/TenantSearchWidget";
 import MessageThreadDialog from "@/components/MessageThreadDialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
@@ -611,13 +611,23 @@ const AgentDashboard = () => {
                   </div>
                 </div>
 
-                <Button 
-                  variant="secondary"
-                  className="w-full font-bold text-base py-6 bg-white text-emerald-600 hover:bg-white/90"
-                  onClick={() => navigate("/agent/earnings")}
-                >
-                  View Full Earnings →
-                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button 
+                    variant="secondary"
+                    className="font-bold bg-white text-emerald-600 hover:bg-white/90"
+                    onClick={() => navigate("/agent/earnings")}
+                  >
+                    Full Earnings →
+                  </Button>
+                  <Button 
+                    variant="secondary"
+                    className="font-bold bg-white/90 text-emerald-600 hover:bg-white"
+                    onClick={() => navigate("/agent/commission-history")}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                    History
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
