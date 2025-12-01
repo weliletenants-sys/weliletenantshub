@@ -51,6 +51,7 @@ const ManagerDashboard = () => {
     overdueTenants: 0,
     totalLandlords: 0,
     totalTenantsRegistered: 0,
+    pendingLandlordVerifications: 0,
     pendingVerifications: 0,
     pendingPayments: 0,
     verifiedPayments: 0,
@@ -538,6 +539,7 @@ const ManagerDashboard = () => {
             landlord_name,
             landlord_phone,
             registered_by,
+            is_verified,
             created_at
           `),
           supabase.from("tenants").select(`
@@ -563,6 +565,7 @@ const ManagerDashboard = () => {
         
         const totalLandlords = landlordsData.data?.length || 0;
         const totalTenantsRegistered = tenantsRegisteredData.data?.length || 0;
+        const pendingLandlordVerifications = landlordsData.data?.filter(l => !l.is_verified).length || 0;
         const pendingVerifications = pendingVerificationsCount.count || 0;
 
         // Calculate portfolio value from fetched tenant balances
@@ -613,6 +616,7 @@ const ManagerDashboard = () => {
           overdueTenants,
           totalLandlords,
           totalTenantsRegistered,
+          pendingLandlordVerifications,
           pendingVerifications,
           pendingPayments,
           verifiedPayments,
@@ -2504,6 +2508,25 @@ const ManagerDashboard = () => {
               <div className="text-2xl font-bold text-purple-600">{stats.totalLandlords}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 Click to view by agent
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card 
+            id="stats-pending-landlord-verifications"
+            className="cursor-pointer hover:shadow-lg transition-all"
+            onClick={() => navigate('/manager/landlords/unverified')}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4 text-orange-500" />
+                Pending Landlord Verifications
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">{stats.pendingLandlordVerifications}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stats.pendingLandlordVerifications === 0 ? 'All landlords verified' : 'Click to review and verify'}
               </p>
             </CardContent>
           </Card>
