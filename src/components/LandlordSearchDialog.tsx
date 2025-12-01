@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -14,6 +14,8 @@ import { Building2, Search, Phone, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
+import { useDebounce } from "@/hooks/useDebounce";
+import { cn } from "@/lib/utils";
 
 interface LandlordSearchDialogProps {
   userRole: "agent" | "manager";
@@ -34,6 +36,68 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<LandlordResult[]>([]);
+  const [suggestions, setSuggestions] = useState<LandlordResult[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+  // Fetch autocomplete suggestions
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (!debouncedSearchQuery.trim() || debouncedSearchQuery.length < 2) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+
+      setLoadingSuggestions(true);
+      try {
+        const query = debouncedSearchQuery.trim();
+        
+        let supabaseQuery = supabase
+          .from("landlords")
+          .select(`
+            id,
+            landlord_name,
+            landlord_phone,
+            created_at
+          `)
+          .or(`landlord_name.ilike.%${query}%,landlord_phone.ilike.%${query}%`)
+          .limit(5);
+
+        const { data, error } = await supabaseQuery;
+
+        if (error) throw error;
+
+        // For agents, filter to only show landlords they've registered tenants for
+        if (userRole === "agent" && agentId && data && data.length > 0) {
+          const landlordIds = data.map(l => l.id);
+          const { data: tenantData } = await supabase
+            .from("tenants")
+            .select("landlord_id")
+            .eq("agent_id", agentId)
+            .in("landlord_id", landlordIds);
+
+          const accessibleLandlordIds = new Set(tenantData?.map(t => t.landlord_id) || []);
+          const filteredResults = data.filter(l => accessibleLandlordIds.has(l.id));
+          setSuggestions(filteredResults);
+          setShowSuggestions(filteredResults.length > 0);
+        } else {
+          setSuggestions(data || []);
+          setShowSuggestions((data || []).length > 0);
+        }
+      } catch (error) {
+        console.error("Error fetching suggestions:", error);
+        setSuggestions([]);
+        setShowSuggestions(false);
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    };
+
+    fetchSuggestions();
+  }, [debouncedSearchQuery, userRole, agentId]);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -41,6 +105,7 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
       return;
     }
 
+    setShowSuggestions(false);
     setSearching(true);
     try {
       const query = searchQuery.trim();
@@ -102,11 +167,19 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
     setOpen(false);
     setSearchQuery("");
     setResults([]);
+    setSuggestions([]);
+    setShowSuggestions(false);
     if (userRole === "agent") {
       navigate(`/agent/landlord/${landlordId}`);
     } else {
       navigate(`/manager/landlord/${landlordId}`);
     }
+  };
+
+  const handleSelectSuggestion = (landlord: LandlordResult) => {
+    setSearchQuery(landlord.landlord_name);
+    setShowSuggestions(false);
+    handleSelectLandlord(landlord.id);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -141,15 +214,53 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
         <div className="space-y-4 mt-4">
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
               <Input
+                ref={inputRef}
                 placeholder="Enter landlord name or phone number..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={handleKeyPress}
+                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
                 className="pl-10"
                 disabled={searching}
               />
+              
+              {/* Autocomplete Suggestions Dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                  {loadingSuggestions ? (
+                    <div className="p-3 text-center text-sm text-muted-foreground">
+                      Loading suggestions...
+                    </div>
+                  ) : (
+                    <ul className="py-1">
+                      {suggestions.map((landlord) => (
+                        <li
+                          key={landlord.id}
+                          onClick={() => handleSelectSuggestion(landlord)}
+                          className="px-4 py-3 hover:bg-accent cursor-pointer transition-colors border-b border-border last:border-b-0"
+                        >
+                          <div className="flex items-start gap-3">
+                            <Building2 className="h-4 w-4 text-primary mt-1 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm text-foreground truncate">
+                                {landlord.landlord_name}
+                              </p>
+                              <div className="flex items-center gap-1 mt-1">
+                                <Phone className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                <p className="text-xs text-muted-foreground">
+                                  {landlord.landlord_phone}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
             <Button
               onClick={handleSearch}
