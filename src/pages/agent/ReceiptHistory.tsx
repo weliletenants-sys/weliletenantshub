@@ -16,6 +16,7 @@ interface PaymentRecord {
   commission: number;
   collection_date: string;
   payment_method: string;
+  payment_id: string | null;
   status: string;
   tenant: {
     id: string;
@@ -293,6 +294,7 @@ export default function ReceiptHistory() {
                   commission: selectedPayment.commission,
                   collectionDate: selectedPayment.collection_date,
                   paymentMethod: selectedPayment.payment_method,
+                  paymentId: selectedPayment.payment_id,
                 }}
                 tenantData={{
                   tenant_name: selectedPayment.tenant.tenant_name,

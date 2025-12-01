@@ -46,6 +46,7 @@ interface Notification {
     amount: number;
     payment_method: string;
     payment_date: string;
+    payment_id?: string;
     previous_balance?: number;
     new_balance?: number;
     commission?: number;
@@ -90,6 +91,7 @@ const Notifications = () => {
       commission: number;
       collectionDate: string;
       paymentMethod: string;
+      paymentId?: string;
     };
     tenantData: {
       tenant_name: string;
@@ -584,6 +586,7 @@ const Notifications = () => {
             commission: notification.payment_data.amount * 0.05,
             collectionDate: notification.payment_data.payment_date,
             paymentMethod: notification.payment_data.payment_method,
+            paymentId: notification.payment_data.payment_id,
           },
           tenantData: {
             tenant_name: tenantData.tenant_name,
@@ -802,6 +805,7 @@ const Notifications = () => {
                           commission: notification.payment_data!.commission || notification.payment_data!.amount * 0.05,
                           collectionDate: notification.payment_data!.payment_date,
                           paymentMethod: notification.payment_data!.payment_method,
+                          paymentId: notification.payment_data!.payment_id,
                         },
                         tenantData: {
                           tenant_name: notification.payment_data!.tenant_name,

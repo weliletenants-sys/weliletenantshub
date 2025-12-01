@@ -1108,6 +1108,7 @@ const AgentTenantDetail = () => {
                   commission: lastPayment.commission,
                   collectionDate: lastPayment.collection_date,
                   paymentMethod: lastPayment.payment_method,
+                  paymentId: lastPayment.payment_id,
                 }}
                 tenantData={{
                   tenant_name: tenant.tenant_name,
