@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Search, Zap } from "lucide-react";
+import { haptics } from "@/utils/haptics";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -82,10 +83,13 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    haptics.light(); // Form submission attempt
+    
     if (!selectedTenant || !amount || !agentId) return;
 
     const paymentAmount = parseFloat(amount);
     if (isNaN(paymentAmount) || paymentAmount <= 0) {
+      haptics.error(); // Validation error
       toast.error("Please enter a valid amount");
       return;
     }
@@ -103,12 +107,16 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
       commission,
     }, {
       onSuccess: () => {
+        haptics.success(); // Success feedback
         // Reset form on success
         setSelectedTenant(null);
         setAmount("");
         setPaymentMethod("cash");
         onOpenChange(false);
         onSuccess?.();
+      },
+      onError: () => {
+        haptics.error(); // Error feedback
       }
     });
   };

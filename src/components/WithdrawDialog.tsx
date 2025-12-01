@@ -35,17 +35,19 @@ export function WithdrawDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    haptics.light(); // Form submission attempt
 
     const withdrawAmount = parseFloat(amount);
 
     if (!withdrawAmount || withdrawAmount <= 0) {
+      haptics.error(); // Validation error
       toast.error("Please enter a valid amount");
       return;
     }
 
     if (withdrawAmount > currentBalance) {
+      haptics.error(); // Validation error
       toast.error("Insufficient balance");
-      haptics.error();
       return;
     }
 
@@ -62,7 +64,7 @@ export function WithdrawDialog({
 
       if (error) throw error;
 
-      haptics.success();
+      haptics.success(); // Success feedback
       toast.success(`Withdrawal request for UGX ${withdrawAmount.toLocaleString()} submitted`, {
         description: "Your request is pending manager approval",
       });
@@ -72,8 +74,8 @@ export function WithdrawDialog({
       onSuccess?.();
     } catch (error: any) {
       console.error("Error submitting withdrawal:", error);
+      haptics.error(); // Error feedback
       toast.error("Failed to submit withdrawal request");
-      haptics.error();
     } finally {
       setIsSubmitting(false);
     }

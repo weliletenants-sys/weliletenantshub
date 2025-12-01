@@ -85,14 +85,15 @@ const RegisterTenant = () => {
 
   const handleTenantSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    haptics.light(); // Form submission attempt
 
     if (!agentId || !selectedLandlord) {
+      haptics.error(); // Validation error
       toast.error("Missing required information");
       return;
     }
 
     setIsSubmitting(true);
-    haptics.light();
 
     try {
       const registrationFee = parseFloat(tenantFormData.monthlyRent) <= 100000 ? 10000 : 20000;
@@ -131,7 +132,7 @@ const RegisterTenant = () => {
 
       if (walletError) throw walletError;
 
-      haptics.success();
+      haptics.success(); // Success feedback
       toast.success("🎉 Tenant registered! UGX 5,000 added to wallet", {
         duration: 5000,
       });
@@ -139,6 +140,7 @@ const RegisterTenant = () => {
       navigate("/agent/tenants");
     } catch (error) {
       console.error("Error registering tenant:", error);
+      haptics.error(); // Error feedback
       toast.error("Failed to register tenant");
     } finally {
       setIsSubmitting(false);

@@ -59,21 +59,24 @@ export function TransferMoneyDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    haptics.light(); // Form submission attempt
 
     const transferAmount = parseFloat(amount);
 
     if (!transferAmount || transferAmount <= 0) {
+      haptics.error(); // Validation error
       toast.error("Please enter a valid amount");
       return;
     }
 
     if (transferAmount > currentBalance) {
+      haptics.error(); // Validation error
       toast.error("Insufficient balance");
-      haptics.error();
       return;
     }
 
     if (!phone || phone.length < 10) {
+      haptics.error(); // Validation error
       toast.error("Please enter a valid phone number");
       return;
     }
@@ -90,8 +93,8 @@ export function TransferMoneyDialog({
         .maybeSingle();
 
       if (profileError || !recipientProfile) {
+        haptics.error(); // Error feedback
         toast.error("Recipient agent not found");
-        haptics.error();
         setIsSubmitting(false);
         return;
       }
@@ -103,15 +106,15 @@ export function TransferMoneyDialog({
         .maybeSingle();
 
       if (agentError || !recipientAgent) {
+        haptics.error(); // Error feedback
         toast.error("Recipient agent not found");
-        haptics.error();
         setIsSubmitting(false);
         return;
       }
 
       if (recipientAgent.id === agentId) {
+        haptics.error(); // Error feedback
         toast.error("Cannot transfer to yourself");
-        haptics.error();
         setIsSubmitting(false);
         return;
       }
@@ -155,7 +158,7 @@ export function TransferMoneyDialog({
 
       if (recipientUpdateError) throw recipientUpdateError;
 
-      haptics.success();
+      haptics.success(); // Success feedback
       toast.success(`UGX ${transferAmount.toLocaleString()} transferred successfully`, {
         description: `Sent to ${recipientName || phone}`,
       });
@@ -167,8 +170,8 @@ export function TransferMoneyDialog({
       onSuccess?.();
     } catch (error: any) {
       console.error("Error transferring funds:", error);
+      haptics.error(); // Error feedback
       toast.error("Failed to transfer funds");
-      haptics.error();
     } finally {
       setIsSubmitting(false);
     }

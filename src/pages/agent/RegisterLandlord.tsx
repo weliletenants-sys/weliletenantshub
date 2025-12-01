@@ -33,14 +33,15 @@ const RegisterLandlord = ({ prefilledPhone = "", onSuccess, embedded = false }: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    haptics.light(); // Form submission attempt
 
     if (!agentId) {
+      haptics.error(); // Validation error
       toast.error("Agent ID not found");
       return;
     }
 
     setIsSubmitting(true);
-    haptics.light();
 
     try {
       // Insert landlord
@@ -60,6 +61,7 @@ const RegisterLandlord = ({ prefilledPhone = "", onSuccess, embedded = false }: 
         .single();
 
       if (landlordError) {
+        haptics.error(); // Error feedback
         if (landlordError.code === '23505') { // Unique constraint violation
           toast.error("This landlord phone number is already registered");
         } else {
@@ -68,7 +70,7 @@ const RegisterLandlord = ({ prefilledPhone = "", onSuccess, embedded = false }: 
         return;
       }
 
-      haptics.success();
+      haptics.success(); // Success feedback
       toast.success("🎉 Landlord registered! Awaiting manager verification for UGX 500 reward", {
         duration: 5000,
       });
@@ -80,6 +82,7 @@ const RegisterLandlord = ({ prefilledPhone = "", onSuccess, embedded = false }: 
       }
     } catch (error) {
       console.error("Error registering landlord:", error);
+      haptics.error(); // Error feedback
       toast.error("Failed to register landlord");
     } finally {
       setIsSubmitting(false);

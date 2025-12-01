@@ -8,6 +8,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { haptics } from "@/utils/haptics";
 import { format } from "date-fns";
 import { CalendarIcon, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -75,8 +76,10 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    haptics.light(); // Form submission attempt
     
     if (!selectedTenant || !amount) {
+      haptics.error(); // Validation error
       toast({
         title: "Missing information",
         description: "Please select a tenant and enter an amount",
@@ -168,6 +171,7 @@ You can generate and share the receipt with your tenant from the payment notific
         console.error("Error sending notification:", notificationError);
       }
 
+      haptics.success(); // Success feedback
       toast({
         title: "Payment recorded",
         description: `Payment of UGX ${paymentAmount.toLocaleString()} recorded for ${selectedTenant.tenant_name}`,
@@ -181,6 +185,7 @@ You can generate and share the receipt with your tenant from the payment notific
       onOpenChange(false);
     } catch (error) {
       console.error("Error recording payment:", error);
+      haptics.error(); // Error feedback
       toast({
         title: "Error",
         description: "Failed to record payment",
