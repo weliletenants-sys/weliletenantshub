@@ -13,16 +13,16 @@ const SplashScreen = ({ onComplete }: SplashScreenProps) => {
     // Trigger haptic feedback on splash screen appearance
     haptics.light();
 
-    // Reduced splash duration for faster load
+    // Ultra-fast splash for instant login feel
     const timer = setTimeout(() => {
       setIsVisible(false);
-    }, 1200);
+    }, 600);
 
     // Complete after fade out animation
     const completeTimer = setTimeout(() => {
       haptics.success();
       onComplete();
-    }, 1500);
+    }, 900);
 
     return () => {
       clearTimeout(timer);
