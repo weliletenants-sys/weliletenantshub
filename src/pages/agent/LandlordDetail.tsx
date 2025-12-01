@@ -5,9 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Phone, User, Building2, DollarSign, Calendar, TrendingUp, Users } from "lucide-react";
+import { ArrowLeft, Phone, User, Building2, DollarSign, Calendar, TrendingUp, Users, Search } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -51,6 +52,8 @@ const AgentLandlordDetail = () => {
   const [tenants, setTenants] = useState<TenantData[]>([]);
   const [payments, setPayments] = useState<PaymentData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tenantSearch, setTenantSearch] = useState("");
+  const [paymentSearch, setPaymentSearch] = useState("");
 
   useEffect(() => {
     fetchLandlordData();
@@ -122,6 +125,16 @@ const AgentLandlordDetail = () => {
       </AgentLayout>
     );
   }
+
+  const filteredTenants = tenants.filter(tenant =>
+    tenant.tenant_name.toLowerCase().includes(tenantSearch.toLowerCase()) ||
+    tenant.tenant_phone.includes(tenantSearch)
+  );
+
+  const filteredPayments = payments.filter(payment =>
+    payment.tenants?.tenant_name.toLowerCase().includes(paymentSearch.toLowerCase()) ||
+    payment.amount.toString().includes(paymentSearch)
+  );
 
   const totalRent = tenants.reduce((sum, t) => sum + (t.rent_amount || 0), 0);
   const totalOutstanding = tenants.reduce((sum, t) => sum + (t.outstanding_balance || 0), 0);
@@ -255,8 +268,21 @@ const AgentLandlordDetail = () => {
             <CardDescription>All tenants under this landlord</CardDescription>
           </CardHeader>
           <CardContent>
-            {tenants.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No tenants found</p>
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name or phone..."
+                  value={tenantSearch}
+                  onChange={(e) => setTenantSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            {filteredTenants.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                {tenantSearch ? "No tenants match your search" : "No tenants found"}
+              </p>
             ) : (
               <Table>
                 <TableHeader>
@@ -270,7 +296,7 @@ const AgentLandlordDetail = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tenants.map((tenant) => (
+                  {filteredTenants.map((tenant) => (
                     <TableRow 
                       key={tenant.id}
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
@@ -310,8 +336,21 @@ const AgentLandlordDetail = () => {
             <CardDescription>Last 50 payments from all tenants</CardDescription>
           </CardHeader>
           <CardContent>
-            {payments.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No payments recorded</p>
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by tenant name or amount..."
+                  value={paymentSearch}
+                  onChange={(e) => setPaymentSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            {filteredPayments.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                {paymentSearch ? "No payments match your search" : "No payments recorded"}
+              </p>
             ) : (
               <Table>
                 <TableHeader>
@@ -324,7 +363,7 @@ const AgentLandlordDetail = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {payments.map((payment) => (
+                  {filteredPayments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell>
                         {format(new Date(payment.collection_date), "MMM d, yyyy")}
