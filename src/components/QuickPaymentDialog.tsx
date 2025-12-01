@@ -200,7 +200,7 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
       collectionDate: dateTime.toISOString(),
       agentId,
       commission,
-      paymentId: paymentId || undefined,
+      paymentId: paymentId.trim(), // TID is now mandatory
     }, {
       onSuccess: () => {
         haptics.success(); // Success feedback

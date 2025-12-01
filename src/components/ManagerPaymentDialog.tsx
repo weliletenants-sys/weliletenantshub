@@ -149,11 +149,33 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
     e.preventDefault();
     haptics.light(); // Form submission attempt
     
-    if (!selectedTenant || !amount || !paymentId) {
-      haptics.error(); // Validation error
+    // CRITICAL: Validate all required fields including TID
+    if (!selectedTenant) {
+      haptics.error();
       toast({
-        title: "Missing information",
-        description: "Please fill in all required fields including Transaction ID",
+        title: "Missing Information",
+        description: "Please select a tenant",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!amount || parseFloat(amount) <= 0) {
+      haptics.error();
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid payment amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // CRITICAL: TID is mandatory for all payments
+    if (!paymentId || paymentId.trim().length === 0) {
+      haptics.error();
+      toast({
+        title: "Transaction ID Required",
+        description: "Transaction ID (TID) is required for all payments",
         variant: "destructive",
       });
       return;
@@ -210,7 +232,7 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
           amount: paymentAmount,
           commission: commission,
           payment_method: paymentMethod,
-          payment_id: paymentId || null,
+          payment_id: paymentId.trim(), // TID is now mandatory
           collection_date: dateTime.toISOString(),
           status: "pending", // Will be auto-verified by trigger
           created_by: user.id,
