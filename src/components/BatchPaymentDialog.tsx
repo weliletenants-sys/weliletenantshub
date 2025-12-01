@@ -118,12 +118,47 @@ export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentD
   };
 
   const processPayments = async () => {
-    // Validate all entries
-    const invalidEntries = payments.filter(p => !p.tenant || !p.amount);
+    // Validate all entries have tenant, amount, AND Transaction ID
+    const invalidEntries = payments.filter(p => !p.tenant || !p.amount || !p.paymentId);
     if (invalidEntries.length > 0) {
       toast({
         title: "Incomplete entries",
-        description: `${invalidEntries.length} payment(s) missing tenant or amount`,
+        description: `${invalidEntries.length} payment(s) missing tenant, amount, or Transaction ID (TID)`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check for duplicate TIDs within batch
+    const tidSet = new Set();
+    const duplicateTids: string[] = [];
+    payments.forEach(p => {
+      if (p.paymentId && tidSet.has(p.paymentId)) {
+        duplicateTids.push(p.paymentId);
+      }
+      tidSet.add(p.paymentId);
+    });
+
+    if (duplicateTids.length > 0) {
+      toast({
+        title: "Duplicate Transaction IDs",
+        description: `Found duplicate TIDs in batch: ${duplicateTids.join(", ")}. Each TID must be unique.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check for existing TIDs in database
+    const { data: existingPayments } = await supabase
+      .from("collections")
+      .select("payment_id")
+      .in("payment_id", payments.map(p => p.paymentId).filter(Boolean));
+
+    if (existingPayments && existingPayments.length > 0) {
+      const existingTids = existingPayments.map(p => p.payment_id).join(", ");
+      toast({
+        title: "Transaction IDs Already Exist",
+        description: `These TIDs already exist in the system: ${existingTids}. Please use unique TIDs.`,
         variant: "destructive",
       });
       return;
@@ -375,14 +410,16 @@ You can generate and share the receipt with your tenant from the payment notific
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Payment ID (Optional)</Label>
+                        <Label>Transaction ID (TID) *</Label>
                         <Input
                           type="text"
-                          placeholder="Enter payment reference ID"
+                          placeholder="Enter unique transaction ID"
                           value={payment.paymentId}
                           onChange={(e) => updatePaymentEntry(payment.id, "paymentId", e.target.value)}
                           disabled={isProcessing}
+                          required
                         />
+                        <p className="text-xs text-muted-foreground">Required to prevent double entry</p>
                       </div>
 
                       <div className="space-y-2">

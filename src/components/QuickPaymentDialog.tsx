@@ -90,12 +90,29 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
     e.preventDefault();
     haptics.light(); // Form submission attempt
     
-    if (!selectedTenant || !amount || !agentId) return;
+    if (!selectedTenant || !amount || !agentId || !paymentId) {
+      haptics.error();
+      toast.error("Please fill in all required fields including Transaction ID");
+      return;
+    }
 
     const paymentAmount = parseFloat(amount);
     if (isNaN(paymentAmount) || paymentAmount <= 0) {
       haptics.error(); // Validation error
       toast.error("Please enter a valid amount");
+      return;
+    }
+
+    // Check for duplicate Transaction ID
+    const { data: existingPayment } = await supabase
+      .from("collections")
+      .select("id")
+      .eq("payment_id", paymentId)
+      .single();
+
+    if (existingPayment) {
+      haptics.error();
+      toast.error("This Transaction ID (TID) already exists. Please use a unique TID to avoid double entry.");
       return;
     }
 
@@ -221,16 +238,18 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
             />
           </div>
 
-          {/* Payment ID */}
+          {/* Transaction ID */}
           <div className="space-y-2">
-            <Label htmlFor="payment-id">Payment ID (Optional)</Label>
+            <Label htmlFor="payment-id">Transaction ID (TID) *</Label>
             <Input
               id="payment-id"
               type="text"
-              placeholder="Enter payment reference ID"
+              placeholder="Enter unique transaction ID"
               value={paymentId}
               onChange={(e) => setPaymentId(e.target.value)}
+              required
             />
+            <p className="text-xs text-muted-foreground">Required to prevent double entry</p>
           </div>
 
           {/* Payment Method */}
@@ -336,7 +355,7 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
             <Button
               type="submit"
               className="flex-1 gap-2"
-              disabled={paymentMutation.isPending || !selectedTenant || !amount}
+              disabled={paymentMutation.isPending || !selectedTenant || !amount || !paymentId}
             >
               {paymentMutation.isPending ? (
                 <>
