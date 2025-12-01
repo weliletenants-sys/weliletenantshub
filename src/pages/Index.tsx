@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import WelileLogo from "@/components/WelileLogo";
 import { UserCog, Users, Download } from "lucide-react";
+import { haptics } from "@/utils/haptics";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -13,7 +14,10 @@ const Index = () => {
         <Button 
           variant="outline" 
           size="sm"
-          onClick={() => navigate("/install")}
+          onClick={() => {
+            haptics.light();
+            navigate("/install");
+          }}
           className="gap-2"
         >
           <Download className="h-4 w-4" />
@@ -36,7 +40,10 @@ const Index = () => {
             <Button
               size="lg"
               className="w-full h-24 text-lg flex flex-col gap-2"
-              onClick={() => navigate("/login?role=agent")}
+              onClick={() => {
+                haptics.light();
+                navigate("/login?role=agent");
+              }}
             >
               <Users className="h-8 w-8" />
               Agent Portal
@@ -45,7 +52,10 @@ const Index = () => {
               size="lg"
               variant="secondary"
               className="w-full h-24 text-lg flex flex-col gap-2"
-              onClick={() => navigate("/login?role=manager")}
+              onClick={() => {
+                haptics.light();
+                navigate("/login?role=manager");
+              }}
             >
               <UserCog className="h-8 w-8" />
               Manager Portal

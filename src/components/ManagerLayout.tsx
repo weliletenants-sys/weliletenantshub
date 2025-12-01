@@ -6,6 +6,7 @@ import Breadcrumbs from "./Breadcrumbs";
 import { supabase } from "@/integrations/supabase/client";
 import { LayoutDashboard, Users, CheckSquare, LogOut, Settings, Home, TrendingUp, FileText, DollarSign, History, MailCheck, Printer, Calculator, Activity, ArrowDownToLine, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
+import { haptics } from "@/utils/haptics";
 import { useRipple } from "@/hooks/useRipple";
 import { useSwipeBack } from "@/hooks/useSwipeBack";
 import { useRealtimeLandlordNotifications } from "@/hooks/useRealtimeLandlordNotifications";
@@ -38,6 +39,7 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
   useRealtimeLandlordNotifications(true);
 
   const handleLogout = async () => {
+    haptics.success();
     await supabase.auth.signOut();
     toast.success("Logged out successfully");
     navigate("/");
@@ -68,7 +70,14 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
         <WelileLogo />
         <div className="flex items-center gap-2 md:gap-4">
           <LandlordSearchDialog userRole="manager" />
-          <Button variant="ghost" size="default" onClick={() => setShowLogoutDialog(true)}>
+          <Button 
+            variant="ghost" 
+            size="default" 
+            onClick={() => {
+              haptics.light();
+              setShowLogoutDialog(true);
+            }}
+          >
             <LogOut className="h-5 w-5 mr-2" />
             Logout
           </Button>
@@ -84,7 +93,7 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => haptics.light()}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleLogout}>
               Logout
             </AlertDialogAction>
@@ -117,7 +126,11 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
                 variant="outline"
                 className="w-full justify-start h-14 text-base"
                 size="lg"
-                onClick={() => navigate("/")}
+                onClick={(e) => {
+                  createRipple(e);
+                  haptics.light();
+                  navigate("/");
+                }}
               >
                 <Home className="h-6 w-6 mr-3" />
                 Back to Home
