@@ -1237,6 +1237,13 @@ const AgentDashboard = () => {
       />
       
       <BackgroundSyncIndicator />
+      
+      {/* Money flow animation overlay */}
+      <MoneyFlowAnimation
+        amount={moneyFlowAmount}
+        type={moneyFlowType}
+        trigger={moneyFlowTrigger}
+      />
     </AgentLayout>
   );
 };
