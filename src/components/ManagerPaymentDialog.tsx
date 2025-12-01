@@ -39,7 +39,9 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentId, setPaymentId] = useState("");
   const [paymentDate, setPaymentDate] = useState<Date>(new Date());
+  const [paymentTime, setPaymentTime] = useState({ hours: new Date().getHours().toString().padStart(2, '0'), minutes: new Date().getMinutes().toString().padStart(2, '0') });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const { toast } = useToast();
@@ -106,6 +108,10 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
         .eq("id", user.id)
         .single();
 
+      // Combine date and time into timestamp
+      const dateTime = new Date(paymentDate);
+      dateTime.setHours(parseInt(paymentTime.hours), parseInt(paymentTime.minutes), 0, 0);
+
       // Insert the collection record
       const { data: collectionData, error: collectionError } = await supabase
         .from("collections")
@@ -115,7 +121,8 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
           amount: paymentAmount,
           commission: commission,
           payment_method: paymentMethod,
-          collection_date: format(paymentDate, "yyyy-MM-dd"),
+          payment_id: paymentId || null,
+          collection_date: dateTime.toISOString(),
           status: "pending", // Will be auto-verified by trigger
           created_by: user.id,
           created_by_manager: true, // Manager payment - auto-verify
@@ -181,7 +188,9 @@ You can generate and share the receipt with your tenant from the payment notific
       setSelectedTenant(null);
       setAmount("");
       setPaymentMethod("cash");
+      setPaymentId("");
       setPaymentDate(new Date());
+      setPaymentTime({ hours: new Date().getHours().toString().padStart(2, '0'), minutes: new Date().getMinutes().toString().padStart(2, '0') });
       onOpenChange(false);
     } catch (error) {
       console.error("Error recording payment:", error);
@@ -274,6 +283,17 @@ You can generate and share the receipt with your tenant from the payment notific
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="payment-id">Payment ID (Optional)</Label>
+            <Input
+              id="payment-id"
+              type="text"
+              placeholder="Enter payment reference ID"
+              value={paymentId}
+              onChange={(e) => setPaymentId(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="payment-method">Payment Method</Label>
             <Select value={paymentMethod} onValueChange={setPaymentMethod}>
               <SelectTrigger id="payment-method">
@@ -308,9 +328,37 @@ You can generate and share the receipt with your tenant from the payment notific
                   selected={paymentDate}
                   onSelect={(date) => date && setPaymentDate(date)}
                   initialFocus
+                  className={cn("p-3 pointer-events-auto")}
                 />
               </PopoverContent>
             </Popover>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Payment Time</Label>
+            <div className="flex gap-2">
+              <Select value={paymentTime.hours} onValueChange={(val) => setPaymentTime({ ...paymentTime, hours: val })}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="HH" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')).map((hour) => (
+                    <SelectItem key={hour} value={hour}>{hour}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-2xl font-bold self-center">:</span>
+              <Select value={paymentTime.minutes} onValueChange={(val) => setPaymentTime({ ...paymentTime, minutes: val })}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="MM" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0')).map((minute) => (
+                    <SelectItem key={minute} value={minute}>{minute}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {amount && selectedTenant && (

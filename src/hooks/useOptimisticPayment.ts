@@ -15,6 +15,7 @@ interface RecordPaymentData {
   collectionDate: string;
   agentId: string;
   commission: number;
+  paymentId?: string;
 }
 
 /**
@@ -36,6 +37,7 @@ export const useOptimisticPayment = () => {
             commission: data.commission,
             payment_method: data.paymentMethod,
             collection_date: data.collectionDate,
+            payment_id: data.paymentId || null,
             status: 'pending',
           },
           data.tenantId
@@ -54,6 +56,7 @@ export const useOptimisticPayment = () => {
         commission: data.commission,
         payment_method: data.paymentMethod,
         collection_date: data.collectionDate,
+        payment_id: data.paymentId || null,
         status: 'completed',
         created_by: user?.id || null,
         created_by_manager: false, // Agents create payments that need verification
@@ -113,6 +116,7 @@ export const useOptimisticPayment = () => {
         commission: data.commission,
         payment_method: data.paymentMethod,
         collection_date: data.collectionDate,
+        payment_id: data.paymentId || null,
         status: 'pending',
         created_at: new Date().toISOString(),
         created_by: user?.id || '',

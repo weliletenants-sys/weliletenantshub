@@ -36,7 +36,9 @@ interface PaymentEntry {
   tenant: Tenant | null;
   amount: string;
   paymentMethod: string;
+  paymentId: string;
   paymentDate: Date;
+  paymentTime: { hours: string; minutes: string };
 }
 
 interface BatchPaymentDialogProps {
@@ -47,7 +49,7 @@ interface BatchPaymentDialogProps {
 export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentDialogProps) {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [payments, setPayments] = useState<PaymentEntry[]>([
-    { id: crypto.randomUUID(), tenant: null, amount: "", paymentMethod: "cash", paymentDate: new Date() }
+    { id: crypto.randomUUID(), tenant: null, amount: "", paymentMethod: "cash", paymentId: "", paymentDate: new Date(), paymentTime: { hours: new Date().getHours().toString().padStart(2, '0'), minutes: new Date().getMinutes().toString().padStart(2, '0') } }
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -95,7 +97,7 @@ export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentD
   const addPaymentEntry = () => {
     setPayments([
       ...payments,
-      { id: crypto.randomUUID(), tenant: null, amount: "", paymentMethod: "cash", paymentDate: new Date() }
+      { id: crypto.randomUUID(), tenant: null, amount: "", paymentMethod: "cash", paymentId: "", paymentDate: new Date(), paymentTime: { hours: new Date().getHours().toString().padStart(2, '0'), minutes: new Date().getMinutes().toString().padStart(2, '0') } }
     ]);
   };
 
@@ -160,6 +162,10 @@ export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentD
         const previousBalance = payment.tenant!.outstanding_balance || 0;
         const newBalance = Math.max(0, previousBalance - paymentAmount);
 
+        // Combine date and time into timestamp
+        const dateTime = new Date(payment.paymentDate);
+        dateTime.setHours(parseInt(payment.paymentTime.hours), parseInt(payment.paymentTime.minutes), 0, 0);
+
         // Insert collection record
         const { data: collectionData, error: collectionError } = await supabase
           .from("collections")
@@ -169,7 +175,8 @@ export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentD
             amount: paymentAmount,
             commission: commission,
             payment_method: payment.paymentMethod,
-            collection_date: format(payment.paymentDate, "yyyy-MM-dd"),
+            payment_id: payment.paymentId || null,
+            collection_date: dateTime.toISOString(),
             status: "pending", // Will be auto-verified by trigger
             created_by: user.id,
             created_by_manager: true, // Manager payment - auto-verify
@@ -241,7 +248,7 @@ You can generate and share the receipt with your tenant from the payment notific
       
       // Reset form after short delay
       setTimeout(() => {
-        setPayments([{ id: crypto.randomUUID(), tenant: null, amount: "", paymentMethod: "cash", paymentDate: new Date() }]);
+        setPayments([{ id: crypto.randomUUID(), tenant: null, amount: "", paymentMethod: "cash", paymentId: "", paymentDate: new Date(), paymentTime: { hours: new Date().getHours().toString().padStart(2, '0'), minutes: new Date().getMinutes().toString().padStart(2, '0') } }]);
         setProcessingSummary(null);
         onOpenChange(false);
       }, 2000);
@@ -367,6 +374,17 @@ You can generate and share the receipt with your tenant from the payment notific
                       </div>
 
                       <div className="space-y-2">
+                        <Label>Payment ID (Optional)</Label>
+                        <Input
+                          type="text"
+                          placeholder="Enter payment reference ID"
+                          value={payment.paymentId}
+                          onChange={(e) => updatePaymentEntry(payment.id, "paymentId", e.target.value)}
+                          disabled={isProcessing}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
                         <Label>Payment Method</Label>
                         <Select 
                           value={payment.paymentMethod} 
@@ -406,9 +424,45 @@ You can generate and share the receipt with your tenant from the payment notific
                               selected={payment.paymentDate}
                               onSelect={(date) => date && updatePaymentEntry(payment.id, "paymentDate", date)}
                               initialFocus
+                              className={cn("p-3 pointer-events-auto")}
                             />
                           </PopoverContent>
                         </Popover>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Payment Time</Label>
+                        <div className="flex gap-2">
+                          <Select 
+                            value={payment.paymentTime.hours} 
+                            onValueChange={(val) => updatePaymentEntry(payment.id, "paymentTime", { ...payment.paymentTime, hours: val })}
+                            disabled={isProcessing}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="HH" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')).map((hour) => (
+                                <SelectItem key={hour} value={hour}>{hour}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <span className="text-2xl font-bold self-center">:</span>
+                          <Select 
+                            value={payment.paymentTime.minutes} 
+                            onValueChange={(val) => updatePaymentEntry(payment.id, "paymentTime", { ...payment.paymentTime, minutes: val })}
+                            disabled={isProcessing}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="MM" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0')).map((minute) => (
+                                <SelectItem key={minute} value={minute}>{minute}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     </div>
 

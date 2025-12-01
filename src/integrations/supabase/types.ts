@@ -247,6 +247,7 @@ export type Database = {
           created_by: string | null
           created_by_manager: boolean | null
           id: string
+          payment_id: string | null
           payment_method: string | null
           rejection_reason: string | null
           status: string | null
@@ -263,6 +264,7 @@ export type Database = {
           created_by?: string | null
           created_by_manager?: boolean | null
           id?: string
+          payment_id?: string | null
           payment_method?: string | null
           rejection_reason?: string | null
           status?: string | null
@@ -279,6 +281,7 @@ export type Database = {
           created_by?: string | null
           created_by_manager?: boolean | null
           id?: string
+          payment_id?: string | null
           payment_method?: string | null
           rejection_reason?: string | null
           status?: string | null

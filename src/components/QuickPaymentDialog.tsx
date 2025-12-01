@@ -5,14 +5,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Search, Zap } from "lucide-react";
+import { Loader2, Search, Zap, CalendarIcon } from "lucide-react";
 import { haptics } from "@/utils/haptics";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useOptimisticPayment } from "@/hooks/useOptimisticPayment";
+import { format } from "date-fns";
 
 interface Tenant {
   id: string;
@@ -34,6 +36,9 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentId, setPaymentId] = useState("");
+  const [paymentDate, setPaymentDate] = useState<Date>(new Date());
+  const [paymentTime, setPaymentTime] = useState({ hours: new Date().getHours().toString().padStart(2, '0'), minutes: new Date().getMinutes().toString().padStart(2, '0') });
   const [searchOpen, setSearchOpen] = useState(false);
   const [agentId, setAgentId] = useState<string>("");
   
@@ -97,14 +102,19 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
     // Calculate commission (10%)
     const commission = paymentAmount * 0.1;
 
+    // Combine date and time into timestamp
+    const dateTime = new Date(paymentDate);
+    dateTime.setHours(parseInt(paymentTime.hours), parseInt(paymentTime.minutes), 0, 0);
+
     // Use optimistic mutation - UI updates instantly
     paymentMutation.mutate({
       tenantId: selectedTenant.id,
       amount: paymentAmount,
       paymentMethod,
-      collectionDate: new Date().toISOString().split('T')[0],
+      collectionDate: dateTime.toISOString(),
       agentId,
       commission,
+      paymentId: paymentId || undefined,
     }, {
       onSuccess: () => {
         haptics.success(); // Success feedback
@@ -112,6 +122,9 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
         setSelectedTenant(null);
         setAmount("");
         setPaymentMethod("cash");
+        setPaymentId("");
+        setPaymentDate(new Date());
+        setPaymentTime({ hours: new Date().getHours().toString().padStart(2, '0'), minutes: new Date().getMinutes().toString().padStart(2, '0') });
         onOpenChange(false);
         onSuccess?.();
       },
@@ -208,6 +221,18 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
             />
           </div>
 
+          {/* Payment ID */}
+          <div className="space-y-2">
+            <Label htmlFor="payment-id">Payment ID (Optional)</Label>
+            <Input
+              id="payment-id"
+              type="text"
+              placeholder="Enter payment reference ID"
+              value={paymentId}
+              onChange={(e) => setPaymentId(e.target.value)}
+            />
+          </div>
+
           {/* Payment Method */}
           <div className="space-y-2">
             <Label htmlFor="payment-method">Payment Method</Label>
@@ -221,6 +246,62 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
                 <SelectItem value="airtel">Airtel Money</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Payment Date */}
+          <div className="space-y-2">
+            <Label>Payment Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !paymentDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {paymentDate ? format(paymentDate, "PPP") : "Pick a date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={paymentDate}
+                  onSelect={(date) => date && setPaymentDate(date)}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Payment Time */}
+          <div className="space-y-2">
+            <Label>Payment Time</Label>
+            <div className="flex gap-2">
+              <Select value={paymentTime.hours} onValueChange={(val) => setPaymentTime({ ...paymentTime, hours: val })}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="HH" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')).map((hour) => (
+                    <SelectItem key={hour} value={hour}>{hour}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-2xl font-bold self-center">:</span>
+              <Select value={paymentTime.minutes} onValueChange={(val) => setPaymentTime({ ...paymentTime, minutes: val })}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="MM" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0')).map((minute) => (
+                    <SelectItem key={minute} value={minute}>{minute}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Commission Preview */}
