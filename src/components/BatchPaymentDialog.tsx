@@ -41,6 +41,7 @@ interface PaymentEntry {
   paymentTime: { hours: string; minutes: string };
   tidExists?: boolean;
   checkingTid?: boolean;
+  tidFormatError?: string;
 }
 
 interface BatchPaymentDialogProps {
@@ -184,6 +185,17 @@ export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentD
       toast({
         title: "Incomplete entries",
         description: `${invalidEntries.length} payment(s) missing tenant, amount, or Transaction ID (TID)`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check for format errors
+    const formatErrors = payments.filter(p => p.tidFormatError);
+    if (formatErrors.length > 0) {
+      toast({
+        title: "Invalid Transaction ID Format",
+        description: `${formatErrors.length} payment(s) have invalid TID format. Please fix before submitting.`,
         variant: "destructive",
       });
       return;
@@ -473,11 +485,11 @@ You can generate and share the receipt with your tenant from the payment notific
                             value={payment.paymentId}
                             onChange={(e) => updatePaymentEntry(payment.id, "paymentId", e.target.value)}
                             disabled={isProcessing}
-                            required
-                            className={cn(
-                              payment.tidExists && "border-destructive focus-visible:ring-destructive",
-                              payment.checkingTid && "pr-10"
-                            )}
+                      required
+                      className={cn(
+                        (payment.tidExists || payment.tidFormatError) && "border-destructive focus-visible:ring-destructive",
+                        payment.checkingTid && "pr-10"
+                      )}
                           />
                           {payment.checkingTid && (
                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -485,7 +497,15 @@ You can generate and share the receipt with your tenant from the payment notific
                             </div>
                           )}
                         </div>
-                        {payment.tidExists && (
+                         {payment.tidFormatError && (
+                          <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                            <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-destructive font-medium">
+                              {payment.tidFormatError}
+                            </p>
+                          </div>
+                        )}
+                        {payment.tidExists && !payment.tidFormatError && (
                           <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
                             <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
                             <p className="text-xs text-destructive font-medium">
@@ -493,14 +513,18 @@ You can generate and share the receipt with your tenant from the payment notific
                             </p>
                           </div>
                         )}
-                        {!payment.tidExists && payment.paymentId && !payment.checkingTid && payment.paymentId.length >= 3 && (
+                        {!payment.tidExists && !payment.tidFormatError && payment.paymentId && !payment.checkingTid && payment.paymentId.length >= 3 && (
                           <div className="flex items-center gap-2 text-xs text-success">
                             <CheckCircle2 className="h-3 w-3" />
                             TID available
                           </div>
                         )}
-                        {!payment.tidExists && (
-                          <p className="text-xs text-muted-foreground">Required to prevent double entry</p>
+                        {!payment.tidExists && !payment.tidFormatError && (
+                          <p className="text-xs text-muted-foreground">
+                            {payment.paymentMethod === "mtn" && "Format: MTN-XXXXX (e.g., MTN-12345)"}
+                            {payment.paymentMethod === "airtel" && "Format: ATL-XXXXX (e.g., ATL-12345)"}
+                            {payment.paymentMethod === "cash" && "Required to prevent double entry"}
+                          </p>
                         )}
                       </div>
 
