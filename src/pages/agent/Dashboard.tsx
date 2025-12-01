@@ -1065,6 +1065,25 @@ const AgentDashboard = () => {
             </CardContent>
           </Card>
 
+          <Card 
+            className="cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all active:scale-95"
+            onClick={() => {
+              haptics.light();
+              navigate("/agent/tenants?tab=overdue");
+            }}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-destructive" />
+                ⚠️ Overdue Tenants
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">{overdueTenants.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">Need immediate attention</p>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
