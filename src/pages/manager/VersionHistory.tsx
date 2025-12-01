@@ -6,12 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Calendar, Users, TrendingUp, Package, CheckCircle2, Clock, Sparkles } from "lucide-react";
+import { ArrowLeft, Calendar, Users, TrendingUp, Package, CheckCircle2, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 import { format } from "date-fns";
 import { Progress } from "@/components/ui/progress";
-import { ReleaseNotesGenerator } from "@/components/ReleaseNotesGenerator";
 
 interface VersionData {
   id: string;
@@ -30,7 +29,6 @@ const VersionHistory = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [totalUsers, setTotalUsers] = useState(0);
   const [currentVersion, setCurrentVersion] = useState<string>("");
-  const [releaseNotesDialogOpen, setReleaseNotesDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchVersionHistory();
@@ -143,36 +141,23 @@ const VersionHistory = () => {
     <ManagerLayout>
       <div className="space-y-6 p-6 max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                navigate(-1);
-                haptics.light();
-              }}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Version History</h1>
-              <p className="text-muted-foreground">
-                Track deployment history and user adoption rates
-              </p>
-            </div>
-          </div>
-
+        <div className="flex items-center gap-4 mb-6">
           <Button
+            variant="ghost"
+            size="icon"
             onClick={() => {
-              setReleaseNotesDialogOpen(true);
+              navigate(-1);
               haptics.light();
             }}
-            className="gap-2"
           >
-            <Sparkles className="h-4 w-4" />
-            Generate Release Notes
+            <ArrowLeft className="h-5 w-5" />
           </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Version History</h1>
+            <p className="text-muted-foreground">
+              Track deployment history and user adoption rates
+            </p>
+          </div>
         </div>
 
         {/* Stats Summary */}
@@ -330,16 +315,6 @@ const VersionHistory = () => {
           </CardContent>
         </Card>
       </div>
-
-      {/* Release Notes Generator Dialog */}
-      <ReleaseNotesGenerator
-        open={releaseNotesDialogOpen}
-        onOpenChange={setReleaseNotesDialogOpen}
-        onGenerated={(notes) => {
-          console.log("Generated release notes:", notes);
-          toast.success("Release notes generated! You can copy or download them.");
-        }}
-      />
     </ManagerLayout>
   );
 };
