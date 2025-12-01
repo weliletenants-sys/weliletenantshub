@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Building2, Search, Phone, User } from "lucide-react";
+import { Building2, Search, Phone, User, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,6 +28,7 @@ interface LandlordResult {
   landlord_phone: string;
   created_at: string;
   tenant_count?: number;
+  total_outstanding?: number;
 }
 
 export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialogProps) => {
@@ -55,24 +56,27 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
       try {
         const query = debouncedSearchQuery.trim();
         
-        let supabaseQuery = supabase
+        // First, get matching landlords
+        let landlordQuery = supabase
           .from("landlords")
-          .select(`
-            id,
-            landlord_name,
-            landlord_phone,
-            created_at
-          `)
+          .select("id, landlord_name, landlord_phone, created_at")
           .or(`landlord_name.ilike.%${query}%,landlord_phone.ilike.%${query}%`)
           .limit(5);
 
-        const { data, error } = await supabaseQuery;
+        const { data: landlordData, error: landlordError } = await landlordQuery;
 
-        if (error) throw error;
+        if (landlordError) throw landlordError;
+        if (!landlordData || landlordData.length === 0) {
+          setSuggestions([]);
+          setShowSuggestions(false);
+          setLoadingSuggestions(false);
+          return;
+        }
 
         // For agents, filter to only show landlords they've registered tenants for
-        if (userRole === "agent" && agentId && data && data.length > 0) {
-          const landlordIds = data.map(l => l.id);
+        let filteredLandlords = landlordData;
+        if (userRole === "agent" && agentId) {
+          const landlordIds = landlordData.map(l => l.id);
           const { data: tenantData } = await supabase
             .from("tenants")
             .select("landlord_id")
@@ -80,13 +84,50 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
             .in("landlord_id", landlordIds);
 
           const accessibleLandlordIds = new Set(tenantData?.map(t => t.landlord_id) || []);
-          const filteredResults = data.filter(l => accessibleLandlordIds.has(l.id));
-          setSuggestions(filteredResults);
-          setShowSuggestions(filteredResults.length > 0);
-        } else {
-          setSuggestions(data || []);
-          setShowSuggestions((data || []).length > 0);
+          filteredLandlords = landlordData.filter(l => accessibleLandlordIds.has(l.id));
         }
+
+        if (filteredLandlords.length === 0) {
+          setSuggestions([]);
+          setShowSuggestions(false);
+          setLoadingSuggestions(false);
+          return;
+        }
+
+        // Get tenant counts and total outstanding balances for each landlord
+        const landlordIds = filteredLandlords.map(l => l.id);
+        
+        let tenantsQuery = supabase
+          .from("tenants")
+          .select("landlord_id, outstanding_balance")
+          .in("landlord_id", landlordIds);
+
+        // For agents, only count their own tenants
+        if (userRole === "agent" && agentId) {
+          tenantsQuery = tenantsQuery.eq("agent_id", agentId);
+        }
+
+        const { data: tenantsData } = await tenantsQuery;
+
+        // Aggregate tenant data by landlord
+        const landlordStats = new Map<string, { count: number; outstanding: number }>();
+        tenantsData?.forEach(tenant => {
+          const current = landlordStats.get(tenant.landlord_id) || { count: 0, outstanding: 0 };
+          landlordStats.set(tenant.landlord_id, {
+            count: current.count + 1,
+            outstanding: current.outstanding + (tenant.outstanding_balance || 0)
+          });
+        });
+
+        // Combine landlord data with stats
+        const enrichedLandlords: LandlordResult[] = filteredLandlords.map(landlord => ({
+          ...landlord,
+          tenant_count: landlordStats.get(landlord.id)?.count || 0,
+          total_outstanding: landlordStats.get(landlord.id)?.outstanding || 0
+        }));
+
+        setSuggestions(enrichedLandlords);
+        setShowSuggestions(enrichedLandlords.length > 0);
       } catch (error) {
         console.error("Error fetching suggestions:", error);
         setSuggestions([]);
@@ -228,7 +269,7 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
               
               {/* Autocomplete Suggestions Dropdown */}
               {showSuggestions && suggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
                   {loadingSuggestions ? (
                     <div className="p-3 text-center text-sm text-muted-foreground">
                       Loading suggestions...
@@ -242,9 +283,9 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
                           className="px-4 py-3 hover:bg-accent cursor-pointer transition-colors border-b border-border last:border-b-0"
                         >
                           <div className="flex items-start gap-3">
-                            <Building2 className="h-4 w-4 text-primary mt-1 flex-shrink-0" />
+                            <Building2 className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm text-foreground truncate">
+                              <p className="font-semibold text-sm text-foreground truncate">
                                 {landlord.landlord_name}
                               </p>
                               <div className="flex items-center gap-1 mt-1">
@@ -252,6 +293,20 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
                                 <p className="text-xs text-muted-foreground">
                                   {landlord.landlord_phone}
                                 </p>
+                              </div>
+                              <div className="flex items-center gap-3 mt-2 text-xs">
+                                <div className="flex items-center gap-1">
+                                  <User className="h-3 w-3 text-muted-foreground" />
+                                  <span className="text-muted-foreground">
+                                    {landlord.tenant_count || 0} {landlord.tenant_count === 1 ? 'tenant' : 'tenants'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <DollarSign className="h-3 w-3 text-muted-foreground" />
+                                  <span className="text-muted-foreground">
+                                    UGX {(landlord.total_outstanding || 0).toLocaleString()}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
