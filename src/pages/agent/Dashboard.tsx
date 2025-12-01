@@ -28,6 +28,7 @@ import { useServiceWorker } from "@/hooks/useServiceWorker";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { BackgroundSyncIndicator } from "@/components/BackgroundSyncIndicator";
+import { MoneyFlowAnimation, WalletRippleEffect } from "@/components/MoneyFlowAnimation";
 
 const AgentDashboard = () => {
   const navigate = useNavigate();
@@ -61,6 +62,12 @@ const AgentDashboard = () => {
   const [threadViewOpen, setThreadViewOpen] = useState(false);
   const [selectedThreadId, setSelectedThreadId] = useState<string>("");
   const [threadCounts, setThreadCounts] = useState<{ [key: string]: number }>({});
+  
+  // Money flow animation state
+  const [moneyFlowTrigger, setMoneyFlowTrigger] = useState(false);
+  const [moneyFlowAmount, setMoneyFlowAmount] = useState(0);
+  const [moneyFlowType, setMoneyFlowType] = useState<"increase" | "decrease">("increase");
+  const [walletRippleTrigger, setWalletRippleTrigger] = useState(false);
   
   // Ref for auto-scroll to manager messages
   const managerMessagesRef = useRef<HTMLDivElement>(null);
@@ -121,13 +128,31 @@ const AgentDashboard = () => {
               wallet_balance: payload.new.wallet_balance
             }));
             
-            // Show toast notification for wallet changes
+            // Calculate change and trigger animations
             const change = (payload.new.wallet_balance || 0) - (payload.old?.wallet_balance || 0);
-            if (change > 0) {
-              haptics.success();
-              toast.success(`💰 Wallet Updated! +UGX ${change.toLocaleString()}`, {
-                duration: 4000,
-              });
+            const changeAmount = Math.abs(change);
+            
+            if (change !== 0) {
+              // Trigger money flow animation
+              setMoneyFlowAmount(changeAmount);
+              setMoneyFlowType(change > 0 ? "increase" : "decrease");
+              setMoneyFlowTrigger(prev => !prev);
+              
+              // Trigger wallet ripple effect
+              setWalletRippleTrigger(prev => !prev);
+              
+              // Haptic and toast feedback
+              if (change > 0) {
+                haptics.success();
+                toast.success(`💰 Wallet Updated! +UGX ${change.toLocaleString()}`, {
+                  duration: 4000,
+                });
+              } else {
+                haptics.medium();
+                toast.info(`💸 Money Sent: -UGX ${changeAmount.toLocaleString()}`, {
+                  duration: 4000,
+                });
+              }
             }
           }
         }
@@ -527,6 +552,13 @@ const AgentDashboard = () => {
 
   return (
     <AgentLayout currentPage="/agent/dashboard">
+      {/* Money Flow Animation - Full screen overlay */}
+      <MoneyFlowAnimation 
+        amount={moneyFlowAmount}
+        type={moneyFlowType}
+        trigger={moneyFlowTrigger}
+      />
+      
       <PullToRefresh onRefresh={handleRefresh} pullingContent="">
         <ContentTransition
           loading={isLoading}
@@ -592,6 +624,9 @@ const AgentDashboard = () => {
 
           {/* Wallet Balance Card - Modern Purple Design */}
           <Card className="bg-gradient-to-br from-purple-600 via-purple-500 to-violet-600 text-white overflow-hidden relative hover:shadow-2xl transition-all border-0 shadow-purple-500/50">
+            {/* Ripple animation effect */}
+            <WalletRippleEffect trigger={walletRippleTrigger} />
+            
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-24 translate-x-24 blur-2xl" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-300/20 rounded-full translate-y-20 -translate-x-20 blur-xl" />
             <div className="absolute inset-0 bg-gradient-to-tr from-purple-700/30 via-transparent to-violet-500/20" />
