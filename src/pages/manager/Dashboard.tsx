@@ -8,7 +8,7 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save, DollarSign, Download, FileText, X, UserPlus } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save, DollarSign, Download, FileText, X, UserPlus, Hash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -2870,6 +2870,37 @@ const ManagerDashboard = () => {
               </div>
             )}
           </CardContent>
+          </Card>
+
+          {/* TID History Quick Access */}
+          <Card className="border-2 border-purple-500/20 cursor-pointer hover:border-purple-500/40 transition-colors" onClick={() => navigate("/manager/tid-history")}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Hash className="h-5 w-5 text-purple-500" />
+                Transaction ID (TID) History
+              </CardTitle>
+              <CardDescription>
+                Complete audit trail of all payment transactions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-full bg-purple-500/20">
+                    <Hash className="h-6 w-6 text-purple-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">View Complete History</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Track all TIDs with timestamps and recorders
+                    </p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm">
+                  View Details →
+                </Button>
+              </div>
+            </CardContent>
           </Card>
 
           {/* Portfolio Growth Tracking */}
