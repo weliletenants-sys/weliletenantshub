@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X, Reply, Send, MessageCircle, Calculator, Wallet, UserPlus, UserCheck } from "lucide-react";
+import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X, Reply, Send, MessageCircle, Calculator, Wallet, UserPlus, UserCheck, ArrowDownToLine, ArrowRightLeft } from "lucide-react";
 import { TenantSearchWidget } from "@/components/TenantSearchWidget";
 import MessageThreadDialog from "@/components/MessageThreadDialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
@@ -21,6 +21,8 @@ import { haptics } from "@/utils/haptics";
 import QuickPaymentDialog from "@/components/QuickPaymentDialog";
 import { DailyRepaymentCalculatorDialog } from "@/components/DailyRepaymentCalculatorDialog";
 import { CommissionCalculatorDialog } from "@/components/CommissionCalculatorDialog";
+import { WithdrawDialog } from "@/components/WithdrawDialog";
+import { TransferMoneyDialog } from "@/components/TransferMoneyDialog";
 import { clearOldCaches, getCacheSize } from "@/lib/cacheManager";
 import { useServiceWorker } from "@/hooks/useServiceWorker";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,6 +43,8 @@ const AgentDashboard = () => {
   const [quickPaymentOpen, setQuickPaymentOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [commissionCalculatorOpen, setCommissionCalculatorOpen] = useState(false);
+  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [pendingVerifications, setPendingVerifications] = useState(0);
   const [verifiedPayments, setVerifiedPayments] = useState(0);
   const [rejectedPayments, setRejectedPayments] = useState(0);
@@ -634,6 +638,31 @@ const AgentDashboard = () => {
                     <span className="text-xs">+UGX 5,000</span>
                   </Button>
                 </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <Button 
+                    variant="secondary"
+                    className="font-bold text-sm py-5 bg-green-600 text-white hover:bg-green-700 flex flex-col items-center gap-1"
+                    onClick={() => {
+                      setWithdrawDialogOpen(true);
+                      haptics.light();
+                    }}
+                  >
+                    <ArrowDownToLine className="h-5 w-5" />
+                    <span>Withdraw</span>
+                  </Button>
+                  <Button 
+                    variant="secondary"
+                    className="font-bold text-sm py-5 bg-blue-600 text-white hover:bg-blue-700 flex flex-col items-center gap-1"
+                    onClick={() => {
+                      setTransferDialogOpen(true);
+                      haptics.light();
+                    }}
+                  >
+                    <ArrowRightLeft className="h-5 w-5" />
+                    <span>Transfer</span>
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -725,6 +754,22 @@ const AgentDashboard = () => {
           <CommissionCalculatorDialog
             open={commissionCalculatorOpen}
             onOpenChange={setCommissionCalculatorOpen}
+          />
+
+          <WithdrawDialog
+            open={withdrawDialogOpen}
+            onOpenChange={setWithdrawDialogOpen}
+            agentId={agentId || ""}
+            currentBalance={agentData?.wallet_balance || 0}
+            onSuccess={fetchAgentData}
+          />
+
+          <TransferMoneyDialog
+            open={transferDialogOpen}
+            onOpenChange={setTransferDialogOpen}
+            agentId={agentId || ""}
+            currentBalance={agentData?.wallet_balance || 0}
+            onSuccess={fetchAgentData}
           />
 
           {/* Overdue Payment Notifications */}
