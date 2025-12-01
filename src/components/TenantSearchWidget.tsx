@@ -26,9 +26,11 @@ export const TenantSearchWidget = ({ agentId }: TenantSearchWidgetProps) => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
   const [showRecent, setShowRecent] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Load recent searches from localStorage on mount
   useEffect(() => {
@@ -73,32 +75,47 @@ export const TenantSearchWidget = ({ agentId }: TenantSearchWidgetProps) => {
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     
-    if (query.trim().length < 2) {
+    // Reset states when query is empty
+    if (query.trim().length === 0) {
       setSearchResults([]);
+      setSuggestions([]);
       setShowRecent(false);
+      setShowSuggestions(false);
       return;
     }
 
-    setIsSearching(true);
-    setShowRecent(false);
-    haptics.light();
+    // Show autocomplete suggestions after 1 character
+    if (query.trim().length >= 1) {
+      setIsSearching(true);
+      setShowRecent(false);
+      setShowSuggestions(true);
+      haptics.light();
 
-    try {
-      const { data, error } = await supabase
-        .from("tenants")
-        .select("id, tenant_name, tenant_phone, outstanding_balance, status")
-        .eq("agent_id", agentId)
-        .or(`tenant_name.ilike.%${query}%,tenant_phone.ilike.%${query}%`)
-        .limit(5);
+      try {
+        const { data, error } = await supabase
+          .from("tenants")
+          .select("id, tenant_name, tenant_phone, outstanding_balance, status")
+          .eq("agent_id", agentId)
+          .or(`tenant_name.ilike.%${query}%,tenant_phone.ilike.%${query}%`)
+          .limit(8);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      setSearchResults(data || []);
-    } catch (error) {
-      console.error("Search error:", error);
-      toast.error("Failed to search tenants");
-    } finally {
-      setIsSearching(false);
+        // For 1 character, show suggestions; for 2+, show full results
+        if (query.trim().length === 1) {
+          setSuggestions(data || []);
+          setSearchResults([]);
+        } else {
+          setSearchResults(data || []);
+          setSuggestions([]);
+          setShowSuggestions(false);
+        }
+      } catch (error) {
+        console.error("Search error:", error);
+        toast.error("Failed to search tenants");
+      } finally {
+        setIsSearching(false);
+      }
     }
   };
 
@@ -108,7 +125,9 @@ export const TenantSearchWidget = ({ agentId }: TenantSearchWidgetProps) => {
     navigate(`/agent/tenants/${tenant.id}`);
     setSearchQuery("");
     setSearchResults([]);
+    setSuggestions([]);
     setShowRecent(false);
+    setShowSuggestions(false);
   };
 
   return (
@@ -147,7 +166,9 @@ export const TenantSearchWidget = ({ agentId }: TenantSearchWidgetProps) => {
                 onClick={() => {
                   setSearchQuery("");
                   setSearchResults([]);
+                  setSuggestions([]);
                   setShowRecent(true);
+                  setShowSuggestions(false);
                 }}
               >
                 Clear
@@ -155,8 +176,50 @@ export const TenantSearchWidget = ({ agentId }: TenantSearchWidgetProps) => {
             )}
           </div>
 
+          {/* Autocomplete Suggestions (1 character) */}
+          {showSuggestions && searchQuery.length === 1 && suggestions.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border-2 border-blue-200">
+              <div className="p-3 bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100">
+                <div className="flex items-center gap-2">
+                  <Search className="h-4 w-4 text-blue-600" />
+                  <h4 className="font-bold text-blue-900 text-sm">
+                    Suggestions ({suggestions.length})
+                  </h4>
+                  <Badge variant="secondary" className="text-xs ml-auto">
+                    Type more to refine
+                  </Badge>
+                </div>
+              </div>
+              <div className="divide-y divide-blue-50 max-h-64 overflow-y-auto">
+                {suggestions.map((tenant) => (
+                  <button
+                    key={tenant.id}
+                    onClick={() => handleSelectTenant(tenant)}
+                    className="w-full p-3 hover:bg-blue-50 transition-all text-left flex items-center gap-3 group"
+                  >
+                    <div className="p-1.5 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                      <User className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-blue-900 text-sm mb-0.5 truncate">
+                        {tenant.tenant_name}
+                      </h4>
+                      <div className="flex items-center gap-2 text-xs text-blue-600">
+                        <Phone className="h-3 w-3" />
+                        <span>{tenant.tenant_phone}</span>
+                        <span className="text-blue-400">•</span>
+                        <span className="font-semibold">UGX {tenant.outstanding_balance?.toLocaleString() || 0}</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-blue-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Recent Searches */}
-          {showRecent && searchQuery.length < 2 && recentSearches.length > 0 && (
+          {showRecent && searchQuery.length === 0 && recentSearches.length > 0 && (
             <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
               <div className="p-4 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
