@@ -48,6 +48,7 @@ const ManagerDashboard = () => {
     totalTenants: 0,
     activeTenants: 0,
     pipelineTenants: 0,
+    overdueTenants: 0,
     totalLandlords: 0,
     totalTenantsRegistered: 0,
     pendingVerifications: 0,
@@ -529,7 +530,7 @@ const ManagerDashboard = () => {
         // Fetch only essential counts first (parallel + optimized)
         const [agentsCount, tenantsCount, pendingVerificationsCount, collectionsData, landlordsData, tenantsRegisteredData] = await Promise.all([
           supabase.from("agents").select("*", { count: 'exact', head: false }),
-          supabase.from("tenants").select("outstanding_balance, status"),
+          supabase.from("tenants").select("outstanding_balance, status, next_payment_date"),
           supabase.from("tenants").select("*", { count: 'exact', head: true }).eq("status", "pending"),
           supabase.from("collections").select("status"),
           supabase.from("landlords").select(`
@@ -551,6 +552,15 @@ const ManagerDashboard = () => {
         const totalTenants = tenantsCount.data?.length || 0;
         const activeTenants = tenantsCount.data?.filter(t => (parseFloat(t.outstanding_balance?.toString() || '0') > 0)).length || 0;
         const pipelineTenants = tenantsCount.data?.filter(t => (parseFloat(t.outstanding_balance?.toString() || '0') === 0)).length || 0;
+        
+        // Calculate overdue tenants
+        const today = new Date();
+        const overdueTenants = tenantsCount.data?.filter(t => {
+          if (!t.next_payment_date) return false;
+          const nextPayment = new Date(t.next_payment_date);
+          return nextPayment < today && ['verified', 'active'].includes(t.status || '');
+        }).length || 0;
+        
         const totalLandlords = landlordsData.data?.length || 0;
         const totalTenantsRegistered = tenantsRegisteredData.data?.length || 0;
         const pendingVerifications = pendingVerificationsCount.count || 0;
@@ -600,6 +610,7 @@ const ManagerDashboard = () => {
           totalTenants,
           activeTenants,
           pipelineTenants,
+          overdueTenants,
           totalLandlords,
           totalTenantsRegistered,
           pendingVerifications,
@@ -2459,6 +2470,26 @@ const ManagerDashboard = () => {
           </Card>
 
           <Card 
+            id="stats-overdue-tenants"
+            className="cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all active:scale-95"
+            onClick={() => {
+              haptics.light();
+              navigate("/manager/portfolio-breakdown?filter=overdue");
+            }}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-destructive" />
+                ⚠️ Overdue Tenants
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">{stats.overdueTenants}</div>
+              <p className="text-xs text-muted-foreground mt-1">Need immediate attention</p>
+            </CardContent>
+          </Card>
+
+          <Card
             id="stats-total-landlords"
             className="cursor-pointer hover:shadow-lg transition-all"
             onClick={() => fetchLandlordAgentBreakdown()}

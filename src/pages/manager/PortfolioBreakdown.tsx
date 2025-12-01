@@ -140,11 +140,18 @@ const ManagerPortfolioBreakdown = () => {
       const portfolios: AgentPortfolio[] = agents?.map(agent => {
         let agentTenants = tenants?.filter(t => t.agent_id === agent.id) || [];
         
-        // Apply active/pipeline filter if specified
+        // Apply active/pipeline/overdue filter if specified
         if (filterType === 'active') {
           agentTenants = agentTenants.filter(t => parseFloat(t.outstanding_balance?.toString() || '0') > 0);
         } else if (filterType === 'pipeline') {
           agentTenants = agentTenants.filter(t => parseFloat(t.outstanding_balance?.toString() || '0') === 0);
+        } else if (filterType === 'overdue') {
+          const today = new Date();
+          agentTenants = agentTenants.filter(t => {
+            if (!t.next_payment_date) return false;
+            const nextPayment = new Date(t.next_payment_date);
+            return nextPayment < today && ['verified', 'active'].includes(t.status || '');
+          });
         }
         
         const portfolioValue = agentTenants.reduce(
@@ -605,13 +612,13 @@ const ManagerPortfolioBreakdown = () => {
                 <h1 className="text-3xl font-bold">Portfolio Breakdown</h1>
                 {filterType && (
                   <Badge variant="default" className="text-sm">
-                    {filterType === 'active' ? '💰 Active Tenants' : '📋 Pipeline Tenants'}
+                    {filterType === 'active' ? '💰 Active Tenants' : filterType === 'pipeline' ? '📋 Pipeline Tenants' : '⚠️ Overdue Tenants'}
                   </Badge>
                 )}
               </div>
               <p className="text-muted-foreground">
                 {filterType 
-                  ? `Showing ${filterType === 'active' ? 'active tenants with outstanding balances' : 'pipeline tenants with no balance'}`
+                  ? `Showing ${filterType === 'active' ? 'active tenants with outstanding balances' : filterType === 'pipeline' ? 'pipeline tenants with no balance' : 'overdue tenants needing attention'}`
                   : 'Detailed view of agents and tenant portfolios'
                 }
               </p>
