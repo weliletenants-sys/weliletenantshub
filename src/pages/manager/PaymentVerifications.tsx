@@ -7,7 +7,8 @@ import { PaymentVerificationsSkeleton } from "@/components/TenantDetailSkeleton"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Clock, User, DollarSign, Calendar, Loader2, Eye, CheckSquare, Square } from "lucide-react";
+import { Check, X, Clock, User, DollarSign, Calendar, Loader2, Eye, CheckSquare, Square, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -76,6 +77,7 @@ const PaymentVerifications = () => {
   });
   const [selectedPaymentIds, setSelectedPaymentIds] = useState<Set<string>>(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -461,9 +463,23 @@ const PaymentVerifications = () => {
     }
   };
 
-  const pendingPayments = payments?.filter(p => p.status === "pending") || [];
-  const verifiedPayments = payments?.filter(p => p.status === "verified") || [];
-  const rejectedPayments = payments?.filter(p => p.status === "rejected") || [];
+  // Apply search filter
+  const filterPayments = (paymentsList: Payment[]) => {
+    if (!searchQuery.trim()) return paymentsList;
+    
+    const query = searchQuery.toLowerCase();
+    return paymentsList.filter(payment => 
+      payment.tenants.tenant_name.toLowerCase().includes(query) ||
+      payment.tenants.tenant_phone.includes(query) ||
+      (payment.payment_id && payment.payment_id.toLowerCase().includes(query)) ||
+      payment.agent.profiles.full_name?.toLowerCase().includes(query) ||
+      payment.agent.profiles.phone_number.includes(query)
+    );
+  };
+
+  const pendingPayments = filterPayments(payments?.filter(p => p.status === "pending") || []);
+  const verifiedPayments = filterPayments(payments?.filter(p => p.status === "verified") || []);
+  const rejectedPayments = filterPayments(payments?.filter(p => p.status === "rejected") || []);
 
   const getStatusBadge = (status: string | null) => {
     switch (status) {
@@ -747,6 +763,16 @@ const PaymentVerifications = () => {
           <CardDescription>Review agent payment entries and verify for commission approval</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Search Bar */}
+          <div className="relative mb-6">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              placeholder="Search by tenant, agent, phone, or payment ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
           <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-3 mb-6">
               <TabsTrigger value="pending">

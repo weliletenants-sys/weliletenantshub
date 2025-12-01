@@ -110,6 +110,7 @@ export default function ReceiptHistory() {
         payment.tenant.tenant_name.toLowerCase().includes(query) ||
         payment.tenant.tenant_phone.includes(query) ||
         payment.payment_method.toLowerCase().includes(query) ||
+        (payment.payment_id && payment.payment_id.toLowerCase().includes(query)) ||
         format(new Date(payment.collection_date), "MMM dd, yyyy").toLowerCase().includes(query)
     );
     setFilteredPayments(filtered);
@@ -139,7 +140,7 @@ export default function ReceiptHistory() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
-                placeholder="Search by tenant name, phone, date, or payment method..."
+                placeholder="Search by tenant name, phone, payment ID, date, or method..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
