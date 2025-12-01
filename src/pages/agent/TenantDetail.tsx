@@ -61,6 +61,8 @@ const AgentTenantDetail = () => {
     collectionDate: format(new Date(), "yyyy-MM-dd"),
   });
   const [editForm, setEditForm] = useState({
+    tenantName: "",
+    tenantPhone: "",
     landlordName: "",
     landlordPhone: "",
     lc1Name: "",
@@ -86,6 +88,8 @@ const AgentTenantDetail = () => {
   useEffect(() => {
     if (tenant) {
       setEditForm({
+        tenantName: tenant.tenant_name || "",
+        tenantPhone: tenant.tenant_phone || "",
         landlordName: tenant.landlord_name || "",
         landlordPhone: tenant.landlord_phone || "",
         lc1Name: tenant.lc1_name || "",
@@ -236,6 +240,8 @@ const AgentTenantDetail = () => {
     tenantUpdateMutation.mutate({
       tenantId: tenantId!,
       updates: {
+        tenant_name: editForm.tenantName,
+        tenant_phone: editForm.tenantPhone,
         landlord_name: editForm.landlordName || "",
         landlord_phone: editForm.landlordPhone || "",
         lc1_name: editForm.lc1Name || "",
@@ -337,13 +343,38 @@ const AgentTenantDetail = () => {
                   <div>
                     <DialogTitle>Edit Tenant Details</DialogTitle>
                     <DialogDescription>
-                      Update landlord, LC1, and rent information
+                      Update tenant information, landlord, LC1, and rent details
                     </DialogDescription>
                   </div>
                   <OptimisticBadge show={tenantUpdateMutation.isPending} />
                 </div>
               </DialogHeader>
               <form onSubmit={handleEditTenant} className="space-y-4">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-sm">Tenant Details</h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="tenantName">Tenant Name</Label>
+                    <Input
+                      id="tenantName"
+                      value={editForm.tenantName}
+                      onChange={(e) => setEditForm({ ...editForm, tenantName: e.target.value })}
+                      placeholder="Enter tenant name"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tenantPhone">Tenant Phone</Label>
+                    <Input
+                      id="tenantPhone"
+                      type="tel"
+                      value={editForm.tenantPhone}
+                      onChange={(e) => setEditForm({ ...editForm, tenantPhone: e.target.value })}
+                      placeholder="e.g., 0700123456"
+                      required
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   <h3 className="font-semibold text-sm">Landlord Details</h3>
                   <div className="space-y-2">
