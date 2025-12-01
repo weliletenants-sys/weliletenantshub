@@ -144,6 +144,7 @@ export default function WithdrawalApprovals() {
   });
 
   const handleReject = (request: any) => {
+    haptics.light();
     setSelectedRequest(request);
     setShowRejectDialog(true);
   };
@@ -235,28 +236,40 @@ export default function WithdrawalApprovals() {
         </div>
 
         {/* Filter Buttons */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
             variant={filterStatus === "pending" ? "default" : "outline"}
-            onClick={() => setFilterStatus("pending")}
+            onClick={() => {
+              haptics.light();
+              setFilterStatus("pending");
+            }}
           >
             Pending ({pendingCount})
           </Button>
           <Button
             variant={filterStatus === "approved" ? "default" : "outline"}
-            onClick={() => setFilterStatus("approved")}
+            onClick={() => {
+              haptics.light();
+              setFilterStatus("approved");
+            }}
           >
             Approved ({approvedCount})
           </Button>
           <Button
             variant={filterStatus === "rejected" ? "default" : "outline"}
-            onClick={() => setFilterStatus("rejected")}
+            onClick={() => {
+              haptics.light();
+              setFilterStatus("rejected");
+            }}
           >
             Rejected ({rejectedCount})
           </Button>
           <Button
             variant={filterStatus === "all" ? "default" : "outline"}
-            onClick={() => setFilterStatus("all")}
+            onClick={() => {
+              haptics.light();
+              setFilterStatus("all");
+            }}
           >
             All
           </Button>
@@ -345,11 +358,14 @@ export default function WithdrawalApprovals() {
                     </div>
 
                     {withdrawal.status === "pending" && (
-                      <div className="flex gap-2 ml-4">
+                      <div className="flex flex-col sm:flex-row gap-2 ml-4">
                         <Button
                           size="sm"
                           variant="default"
-                          onClick={() => approveMutation.mutate(withdrawal.id)}
+                          onClick={() => {
+                            haptics.light();
+                            approveMutation.mutate(withdrawal.id);
+                          }}
                           disabled={approveMutation.isPending}
                           className="bg-green-600 hover:bg-green-700"
                         >
@@ -403,6 +419,7 @@ export default function WithdrawalApprovals() {
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
+              haptics.light();
               setShowRejectDialog(false);
               setRejectionReason("");
               setSelectedRequest(null);

@@ -8,6 +8,7 @@ import Breadcrumbs from "./Breadcrumbs";
 import { supabase } from "@/integrations/supabase/client";
 import { Home, Users, Plus, DollarSign, TrendingUp, LogOut, MessageSquare, BarChart3, Settings, Receipt, FileText, BookOpen, Calculator, UserPlus, ArrowDownToLine, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
+import { haptics } from "@/utils/haptics";
 import { useRipple } from "@/hooks/useRipple";
 import { useSwipeBack } from "@/hooks/useSwipeBack";
 import SwipeBackIndicator from "./SwipeBackIndicator";
@@ -39,6 +40,7 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
   const { agentId } = useAuth();
 
   const handleLogout = async () => {
+    haptics.success();
     await supabase.auth.signOut();
     toast.success("Logged out successfully");
     navigate("/");
@@ -76,7 +78,14 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
           <OfflineSyncIndicator />
           <CacheIndicator />
           <NotificationsPanel />
-          <Button variant="ghost" size="default" onClick={() => setShowLogoutDialog(true)}>
+          <Button 
+            variant="ghost" 
+            size="default" 
+            onClick={() => {
+              haptics.light();
+              setShowLogoutDialog(true);
+            }}
+          >
             <LogOut className="h-5 w-5 mr-2" />
             Logout
           </Button>
@@ -92,7 +101,7 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => haptics.light()}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleLogout}>
               Logout
             </AlertDialogAction>
@@ -125,7 +134,11 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
                 variant="outline"
                 className="w-full justify-start h-14 text-base"
                 size="lg"
-                onClick={() => navigate("/")}
+                onClick={(e) => {
+                  createRipple(e);
+                  haptics.light();
+                  navigate("/");
+                }}
               >
                 <Home className="h-6 w-6 mr-3" />
                 Back to Home
