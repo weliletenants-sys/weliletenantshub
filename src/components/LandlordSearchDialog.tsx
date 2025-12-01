@@ -31,19 +31,22 @@ interface LandlordResult {
 export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialogProps) => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<LandlordResult[]>([]);
 
   const handleSearch = async () => {
-    if (!phoneNumber.trim()) {
-      toast.error("Please enter a phone number");
+    if (!searchQuery.trim()) {
+      toast.error("Please enter a landlord name or phone number");
       return;
     }
 
     setSearching(true);
     try {
-      let query = supabase
+      const query = searchQuery.trim();
+      
+      // Search by both name and phone number
+      let supabaseQuery = supabase
         .from("landlords")
         .select(`
           id,
@@ -51,14 +54,14 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
           landlord_phone,
           created_at
         `)
-        .ilike("landlord_phone", `%${phoneNumber.trim()}%`);
+        .or(`landlord_name.ilike.%${query}%,landlord_phone.ilike.%${query}%`);
 
-      const { data, error } = await query;
+      const { data, error } = await supabaseQuery;
 
       if (error) throw error;
 
       if (!data || data.length === 0) {
-        toast.info("No landlords found with that phone number");
+        toast.info("No landlords found matching your search");
         setResults([]);
         return;
       }
@@ -97,7 +100,7 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
 
   const handleSelectLandlord = (landlordId: string) => {
     setOpen(false);
-    setPhoneNumber("");
+    setSearchQuery("");
     setResults([]);
     if (userRole === "agent") {
       navigate(`/agent/landlord/${landlordId}`);
@@ -128,21 +131,21 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
-            Search Landlord by Phone
+            Search Landlord
           </DialogTitle>
           <DialogDescription>
-            Enter the landlord's phone number to view their profile and tenants
+            Search by landlord name or phone number to view their profile and tenants
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 mt-4">
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Enter phone number..."
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="Enter landlord name or phone number..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={handleKeyPress}
                 className="pl-10"
                 disabled={searching}
@@ -150,7 +153,7 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
             </div>
             <Button
               onClick={handleSearch}
-              disabled={searching || !phoneNumber.trim()}
+              disabled={searching || !searchQuery.trim()}
               className="gap-2"
             >
               <Search className="h-4 w-4" />
@@ -195,11 +198,11 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
             </div>
           )}
 
-          {results.length === 0 && phoneNumber && !searching && (
+          {results.length === 0 && searchQuery && !searching && (
             <div className="text-center py-8 text-muted-foreground">
               <Building2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
               <p>No landlords found</p>
-              <p className="text-sm">Try a different phone number</p>
+              <p className="text-sm">Try a different name or phone number</p>
             </div>
           )}
         </div>
