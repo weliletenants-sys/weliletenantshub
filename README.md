@@ -64,6 +64,27 @@ This project is built with:
 
 Simply open [Lovable](https://lovable.dev/projects/b0e338a6-4dda-4085-8ad1-caae7e4e4555) and click on Share -> Publish.
 
+### ⚠️ IMPORTANT: Before Every Publish
+
+**To enable automatic updates on all user devices**, you MUST update the version number:
+
+1. Open `public/version.json`
+2. Increment the `version` number (e.g., `2.0.1` → `2.0.2`)
+3. Update the `buildTime` timestamp
+4. Then click Publish in Lovable
+
+```json
+{
+  "version": "2.0.2",  // ⬅️ CHANGE THIS!
+  "buildTime": "2025-01-15T12:00:00Z",  // ⬅️ UPDATE THIS!
+  "description": "Welile Tenants Hub - [Your changes]"
+}
+```
+
+**Why?** The app checks this file every 2 minutes to detect updates. When users' devices see a new version number, they automatically reload with the latest changes - no manual refresh needed!
+
+📖 **Read full documentation**: `docs/AUTOMATIC_UPDATES.md`
+
 ## Can I connect a custom domain to my Lovable project?
 
 Yes, you can!

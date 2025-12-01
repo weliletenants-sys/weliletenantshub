@@ -17,6 +17,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 import { PerformanceIndicator } from "@/components/PerformanceIndicator";
 import { OptimisticStatusIndicator } from "@/components/OptimisticStatusIndicator";
+import { UpdateIndicator } from "@/components/UpdateIndicator";
 
 // Eagerly load critical pages
 import Index from "./pages/Index";
@@ -123,6 +124,7 @@ const AppContent = () => {
       <InstallReminderProvider />
       <PerformanceIndicator />
       <OptimisticStatusIndicator />
+      <UpdateIndicator />
       
       {/* Changelog Dialog - Shows after updates */}
       <ChangelogDialog
