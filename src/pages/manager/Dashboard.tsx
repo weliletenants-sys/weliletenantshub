@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
-import { useRealtimeAllTenants, useRealtimeAllCollections, useRealtimeAgents, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
+import { useRealtimeAllTenants, useRealtimeAllCollections, useRealtimeAgents, useRealtimeLandlords, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
 import { useRealtimeSyncStatus } from "@/hooks/useRealtimeSyncStatus";
 import { DataSyncBadge } from "@/components/RealtimeSyncIndicator";
 import { Input } from "@/components/ui/input";
@@ -422,6 +422,7 @@ const ManagerDashboard = () => {
   useRealtimeAllTenants();
   useRealtimeAllCollections();
   useRealtimeAgents();
+  useRealtimeLandlords();
 
   // Track sync status for tenants table (for portfolio value updates)
   const { lastSyncTime } = useRealtimeSyncStatus('tenants');
