@@ -67,6 +67,26 @@ export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentD
     }
   }, [open]);
 
+  // Validate TID format for batch payments
+  const validateBatchTidFormat = (tid: string, method: string): string => {
+    if (!tid || tid.trim().length === 0) {
+      return "Transaction ID is required";
+    }
+    
+    if (method === "mtn") {
+      const mtnPattern = /^MTN-\d{5}$/;
+      if (!mtnPattern.test(tid)) {
+        return "MTN Transaction ID must follow format: MTN-XXXXX (e.g., MTN-12345)";
+      }
+    } else if (method === "airtel") {
+      const airtelPattern = /^ATL-\d{5}$/;
+      if (!airtelPattern.test(tid)) {
+        return "Airtel Transaction ID must follow format: ATL-XXXXX (e.g., ATL-12345)";
+      }
+    }
+    return "";
+  };
+
   // Real-time TID duplicate check for all payments
   useEffect(() => {
     const checkAllTids = async () => {
@@ -76,9 +96,16 @@ export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentD
       for (let i = 0; i < updatedPayments.length; i++) {
         const payment = updatedPayments[i];
         
-        if (!payment.paymentId || payment.paymentId.length < 3) {
+        // Check format first
+        const formatError = validateBatchTidFormat(payment.paymentId, payment.paymentMethod);
+        if (payment.tidFormatError !== formatError) {
+          updatedPayments[i] = { ...payment, tidFormatError: formatError };
+          hasChanges = true;
+        }
+
+        if (formatError || !payment.paymentId || payment.paymentId.length < 3) {
           if (payment.tidExists !== false || payment.checkingTid !== false) {
-            updatedPayments[i] = { ...payment, tidExists: false, checkingTid: false };
+            updatedPayments[i] = { ...updatedPayments[i], tidExists: false, checkingTid: false };
             hasChanges = true;
           }
           continue;
@@ -277,7 +304,7 @@ export default function BatchPaymentDialog({ open, onOpenChange }: BatchPaymentD
             amount: paymentAmount,
             commission: commission,
             payment_method: payment.paymentMethod,
-            payment_id: payment.paymentId || null,
+            payment_id: payment.paymentId.trim(), // TID is now mandatory
             collection_date: dateTime.toISOString(),
             status: "pending", // Will be auto-verified by trigger
             created_by: user.id,
