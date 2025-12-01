@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import ManagerLayout from "@/components/ManagerLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Download, Calendar, User, Hash, DollarSign } from "lucide-react";
+import { Search, Download, Calendar, User, Hash, DollarSign, CheckCircle2, XCircle, AlertCircle, TrendingUp, PieChart } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { PieChart as RechartsPieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer } from "recharts";
 
 interface PaymentRecord {
   id: string;
@@ -142,6 +144,83 @@ export default function TIDHistory() {
   const uniqueTIDs = new Set(payments?.map((p) => p.payment_id)).size;
   const managerRecorded = payments?.filter((p) => p.created_by_manager).length || 0;
 
+  // Analytics calculations
+  const analytics = useMemo(() => {
+    if (!payments || payments.length === 0) {
+      return {
+        methodDistribution: [],
+        formatCompliance: { compliant: 0, nonCompliant: 0, rate: 0 },
+        duplicateStats: { unique: 0, total: 0, duplicateRate: 0 },
+      };
+    }
+
+    // Payment method distribution
+    const methodCounts = payments.reduce((acc, p) => {
+      const method = p.payment_method.toUpperCase();
+      acc[method] = (acc[method] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const methodDistribution = Object.entries(methodCounts).map(([name, value]) => ({
+      name,
+      value,
+      amount: payments
+        .filter((p) => p.payment_method.toUpperCase() === name)
+        .reduce((sum, p) => sum + p.amount, 0),
+    }));
+
+    // Format compliance check
+    const validateTidFormat = (tid: string, method: string): boolean => {
+      const upperMethod = method.toUpperCase();
+      if (upperMethod === "MTN") {
+        return /^MTN-[A-Z0-9]{5,}$/i.test(tid);
+      } else if (upperMethod === "AIRTEL") {
+        return /^ATL-[A-Z0-9]{5,}$/i.test(tid);
+      }
+      // Cash has no format requirement
+      return true;
+    };
+
+    let compliant = 0;
+    let nonCompliant = 0;
+
+    payments.forEach((p) => {
+      if (validateTidFormat(p.payment_id, p.payment_method)) {
+        compliant++;
+      } else {
+        nonCompliant++;
+      }
+    });
+
+    const formatCompliance = {
+      compliant,
+      nonCompliant,
+      rate: totalPayments > 0 ? (compliant / totalPayments) * 100 : 0,
+    };
+
+    // Duplicate statistics
+    const tidCounts = payments.reduce((acc, p) => {
+      acc[p.payment_id] = (acc[p.payment_id] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const duplicates = Object.values(tidCounts).filter((count) => count > 1).length;
+
+    const duplicateStats = {
+      unique: uniqueTIDs,
+      total: totalPayments,
+      duplicateRate: totalPayments > 0 ? (duplicates / totalPayments) * 100 : 0,
+    };
+
+    return { methodDistribution, formatCompliance, duplicateStats };
+  }, [payments, totalPayments, uniqueTIDs]);
+
+  const COLORS = {
+    MTN: "hsl(var(--chart-1))",
+    AIRTEL: "hsl(var(--chart-2))",
+    CASH: "hsl(var(--chart-3))",
+  };
+
   return (
     <ManagerLayout>
       <div className="space-y-6 pb-8">
@@ -152,6 +231,195 @@ export default function TIDHistory() {
             Complete audit trail of all payment transactions
           </p>
         </div>
+
+        {/* Analytics Dashboard */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Payment Method Distribution */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PieChart className="h-5 w-5" />
+                Payment Method Distribution
+              </CardTitle>
+              <CardDescription>Breakdown of transactions by payment method</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <ChartContainer
+                  config={{
+                    MTN: { label: "MTN Mobile Money", color: "hsl(var(--chart-1))" },
+                    AIRTEL: { label: "Airtel Money", color: "hsl(var(--chart-2))" },
+                    CASH: { label: "Cash", color: "hsl(var(--chart-3))" },
+                  }}
+                  className="h-[250px]"
+                >
+                  <RechartsPieChart>
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Pie
+                      data={analytics.methodDistribution}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {analytics.methodDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[entry.name as keyof typeof COLORS] || "hsl(var(--muted))"} />
+                      ))}
+                    </Pie>
+                  </RechartsPieChart>
+                </ChartContainer>
+                <div className="space-y-2">
+                  {analytics.methodDistribution.map((method) => (
+                    <div key={method.name} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="h-3 w-3 rounded-full"
+                          style={{ backgroundColor: COLORS[method.name as keyof typeof COLORS] }}
+                        />
+                        <span className="font-medium">{method.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold">{method.value} txns</div>
+                        <div className="text-xs text-muted-foreground">
+                          UGX {method.amount.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Format Compliance */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5" />
+                Format Compliance Rate
+              </CardTitle>
+              <CardDescription>TID format validation statistics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="flex items-center justify-center">
+                  <div className="relative h-40 w-40">
+                    <svg className="h-full w-full" viewBox="0 0 100 100">
+                      <circle
+                        className="text-muted stroke-current"
+                        strokeWidth="10"
+                        cx="50"
+                        cy="50"
+                        r="40"
+                        fill="transparent"
+                      ></circle>
+                      <circle
+                        className="text-primary stroke-current"
+                        strokeWidth="10"
+                        strokeLinecap="round"
+                        cx="50"
+                        cy="50"
+                        r="40"
+                        fill="transparent"
+                        strokeDasharray={`${analytics.formatCompliance.rate * 2.51} 251`}
+                        transform="rotate(-90 50 50)"
+                      ></circle>
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-3xl font-bold">{analytics.formatCompliance.rate.toFixed(1)}%</span>
+                      <span className="text-xs text-muted-foreground">Compliant</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      Compliant
+                    </div>
+                    <div className="text-2xl font-bold">{analytics.formatCompliance.compliant}</div>
+                    <p className="text-xs text-muted-foreground">Valid format</p>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <XCircle className="h-4 w-4 text-red-500" />
+                      Non-Compliant
+                    </div>
+                    <div className="text-2xl font-bold">{analytics.formatCompliance.nonCompliant}</div>
+                    <p className="text-xs text-muted-foreground">Invalid format</p>
+                  </div>
+                </div>
+                <div className="rounded-lg bg-muted p-3 space-y-1">
+                  <div className="text-xs font-semibold">Format Rules:</div>
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    <div>• MTN: MTN-XXXXX</div>
+                    <div>• Airtel: ATL-XXXXX</div>
+                    <div>• Cash: No format required</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Duplicate Prevention Stats */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              Duplicate Prevention Statistics
+            </CardTitle>
+            <CardDescription>TID uniqueness and duplicate tracking</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Hash className="h-4 w-4" />
+                  Unique TIDs
+                </div>
+                <div className="text-3xl font-bold">{analytics.duplicateStats.unique}</div>
+                <p className="text-xs text-muted-foreground">
+                  Out of {analytics.duplicateStats.total} total transactions
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <TrendingUp className="h-4 w-4" />
+                  Uniqueness Rate
+                </div>
+                <div className="text-3xl font-bold">
+                  {analytics.duplicateStats.total > 0
+                    ? ((analytics.duplicateStats.unique / analytics.duplicateStats.total) * 100).toFixed(1)
+                    : 0}%
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {analytics.duplicateStats.duplicateRate > 0 ? (
+                    <span className="text-amber-500">{analytics.duplicateStats.duplicateRate.toFixed(1)}% duplicates detected</span>
+                  ) : (
+                    <span className="text-green-500">No duplicates detected</span>
+                  )}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-4 w-4" />
+                  System Status
+                </div>
+                <div className="text-lg font-semibold text-green-500 flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Active
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Real-time duplicate detection enabled with format validation
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
