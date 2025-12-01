@@ -229,6 +229,28 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
     }
   };
 
+  // Function to highlight matching text
+  const highlightMatch = (text: string, query: string) => {
+    if (!query.trim()) return text;
+    
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    const parts = text.split(regex);
+    
+    return (
+      <>
+        {parts.map((part, index) => 
+          regex.test(part) ? (
+            <span key={index} className="bg-primary/20 text-primary font-semibold">
+              {part}
+            </span>
+          ) : (
+            <span key={index}>{part}</span>
+          )
+        )}
+      </>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -286,12 +308,12 @@ export const LandlordSearchDialog = ({ userRole, agentId }: LandlordSearchDialog
                             <Building2 className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
                             <div className="flex-1 min-w-0">
                               <p className="font-semibold text-sm text-foreground truncate">
-                                {landlord.landlord_name}
+                                {highlightMatch(landlord.landlord_name, searchQuery)}
                               </p>
                               <div className="flex items-center gap-1 mt-1">
                                 <Phone className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                                 <p className="text-xs text-muted-foreground">
-                                  {landlord.landlord_phone}
+                                  {highlightMatch(landlord.landlord_phone, searchQuery)}
                                 </p>
                               </div>
                               <div className="flex items-center gap-3 mt-2 text-xs">
