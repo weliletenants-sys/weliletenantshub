@@ -2515,7 +2515,7 @@ const ManagerDashboard = () => {
 
           <Card 
             id="stats-pending-landlord-verifications"
-            className="cursor-pointer hover:shadow-lg transition-all"
+            className="cursor-pointer hover:shadow-lg transition-all group"
             onClick={() => navigate('/manager/landlords/unverified')}
           >
             <CardHeader className="pb-2">
@@ -2529,6 +2529,16 @@ const ManagerDashboard = () => {
               <p className="text-xs text-muted-foreground mt-1">
                 {stats.pendingLandlordVerifications === 0 ? 'All landlords verified' : 'Click to review and verify'}
               </p>
+              <Button 
+                variant="link" 
+                className="p-0 h-auto text-xs mt-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate('/manager/landlords/notifications');
+                }}
+              >
+                View History →
+              </Button>
             </CardContent>
           </Card>
 

@@ -33,6 +33,7 @@ const AgentRegisterTenant = lazy(() => import("./pages/agent/RegisterTenant"));
 const AgentLandlordDetail = lazy(() => import("./pages/agent/LandlordDetail"));
 const ManagerLandlordDetail = lazy(() => import("./pages/manager/LandlordDetail"));
 const UnverifiedLandlords = lazy(() => import("./pages/manager/UnverifiedLandlords"));
+const LandlordNotifications = lazy(() => import("./pages/manager/LandlordNotifications"));
 const AgentTenantDetail = lazy(() => import("./pages/agent/TenantDetail"));
 const AgentCollections = lazy(() => import("./pages/agent/Collections"));
 const AgentEarnings = lazy(() => import("./pages/agent/Earnings"));
@@ -265,6 +266,11 @@ const AppContent = () => {
             <Route path="/manager/landlords/unverified" element={
               <ProtectedRoute requiredRole="manager">
                 <UnverifiedLandlords />
+              </ProtectedRoute>
+            } />
+            <Route path="/manager/landlords/notifications" element={
+              <ProtectedRoute requiredRole="manager">
+                <LandlordNotifications />
               </ProtectedRoute>
             } />
             <Route path="/manager/audit-log" element={
