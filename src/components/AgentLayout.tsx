@@ -6,7 +6,7 @@ import OfflineSyncIndicator from "./OfflineSyncIndicator";
 import { CacheIndicator } from "./CacheIndicator";
 import Breadcrumbs from "./Breadcrumbs";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Users, Plus, DollarSign, TrendingUp, LogOut, MessageSquare, BarChart3, Settings, Receipt, FileText, BookOpen, Calculator, UserPlus } from "lucide-react";
+import { Home, Users, Plus, DollarSign, TrendingUp, LogOut, MessageSquare, BarChart3, Settings, Receipt, FileText, BookOpen, Calculator, UserPlus, ArrowDownToLine, ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useRipple } from "@/hooks/useRipple";
 import { useSwipeBack } from "@/hooks/useSwipeBack";
@@ -54,6 +54,8 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
 
   const moreNavItems = [
     { icon: TrendingUp, label: "Earnings", path: "/agent/earnings" },
+    { icon: ArrowDownToLine, label: "Withdrawal History", path: "/agent/withdrawal-history" },
+    { icon: ArrowRightLeft, label: "Transfer History", path: "/agent/transfer-history" },
     { icon: Calculator, label: "Daily Calculator", path: "/agent/calculator" },
     { icon: BarChart3, label: "Weekly Report", path: "/agent/weekly-summary" },
     { icon: MessageSquare, label: "AI Assistant", path: "/agent/ai-assistant" },

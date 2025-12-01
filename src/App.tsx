@@ -46,6 +46,8 @@ const AgentNotifications = lazy(() => import("./pages/agent/Notifications"));
 const AgentPrintableDailyRates = lazy(() => import("./pages/agent/PrintableDailyRates"));
 const AgentTrainingMaterials = lazy(() => import("./pages/agent/TrainingMaterials"));
 const AgentCalculator = lazy(() => import("./pages/agent/Calculator"));
+const AgentWithdrawalHistory = lazy(() => import("./pages/agent/WithdrawalHistory"));
+const AgentTransferHistory = lazy(() => import("./pages/agent/TransferHistory"));
 const ManagerDashboard = lazy(() => import("./pages/manager/Dashboard"));
 const ManagerPrintableDailyRates = lazy(() => import("./pages/manager/PrintableDailyRates"));
 const ManagerCalculator = lazy(() => import("./pages/manager/Calculator"));
@@ -223,6 +225,16 @@ const AppContent = () => {
             <Route path="/agent/calculator" element={
               <ProtectedRoute requiredRole="agent">
                 <AgentCalculator />
+              </ProtectedRoute>
+            } />
+            <Route path="/agent/withdrawal-history" element={
+              <ProtectedRoute requiredRole="agent">
+                <AgentWithdrawalHistory />
+              </ProtectedRoute>
+            } />
+            <Route path="/agent/transfer-history" element={
+              <ProtectedRoute requiredRole="agent">
+                <AgentTransferHistory />
               </ProtectedRoute>
             } />
             <Route path="/manager/dashboard" element={
