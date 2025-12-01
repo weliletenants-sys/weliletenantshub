@@ -4,8 +4,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Send, ArrowDownToLine, Clock, TrendingUp, TrendingDown, User } from "lucide-react";
-import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Send, ArrowDownToLine, Clock, TrendingUp, TrendingDown, User, CalendarIcon, X } from "lucide-react";
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -25,6 +28,8 @@ interface WalletTransactionTimelineProps {
   compact?: boolean;
 }
 
+type DateRangePreset = "all" | "today" | "week" | "month" | "custom";
+
 export function WalletTransactionTimeline({ 
   agentId, 
   limit = 5,
@@ -32,6 +37,11 @@ export function WalletTransactionTimeline({
 }: WalletTransactionTimelineProps) {
   const [realtimeUpdate, setRealtimeUpdate] = useState(0);
   const [filter, setFilter] = useState<"all" | "sent" | "received" | "withdrawal">("all");
+  const [datePreset, setDatePreset] = useState<DateRangePreset>("all");
+  const [customDateRange, setCustomDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined,
+  });
 
   // Fetch transfers (sent and received)
   const { data: transfers } = useQuery({
@@ -123,6 +133,26 @@ export function WalletTransactionTimeline({
     };
   }, [agentId]);
 
+  // Get date range based on preset
+  const getDateRange = (): { start: Date; end: Date } | null => {
+    const now = new Date();
+    switch (datePreset) {
+      case "today":
+        return { start: startOfDay(now), end: endOfDay(now) };
+      case "week":
+        return { start: startOfWeek(now), end: endOfWeek(now) };
+      case "month":
+        return { start: startOfMonth(now), end: endOfMonth(now) };
+      case "custom":
+        if (customDateRange.from && customDateRange.to) {
+          return { start: startOfDay(customDateRange.from), end: endOfDay(customDateRange.to) };
+        }
+        return null;
+      default:
+        return null;
+    }
+  };
+
   // Combine and sort transactions
   const allTransactions: Transaction[] = [
     ...(transfers || []).map(t => ({
@@ -147,13 +177,27 @@ export function WalletTransactionTimeline({
     })),
   ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  // Filter transactions based on selected filter
+  // Filter transactions based on selected filter and date range
+  const dateRange = getDateRange();
   const transactions = allTransactions
     .filter(t => {
-      if (filter === "all") return true;
-      return t.type === filter;
+      // Filter by type
+      if (filter !== "all" && t.type !== filter) return false;
+      
+      // Filter by date range
+      if (dateRange) {
+        const transactionDate = new Date(t.timestamp);
+        return isWithinInterval(transactionDate, { start: dateRange.start, end: dateRange.end });
+      }
+      
+      return true;
     })
     .slice(0, limit);
+
+  const handleClearDateFilter = () => {
+    setDatePreset("all");
+    setCustomDateRange({ from: undefined, to: undefined });
+  };
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
@@ -216,27 +260,129 @@ export function WalletTransactionTimeline({
   return (
     <Card className={cn("border-purple-200/50 overflow-hidden", compact && "shadow-sm")}>
       <CardHeader className={cn("bg-gradient-to-r from-purple-50 to-violet-50", compact && "pb-3")}>
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle className={cn("text-lg flex items-center gap-2", compact && "text-base")}>
-            <Clock className="h-5 w-5 text-purple-600" />
-            Recent Activity
-          </CardTitle>
-          <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)} className="w-auto">
-            <TabsList className="h-8 bg-purple-100/50">
-              <TabsTrigger value="all" className="text-xs data-[state=active]:bg-purple-600 data-[state=active]:text-white">
-                All
-              </TabsTrigger>
-              <TabsTrigger value="sent" className="text-xs data-[state=active]:bg-red-600 data-[state=active]:text-white">
-                Sent
-              </TabsTrigger>
-              <TabsTrigger value="received" className="text-xs data-[state=active]:bg-green-600 data-[state=active]:text-white">
-                Received
-              </TabsTrigger>
-              <TabsTrigger value="withdrawal" className="text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                Withdrawals
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className={cn("text-lg flex items-center gap-2", compact && "text-base")}>
+              <Clock className="h-5 w-5 text-purple-600" />
+              Recent Activity
+            </CardTitle>
+            <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)} className="w-auto">
+              <TabsList className="h-8 bg-purple-100/50">
+                <TabsTrigger value="all" className="text-xs data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+                  All
+                </TabsTrigger>
+                <TabsTrigger value="sent" className="text-xs data-[state=active]:bg-red-600 data-[state=active]:text-white">
+                  Sent
+                </TabsTrigger>
+                <TabsTrigger value="received" className="text-xs data-[state=active]:bg-green-600 data-[state=active]:text-white">
+                  Received
+                </TabsTrigger>
+                <TabsTrigger value="withdrawal" className="text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+                  Withdrawals
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
+          {/* Date Range Filter */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant={datePreset === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleClearDateFilter()}
+              className={cn(
+                "h-7 text-xs",
+                datePreset === "all" && "bg-purple-600 hover:bg-purple-700"
+              )}
+            >
+              All Time
+            </Button>
+            <Button
+              variant={datePreset === "today" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setDatePreset("today")}
+              className={cn(
+                "h-7 text-xs",
+                datePreset === "today" && "bg-purple-600 hover:bg-purple-700"
+              )}
+            >
+              Today
+            </Button>
+            <Button
+              variant={datePreset === "week" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setDatePreset("week")}
+              className={cn(
+                "h-7 text-xs",
+                datePreset === "week" && "bg-purple-600 hover:bg-purple-700"
+              )}
+            >
+              This Week
+            </Button>
+            <Button
+              variant={datePreset === "month" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setDatePreset("month")}
+              className={cn(
+                "h-7 text-xs",
+                datePreset === "month" && "bg-purple-600 hover:bg-purple-700"
+              )}
+            >
+              This Month
+            </Button>
+
+            {/* Custom Date Range Picker */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={datePreset === "custom" ? "default" : "outline"}
+                  size="sm"
+                  className={cn(
+                    "h-7 text-xs",
+                    datePreset === "custom" && "bg-purple-600 hover:bg-purple-700"
+                  )}
+                >
+                  <CalendarIcon className="h-3 w-3 mr-1" />
+                  {datePreset === "custom" && customDateRange.from && customDateRange.to
+                    ? `${format(customDateRange.from, "MMM d")} - ${format(customDateRange.to, "MMM d")}`
+                    : "Custom Range"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="range"
+                  selected={{
+                    from: customDateRange.from,
+                    to: customDateRange.to,
+                  }}
+                  onSelect={(range) => {
+                    setCustomDateRange({
+                      from: range?.from,
+                      to: range?.to,
+                    });
+                    if (range?.from && range?.to) {
+                      setDatePreset("custom");
+                    }
+                  }}
+                  numberOfMonths={2}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+
+            {datePreset !== "all" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearDateFilter}
+                className="h-7 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3 mr-1" />
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className={cn("p-0", !compact && "pt-2")}>
