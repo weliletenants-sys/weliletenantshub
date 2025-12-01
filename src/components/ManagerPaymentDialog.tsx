@@ -47,22 +47,51 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
   const [searchOpen, setSearchOpen] = useState(false);
   const [tidExists, setTidExists] = useState(false);
   const [checkingTid, setCheckingTid] = useState(false);
+  const [tidFormatError, setTidFormatError] = useState<string>("");
   const { toast } = useToast();
 
   useEffect(() => {
     if (open) {
       fetchTenants();
-      // Reset TID validation
       setTidExists(false);
       setCheckingTid(false);
+      setTidFormatError("");
     }
   }, [open]);
 
-  // Real-time TID duplicate check with debouncing
+  // Validate TID format based on payment method
+  const validateTidFormat = (tid: string, method: string): string => {
+    if (!tid) return "";
+    
+    if (method === "mtn") {
+      const mtnPattern = /^MTN-\d{5}$/;
+      if (!mtnPattern.test(tid)) {
+        return "MTN Transaction ID must follow format: MTN-XXXXX (e.g., MTN-12345)";
+      }
+    } else if (method === "airtel") {
+      const airtelPattern = /^ATL-\d{5}$/;
+      if (!airtelPattern.test(tid)) {
+        return "Airtel Transaction ID must follow format: ATL-XXXXX (e.g., ATL-12345)";
+      }
+    }
+    return "";
+  };
+
+  // Real-time TID duplicate check and format validation with debouncing
   useEffect(() => {
     const checkTidDuplicate = async () => {
       if (!paymentId || paymentId.length < 3) {
         setTidExists(false);
+        setCheckingTid(false);
+        setTidFormatError("");
+        return;
+      }
+
+      // Check format first
+      const formatError = validateTidFormat(paymentId, paymentMethod);
+      setTidFormatError(formatError);
+
+      if (formatError) {
         setCheckingTid(false);
         return;
       }
@@ -76,7 +105,7 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
           .eq("payment_id", paymentId)
           .maybeSingle();
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        if (error && error.code !== 'PGRST116') {
           console.error("Error checking TID:", error);
         }
 
@@ -88,10 +117,9 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
       }
     };
 
-    // Debounce the check by 500ms
     const timeoutId = setTimeout(checkTidDuplicate, 500);
     return () => clearTimeout(timeoutId);
-  }, [paymentId]);
+  }, [paymentId, paymentMethod]);
 
   const fetchTenants = async () => {
     const { data: tenantsData, error: tenantsError } = await supabase
@@ -126,6 +154,16 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
       toast({
         title: "Missing information",
         description: "Please fill in all required fields including Transaction ID",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (tidFormatError) {
+      haptics.error();
+      toast({
+        title: "Invalid Transaction ID Format",
+        description: tidFormatError,
         variant: "destructive",
       });
       return;
@@ -345,7 +383,7 @@ You can generate and share the receipt with your tenant from the payment notific
                 onChange={(e) => setPaymentId(e.target.value)}
                 required
                 className={cn(
-                  tidExists && "border-destructive focus-visible:ring-destructive",
+                  (tidExists || tidFormatError) && "border-destructive focus-visible:ring-destructive",
                   checkingTid && "pr-10"
                 )}
               />
@@ -355,7 +393,15 @@ You can generate and share the receipt with your tenant from the payment notific
                 </div>
               )}
             </div>
-            {tidExists && (
+            {tidFormatError && (
+              <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-destructive font-medium">
+                  {tidFormatError}
+                </p>
+              </div>
+            )}
+            {tidExists && !tidFormatError && (
               <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
                 <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-destructive font-medium">
@@ -363,14 +409,18 @@ You can generate and share the receipt with your tenant from the payment notific
                 </p>
               </div>
             )}
-            {!tidExists && paymentId && !checkingTid && (
+            {!tidExists && !tidFormatError && paymentId && !checkingTid && (
               <div className="flex items-center gap-2 text-xs text-success">
                 <CheckCircle2 className="h-3 w-3" />
                 TID available
               </div>
             )}
-            {!tidExists && (
-              <p className="text-xs text-muted-foreground">Required to prevent double entry</p>
+            {!tidExists && !tidFormatError && (
+              <p className="text-xs text-muted-foreground">
+                {paymentMethod === "mtn" && "Format: MTN-XXXXX (e.g., MTN-12345)"}
+                {paymentMethod === "airtel" && "Format: ATL-XXXXX (e.g., ATL-12345)"}
+                {paymentMethod === "cash" && "Required to prevent double entry"}
+              </p>
             )}
           </div>
 
@@ -460,7 +510,7 @@ You can generate and share the receipt with your tenant from the payment notific
             >
               Cancel
             </Button>
-            <Button type="submit" className="flex-1" disabled={isSubmitting || tidExists || checkingTid}>
+            <Button type="submit" className="flex-1" disabled={isSubmitting || !selectedTenant || !amount || !paymentId || tidExists || !!tidFormatError || checkingTid}>
               {isSubmitting ? "Recording..." : "Record Payment"}
             </Button>
           </div>
