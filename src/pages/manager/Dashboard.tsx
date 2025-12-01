@@ -3778,8 +3778,18 @@ const ManagerDashboard = () => {
                                   {tenant.status || 'pending'}
                                 </Badge>
                               </div>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {highlightMatch(tenant.tenant_phone, tenantSearchQuery)} • Agent: {tenant.agents?.profiles?.full_name || 'Unknown'}
+                              <p className="text-xs text-muted-foreground">
+                                {highlightMatch(tenant.tenant_phone, tenantSearchQuery)} • Agent: <span 
+                                  className="cursor-pointer hover:text-primary hover:underline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/manager/agents/${tenant.agents?.id}`);
+                                    setShowTenantSearch(false);
+                                    setShowAutocomplete(false);
+                                  }}
+                                >
+                                  {tenant.agents?.profiles?.full_name || 'Unknown'}
+                                </span>
                               </p>
                             </div>
                             <div className="text-right shrink-0 ml-3">
@@ -3947,7 +3957,16 @@ const ManagerDashboard = () => {
                           <p className="text-sm text-muted-foreground">{tenant.tenant_phone}</p>
                           <div className="flex items-center gap-2 mt-1">
                             <p className="text-xs text-muted-foreground">
-                              Agent: {tenant.agents?.profiles?.full_name || 'Unknown'}
+                              Agent: <span 
+                                className="cursor-pointer hover:text-primary hover:underline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/manager/agents/${tenant.agents?.id}`);
+                                  setShowTenantSearch(false);
+                                }}
+                              >
+                                {tenant.agents?.profiles?.full_name || 'Unknown'}
+                              </span>
                             </p>
                             <Badge variant={tenant.status === 'verified' ? 'default' : 'secondary'} className="text-xs">
                               {tenant.status || 'pending'}
@@ -4138,9 +4157,16 @@ const ManagerDashboard = () => {
               .map((agent) => (
                 <Card key={agent.agentId} className="hover:shadow-md transition-all">
                   <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{agent.agentName}</CardTitle>
+                     <div className="flex items-center justify-between">
+                      <div 
+                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/manager/agents/${agent.agentId}`);
+                          setLandlordBreakdownOpen(false);
+                        }}
+                      >
+                        <CardTitle className="text-lg text-primary hover:underline">{agent.agentName}</CardTitle>
                         <p className="text-sm text-muted-foreground mt-1">
                           {agent.count} landlord{agent.count !== 1 ? 's' : ''} registered
                         </p>
@@ -4227,8 +4253,15 @@ const ManagerDashboard = () => {
                 <Card key={agent.agentId} className="hover:shadow-md transition-all">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{agent.agentName}</CardTitle>
+                      <div 
+                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/manager/agents/${agent.agentId}`);
+                          setTenantBreakdownOpen(false);
+                        }}
+                      >
+                        <CardTitle className="text-lg text-primary hover:underline">{agent.agentName}</CardTitle>
                         <p className="text-sm text-muted-foreground mt-1">
                           {agent.count} tenant{agent.count !== 1 ? 's' : ''} registered
                         </p>

@@ -63,6 +63,7 @@ interface Collection {
   collection_date: string;
   status: string;
   tenants?: {
+    id: string;
     tenant_name: string;
   };
 }
@@ -124,6 +125,7 @@ const ManagerAgentDetail = () => {
         .select(`
           *,
           tenants (
+            id,
             tenant_name
           )
         `)
@@ -584,7 +586,12 @@ const ManagerAgentDetail = () => {
                               </div>
                             </TableCell>
                             <TableCell className="font-medium">
-                              {collection.tenants?.tenant_name || 'Unknown'}
+                              <span 
+                                className="cursor-pointer text-primary hover:underline"
+                                onClick={() => navigate(`/manager/tenant/${collection.tenants?.id}`)}
+                              >
+                                {collection.tenants?.tenant_name || 'Unknown'}
+                              </span>
                             </TableCell>
                             <TableCell className="font-semibold">
                               UGX {parseFloat(collection.amount?.toString() || '0').toLocaleString()}
