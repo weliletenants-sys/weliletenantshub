@@ -361,13 +361,13 @@ const AppContent = () => {
 
 const App = () => {
   const [showSplash, setShowSplash] = useState(() => {
-    // Skip splash on repeat visits for faster load
-    const hasShownSplash = sessionStorage.getItem('splashShown');
+    // Show splash only on first-time app open (persists across sessions)
+    const hasShownSplash = localStorage.getItem('splashShown');
     return !hasShownSplash;
   });
 
   const handleSplashComplete = () => {
-    sessionStorage.setItem('splashShown', 'true');
+    localStorage.setItem('splashShown', 'true');
     setShowSplash(false);
   };
 
