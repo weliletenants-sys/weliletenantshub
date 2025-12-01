@@ -80,8 +80,18 @@ export function WithdrawDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+    <>
+      <Button 
+        variant="outline" 
+        className="flex-1 w-full sm:w-auto"
+        onClick={() => onOpenChange(true)}
+      >
+        <ArrowDownToLine className="h-5 w-5 mr-2" />
+        Withdraw
+      </Button>
+      
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className="p-2 bg-gradient-to-br from-green-100 to-emerald-100 rounded-lg">
@@ -126,24 +136,25 @@ export function WithdrawDialog({
             </p>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col gap-3 sm:flex-row">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
               {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Submitting...
                 </>
               ) : (
                 <>
-                  <ArrowDownToLine className="mr-2 h-4 w-4" />
+                  <ArrowDownToLine className="mr-2 h-5 w-5" />
                   Request Withdrawal
                 </>
               )}
@@ -152,5 +163,6 @@ export function WithdrawDialog({
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

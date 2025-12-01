@@ -26,8 +26,8 @@ const BottomNavigation = ({ items, currentPage }: BottomNavigationProps) => {
   const displayItems = items.slice(0, 5);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40 md:hidden safe-bottom">
-      <div className="flex justify-around items-center h-16 px-2">
+    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t-2 border-border z-40 md:hidden safe-bottom">
+      <div className="flex justify-around items-center h-20 px-2">
         {displayItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.path;
@@ -40,14 +40,14 @@ const BottomNavigation = ({ items, currentPage }: BottomNavigationProps) => {
                 navigate(item.path);
               }}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[64px] min-h-[48px]",
+                "flex flex-col items-center justify-center gap-1 px-4 py-3 rounded-lg transition-colors min-w-[72px] min-h-[56px] touch-manipulation",
                 isActive
                   ? "text-primary bg-primary/10"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent"
               )}
             >
-              <Icon className={cn("h-6 w-6", isActive && "scale-110")} />
-              <span className={cn("text-xs font-medium", isActive && "font-semibold")}>
+              <Icon className={cn("h-7 w-7", isActive && "scale-110")} />
+              <span className={cn("text-sm font-medium", isActive && "font-semibold")}>
                 {item.label}
               </span>
             </button>
