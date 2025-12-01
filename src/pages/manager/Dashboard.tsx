@@ -4087,9 +4087,13 @@ const ManagerDashboard = () => {
                       {agent.landlords.map((landlord: any, idx: number) => (
                         <div
                           key={idx}
-                          className="flex items-center justify-between p-2 bg-muted/30 rounded border"
+                          className="flex items-center justify-between p-2 bg-muted/30 rounded border hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => {
+                            navigate(`/manager/landlord/${landlord.id}`);
+                            setLandlordBreakdownOpen(false);
+                          }}
                         >
-                          <span className="font-medium text-sm">{landlord.name}</span>
+                          <span className="font-medium text-sm text-primary hover:underline">{landlord.name}</span>
                           <span className="text-xs text-muted-foreground">
                             {format(new Date(landlord.registeredAt), 'MMM dd, yyyy')}
                           </span>
@@ -4171,9 +4175,13 @@ const ManagerDashboard = () => {
                       {agent.tenants.map((tenant: any, idx: number) => (
                         <div
                           key={idx}
-                          className="flex items-center justify-between p-2 bg-muted/30 rounded border"
+                          className="flex items-center justify-between p-2 bg-muted/30 rounded border hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => {
+                            navigate(`/manager/tenant/${tenant.id}`);
+                            setTenantBreakdownOpen(false);
+                          }}
                         >
-                          <span className="font-medium text-sm">{tenant.name}</span>
+                          <span className="font-medium text-sm text-primary hover:underline">{tenant.name}</span>
                           <span className="text-xs text-muted-foreground">
                             {format(new Date(tenant.registeredAt), 'MMM dd, yyyy')}
                           </span>
