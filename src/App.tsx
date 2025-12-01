@@ -63,6 +63,8 @@ const ManagerSuspensionHistory = lazy(() => import("./pages/manager/SuspensionHi
 const ManagerDeliveryReports = lazy(() => import("./pages/manager/DeliveryReports"));
 const ManagerSettings = lazy(() => import("./pages/manager/Settings"));
 const ManagerPerformanceMonitor = lazy(() => import("./pages/manager/PerformanceMonitor"));
+const ManagerWithdrawalApprovals = lazy(() => import("./pages/manager/WithdrawalApprovals"));
+const ManagerTransferHistory = lazy(() => import("./pages/manager/TransferHistory"));
 const AdminProfileRepair = lazy(() => import("./pages/admin/ProfileRepair"));
 const AdminRoleManagement = lazy(() => import("./pages/admin/RoleManagement"));
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
@@ -321,6 +323,16 @@ const AppContent = () => {
             <Route path="/manager/performance-monitor" element={
               <ProtectedRoute requiredRole="manager">
                 <ManagerPerformanceMonitor />
+              </ProtectedRoute>
+            } />
+            <Route path="/manager/withdrawal-approvals" element={
+              <ProtectedRoute requiredRole="manager">
+                <ManagerWithdrawalApprovals />
+              </ProtectedRoute>
+            } />
+            <Route path="/manager/transfer-history" element={
+              <ProtectedRoute requiredRole="manager">
+                <ManagerTransferHistory />
               </ProtectedRoute>
             } />
             <Route path="/admin" element={<AdminDashboard />} />
