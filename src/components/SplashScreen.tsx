@@ -36,8 +36,8 @@ const SplashScreen = ({ onComplete }: SplashScreenProps) => {
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
     >
-      <div className="flex flex-col items-center gap-6">
-        <div className="animate-logo-entrance w-48 h-48 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="flex flex-col items-center gap-8">
+        <div className="w-48 h-48 rounded-2xl shadow-2xl overflow-hidden transform transition-all duration-700 ease-out scale-100 opacity-100">
           <ProgressiveImage
             src="/welile-logo.jpg"
             alt="Welile Logo"
@@ -46,10 +46,10 @@ const SplashScreen = ({ onComplete }: SplashScreenProps) => {
             eager
           />
         </div>
-        <div className="flex gap-2 animate-fade-in-delay-1">
-          <div className="w-3 h-3 bg-primary-foreground rounded-full animate-bounce [animation-delay:0ms]" />
-          <div className="w-3 h-3 bg-primary-foreground rounded-full animate-bounce [animation-delay:150ms]" />
-          <div className="w-3 h-3 bg-primary-foreground rounded-full animate-bounce [animation-delay:300ms]" />
+        <div className="relative w-16 h-16">
+          {/* Stable spinning loader */}
+          <div className="absolute inset-0 border-4 border-primary-foreground/20 rounded-full" />
+          <div className="absolute inset-0 border-4 border-transparent border-t-primary-foreground rounded-full animate-spin" />
         </div>
       </div>
     </div>
