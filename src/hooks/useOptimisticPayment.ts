@@ -286,6 +286,7 @@ export const useOptimisticTenantCreation = () => {
         days_remaining: 30,
         last_payment_date: null,
         next_payment_date: null,
+        landlord_id: null,
         landlord_name: null,
         landlord_phone: null,
         landlord_id_url: null,

@@ -28,6 +28,8 @@ const Install = lazy(() => import("./pages/Install"));
 const AgentDashboard = lazy(() => import("./pages/agent/Dashboard"));
 const AgentTenants = lazy(() => import("./pages/agent/Tenants"));
 const AgentNewTenant = lazy(() => import("./pages/agent/NewTenant"));
+const AgentRegisterLandlord = lazy(() => import("./pages/agent/RegisterLandlord"));
+const AgentRegisterTenant = lazy(() => import("./pages/agent/RegisterTenant"));
 const AgentTenantDetail = lazy(() => import("./pages/agent/TenantDetail"));
 const AgentCollections = lazy(() => import("./pages/agent/Collections"));
 const AgentEarnings = lazy(() => import("./pages/agent/Earnings"));
@@ -145,6 +147,16 @@ const AppContent = () => {
             <Route path="/agent/new-tenant" element={
               <ProtectedRoute requiredRole="agent">
                 <AgentNewTenant />
+              </ProtectedRoute>
+            } />
+            <Route path="/agent/register-landlord" element={
+              <ProtectedRoute requiredRole="agent">
+                <AgentRegisterLandlord />
+              </ProtectedRoute>
+            } />
+            <Route path="/agent/register-tenant" element={
+              <ProtectedRoute requiredRole="agent">
+                <AgentRegisterTenant />
               </ProtectedRoute>
             } />
             <Route path="/agent/collections" element={
