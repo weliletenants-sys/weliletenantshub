@@ -19,11 +19,14 @@ import {
   FileText,
   CheckCircle2,
   X,
-  Receipt
+  Receipt,
+  Download
 } from "lucide-react";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface CommissionDeposit {
@@ -210,6 +213,102 @@ export default function CommissionHistory() {
     setCustomDateRange({ from: undefined, to: undefined });
   };
 
+  const exportToCSV = () => {
+    try {
+      // CSV Headers
+      const headers = [
+        "Commission Amount",
+        "Payment Amount",
+        "Tenant Name",
+        "Tenant Phone",
+        "Payment Method",
+        "Verified Date",
+        "Verified Time",
+        "Payment ID",
+        "Verified By"
+      ];
+
+      // CSV Rows
+      const rows = filteredDeposits.map((deposit) => [
+        `UGX ${deposit.commission.toLocaleString()}`,
+        `UGX ${deposit.amount.toLocaleString()}`,
+        deposit.tenant.tenant_name,
+        deposit.tenant.tenant_phone,
+        deposit.payment_method?.replace("_", " ") || "Cash",
+        format(new Date(deposit.verified_at), "MMM d, yyyy"),
+        format(new Date(deposit.verified_at), "h:mm a"),
+        deposit.payment_id || deposit.id.slice(0, 8).toUpperCase(),
+        deposit.verified_by_profile?.full_name || "N/A"
+      ]);
+
+      // Combine headers and rows
+      const csvContent = [
+        headers.join(","),
+        ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))
+      ].join("\n");
+
+      // Create download
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute(
+        "download",
+        `commission-history-${format(new Date(), "yyyy-MM-dd")}.csv`
+      );
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success("CSV exported successfully");
+    } catch (error) {
+      console.error("Error exporting CSV:", error);
+      toast.error("Failed to export CSV");
+    }
+  };
+
+  const exportToPDF = () => {
+    try {
+      const doc = new jsPDF();
+
+      // Title
+      doc.setFontSize(18);
+      doc.text("Commission History Report", 14, 20);
+
+      // Summary
+      doc.setFontSize(11);
+      doc.text(`Total Commission: UGX ${totalCommission.toLocaleString()}`, 14, 30);
+      doc.text(`Total Payments: ${filteredDeposits.length}`, 14, 36);
+      doc.text(`Export Date: ${format(new Date(), "MMM d, yyyy 'at' h:mm a")}`, 14, 42);
+
+      // Table
+      const tableData = filteredDeposits.map((deposit) => [
+        format(new Date(deposit.verified_at), "MMM d, yyyy h:mm a"),
+        deposit.tenant.tenant_name,
+        deposit.tenant.tenant_phone,
+        deposit.payment_method?.replace("_", " ") || "Cash",
+        `UGX ${deposit.amount.toLocaleString()}`,
+        `UGX ${deposit.commission.toLocaleString()}`,
+        deposit.payment_id || deposit.id.slice(0, 8).toUpperCase()
+      ]);
+
+      autoTable(doc, {
+        head: [["Date", "Tenant", "Phone", "Method", "Amount", "Commission", "Payment ID"]],
+        body: tableData,
+        startY: 50,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [107, 45, 197] },
+      });
+
+      doc.save(`commission-history-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      toast.success("PDF exported successfully");
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.error("Failed to export PDF");
+    }
+  };
+
   if (loading) {
     return (
       <AgentLayout currentPage="/agent/commission-history">
@@ -380,10 +479,34 @@ export default function CommissionHistory() {
         {/* Transaction List */}
         <Card>
           <CardHeader>
-            <CardTitle>Commission Deposits ({filteredDeposits.length})</CardTitle>
-            <CardDescription>
-              Automatic deposits from verified payments
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Commission Deposits ({filteredDeposits.length})</CardTitle>
+                <CardDescription>
+                  Automatic deposits from verified payments
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportToCSV}
+                  disabled={filteredDeposits.length === 0}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportToPDF}
+                  disabled={filteredDeposits.length === 0}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  PDF
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             {filteredDeposits.length === 0 ? (
