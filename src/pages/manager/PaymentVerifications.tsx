@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import ManagerLayout from "@/components/ManagerLayout";
@@ -49,12 +50,14 @@ interface Payment {
     };
   };
   tenants: {
+    id: string;
     tenant_name: string;
     tenant_phone: string;
   };
 }
 
 const PaymentVerifications = () => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
@@ -102,7 +105,7 @@ const PaymentVerifications = () => {
               phone_number
             )
           ),
-          tenants!inner(tenant_name, tenant_phone)
+          tenants!inner(id, tenant_name, tenant_phone)
         `)
         .order("created_at", { ascending: false });
 
@@ -497,11 +500,24 @@ const PaymentVerifications = () => {
                 </Button>
               )}
               <div className="flex-1">
-                <h3 className="font-semibold text-lg mb-1">{payment.tenants.tenant_name}</h3>
+                <h3 
+                  className="font-semibold text-lg mb-1 cursor-pointer text-primary hover:underline"
+                  onClick={() => navigate(`/manager/tenant/${payment.tenants.id}`)}
+                >
+                  {payment.tenants.tenant_name}
+                </h3>
                 <p className="text-sm text-muted-foreground mb-2">{payment.tenants.tenant_phone}</p>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
                   <User className="h-4 w-4" />
-                  <span>Agent: {payment.agent.profiles.full_name || payment.agent.profiles.phone_number}</span>
+                  <span 
+                    className="cursor-pointer hover:text-primary hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/manager/agents/${payment.agent_id}`);
+                    }}
+                  >
+                    Agent: {payment.agent.profiles.full_name || payment.agent.profiles.phone_number}
+                  </span>
                 </div>
               </div>
             </div>

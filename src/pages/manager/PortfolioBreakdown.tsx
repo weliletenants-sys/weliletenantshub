@@ -960,7 +960,15 @@ const ManagerPortfolioBreakdown = () => {
                           <div>
                             <CardTitle className="flex items-center gap-2">
                               <User className="h-5 w-5" />
-                              {portfolio.name}
+                              <span 
+                                className="cursor-pointer hover:text-primary hover:underline transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/manager/agents/${portfolio.id}`);
+                                }}
+                              >
+                                {portfolio.name}
+                              </span>
                             </CardTitle>
                             <CardDescription className="flex items-center gap-2 mt-1">
                               <Phone className="h-4 w-4" />

@@ -35,6 +35,7 @@ interface TenantData {
   created_at: string;
   agent_id: string;
   agents?: {
+    id: string;
     profiles: {
       full_name: string;
     };
@@ -50,9 +51,11 @@ interface PaymentData {
   tenant_id: string;
   agent_id: string;
   tenants: {
+    id: string;
     tenant_name: string;
   };
   agents?: {
+    id: string;
     profiles: {
       full_name: string;
     };
@@ -99,6 +102,7 @@ const ManagerLandlordDetail = () => {
         .select(`
           *,
           agents (
+            id,
             profiles!agents_user_id_fkey (
               full_name
             )
@@ -117,8 +121,9 @@ const ManagerLandlordDetail = () => {
           .from("collections")
           .select(`
             *,
-            tenants (tenant_name),
+            tenants (id, tenant_name),
             agents (
+              id,
               profiles!agents_user_id_fkey (
                 full_name
               )
@@ -337,10 +342,22 @@ const ManagerLandlordDetail = () => {
                 </TableHeader>
                 <TableBody>
                   {tenants.map((tenant) => (
-                    <TableRow key={tenant.id}>
-                      <TableCell className="font-medium">{tenant.tenant_name}</TableCell>
+                    <TableRow 
+                      key={tenant.id}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => navigate(`/manager/tenant/${tenant.id}`)}
+                    >
+                      <TableCell className="font-medium text-primary hover:underline">{tenant.tenant_name}</TableCell>
                       <TableCell>{tenant.tenant_phone}</TableCell>
-                      <TableCell>{tenant.agents?.profiles?.full_name || "Unknown"}</TableCell>
+                      <TableCell 
+                        className="cursor-pointer text-primary hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/manager/agents/${tenant.agents?.id}`);
+                        }}
+                      >
+                        {tenant.agents?.profiles?.full_name || "Unknown"}
+                      </TableCell>
                       <TableCell>UGX {tenant.rent_amount?.toLocaleString()}</TableCell>
                       <TableCell className="font-semibold">
                         UGX {tenant.outstanding_balance?.toLocaleString()}
@@ -350,7 +367,10 @@ const ManagerLandlordDetail = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate(`/manager/tenant/${tenant.id}`)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/manager/tenant/${tenant.id}`);
+                          }}
                         >
                           View
                         </Button>
@@ -390,10 +410,16 @@ const ManagerLandlordDetail = () => {
                       <TableCell>
                         {format(new Date(payment.collection_date), "MMM d, yyyy")}
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell 
+                        className="font-medium cursor-pointer text-primary hover:underline"
+                        onClick={() => navigate(`/manager/tenant/${payment.tenants?.id}`)}
+                      >
                         {payment.tenants?.tenant_name}
                       </TableCell>
-                      <TableCell>
+                      <TableCell 
+                        className="cursor-pointer text-primary hover:underline"
+                        onClick={() => navigate(`/manager/agents/${payment.agents?.id}`)}
+                      >
                         {payment.agents?.profiles?.full_name || "Unknown"}
                       </TableCell>
                       <TableCell className="font-semibold">

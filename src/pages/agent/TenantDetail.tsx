@@ -709,9 +709,16 @@ const AgentTenantDetail = () => {
                   </CardHeader>
                   <CardContent className="grid gap-3 md:grid-cols-2">
                     {tenant.landlord_name && (
-                      <div className={`p-3 rounded-lg bg-muted/50 transition-all duration-300 ${tenantUpdateMutation.isPending ? 'animate-fade-in-delay-1' : ''}`}>
+                      <div 
+                        className={`p-3 rounded-lg bg-muted/50 transition-all duration-300 cursor-pointer hover:bg-muted active:scale-98 ${tenantUpdateMutation.isPending ? 'animate-fade-in-delay-1' : ''}`}
+                        onClick={() => {
+                          if (tenant.landlord_id) {
+                            navigate(`/agent/landlord/${tenant.landlord_id}`);
+                          }
+                        }}
+                      >
                         <p className="text-xs text-muted-foreground">Name</p>
-                        <p className="font-semibold">{tenant.landlord_name}</p>
+                        <p className="font-semibold text-primary hover:underline">{tenant.landlord_name}</p>
                       </div>
                     )}
                     {tenant.landlord_phone && (

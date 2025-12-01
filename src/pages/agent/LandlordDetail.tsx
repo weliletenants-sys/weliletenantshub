@@ -38,6 +38,7 @@ interface PaymentData {
   status: string;
   tenant_id: string;
   tenants: {
+    id: string;
     tenant_name: string;
   };
 }
@@ -87,7 +88,7 @@ const AgentLandlordDetail = () => {
           .from("collections")
           .select(`
             *,
-            tenants (tenant_name)
+            tenants (id, tenant_name)
           `)
           .in("tenant_id", tenantIds)
           .eq("agent_id", agentId)
@@ -270,8 +271,12 @@ const AgentLandlordDetail = () => {
                 </TableHeader>
                 <TableBody>
                   {tenants.map((tenant) => (
-                    <TableRow key={tenant.id}>
-                      <TableCell className="font-medium">{tenant.tenant_name}</TableCell>
+                    <TableRow 
+                      key={tenant.id}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => navigate(`/agent/tenant/${tenant.id}`)}
+                    >
+                      <TableCell className="font-medium text-primary hover:underline">{tenant.tenant_name}</TableCell>
                       <TableCell>{tenant.tenant_phone}</TableCell>
                       <TableCell>UGX {tenant.rent_amount?.toLocaleString()}</TableCell>
                       <TableCell className="font-semibold">
@@ -282,7 +287,10 @@ const AgentLandlordDetail = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate(`/agent/tenant/${tenant.id}`)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/agent/tenant/${tenant.id}`);
+                          }}
                         >
                           View
                         </Button>
@@ -321,7 +329,10 @@ const AgentLandlordDetail = () => {
                       <TableCell>
                         {format(new Date(payment.collection_date), "MMM d, yyyy")}
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell 
+                        className="font-medium cursor-pointer text-primary hover:underline"
+                        onClick={() => navigate(`/agent/tenant/${payment.tenants?.id}`)}
+                      >
                         {payment.tenants?.tenant_name}
                       </TableCell>
                       <TableCell className="font-semibold">
