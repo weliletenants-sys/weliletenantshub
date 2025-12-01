@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import WelileLogo from "./WelileLogo";
 import Breadcrumbs from "./Breadcrumbs";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Users, CheckSquare, LogOut, Settings, Home, TrendingUp, FileText, DollarSign, History, MailCheck, Printer, Calculator, Activity, ArrowDownToLine, ArrowRightLeft, Hash } from "lucide-react";
+import { LayoutDashboard, Users, CheckSquare, LogOut, Settings, Home, TrendingUp, FileText, DollarSign, History, MailCheck, Printer, Calculator, Activity, ArrowDownToLine, ArrowRightLeft, Hash, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
 import { useRipple } from "@/hooks/useRipple";
@@ -50,6 +50,7 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
     { icon: Users, label: "Agents", path: "/manager/agents" },
     { icon: DollarSign, label: "Payment Verifications", path: "/manager/payment-verifications" },
     { icon: Hash, label: "TID History", path: "/manager/tid-history" },
+    { icon: ShieldAlert, label: "TID Validation", path: "/manager/tid-validation" },
     { icon: ArrowDownToLine, label: "Withdrawal Approvals", path: "/manager/withdrawal-approvals" },
     { icon: ArrowRightLeft, label: "Transfer History", path: "/manager/transfer-history" },
     { icon: History, label: "Verification History", path: "/manager/verification-history" },

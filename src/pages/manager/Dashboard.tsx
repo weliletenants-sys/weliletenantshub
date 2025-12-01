@@ -2903,6 +2903,37 @@ const ManagerDashboard = () => {
             </CardContent>
           </Card>
 
+          {/* TID Validation Quick Access */}
+          <Card className="border-2 border-amber-500/20 cursor-pointer hover:border-amber-500/40 transition-colors" onClick={() => navigate("/manager/tid-validation")}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-amber-500" />
+                TID Validation & Audit
+              </CardTitle>
+              <CardDescription>
+                Fix legacy TIDs and validate format compliance
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-full bg-amber-500/20">
+                    <Shield className="h-6 w-6 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Audit Legacy TIDs</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Identify and fix placeholder Transaction IDs
+                    </p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm">
+                  Validate →
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Portfolio Growth Tracking */}
           <Card className="border-2 border-primary/20">
             <CardHeader>
