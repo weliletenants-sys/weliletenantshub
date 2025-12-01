@@ -486,14 +486,23 @@ const ManagerSettings = () => {
 
             <Separator className="my-4" />
 
-            <Button 
-              onClick={() => setShowChangelogDialog(true)}
-              variant="ghost"
-              className="w-full"
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              View Release Notes
-            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button 
+                onClick={() => setShowChangelogDialog(true)}
+                variant="ghost"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Release Notes
+              </Button>
+              
+              <Button 
+                onClick={() => navigate("/manager/version-history")}
+                variant="ghost"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Version History
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
