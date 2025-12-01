@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, User, Phone, DollarSign, TrendingUp, Users, Calendar, Award, Trash2 } from "lucide-react";
+import { ArrowLeft, User, Phone, DollarSign, TrendingUp, Users, Calendar, Award, Trash2, Wallet } from "lucide-react";
 import { format } from "date-fns";
 import { useRealtimeAgents, useRealtimeAllTenants, useRealtimeAllCollections, useRealtimeProfiles, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
 import {
@@ -34,6 +34,7 @@ interface AgentData {
   total_tenants: number;
   collection_rate: number;
   monthly_earnings: number;
+  wallet_balance: number;
   portfolio_value: number;
   portfolio_limit: number;
   motorcycle_eligible: boolean;
@@ -345,6 +346,76 @@ const ManagerAgentDetail = () => {
           </div>
         </div>
 
+        {/* Earnings Overview Section */}
+        <Card className="border-2 border-success/20 bg-success/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <DollarSign className="h-6 w-6 text-success" />
+              Earnings Overview
+            </CardTitle>
+            <CardDescription>Complete financial breakdown for this agent</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {/* Total Commission Earned */}
+              <div className="p-4 rounded-lg bg-success/10 border-2 border-success/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="h-5 w-5 text-success" />
+                  <p className="text-sm font-medium text-muted-foreground">Commission Earned</p>
+                </div>
+                <div className="text-3xl font-bold text-success">
+                  UGX {totalCommissions.toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  5% from verified payments
+                </p>
+              </div>
+
+              {/* Wallet Balance */}
+              <div className="p-4 rounded-lg bg-primary/10 border-2 border-primary/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Wallet className="h-5 w-5 text-primary" />
+                  <p className="text-sm font-medium text-muted-foreground">Wallet Balance</p>
+                </div>
+                <div className="text-3xl font-bold text-primary">
+                  UGX {parseFloat(agent.wallet_balance?.toString() || '0').toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Available for withdrawal
+                </p>
+              </div>
+
+              {/* Monthly Earnings */}
+              <div className="p-4 rounded-lg bg-amber-500/10 border-2 border-amber-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <DollarSign className="h-5 w-5 text-amber-600" />
+                  <p className="text-sm font-medium text-muted-foreground">Monthly Earnings</p>
+                </div>
+                <div className="text-3xl font-bold text-amber-600">
+                  UGX {parseFloat(agent.monthly_earnings?.toString() || '0').toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  This billing cycle
+                </p>
+              </div>
+
+              {/* Total Collections */}
+              <div className="p-4 rounded-lg bg-blue-500/10 border-2 border-blue-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Award className="h-5 w-5 text-blue-600" />
+                  <p className="text-sm font-medium text-muted-foreground">Total Collected</p>
+                </div>
+                <div className="text-3xl font-bold text-blue-600">
+                  UGX {totalCollected.toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  From {collections.filter(c => c.status === "completed").length} verified payments
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Performance Metrics Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
@@ -375,14 +446,16 @@ const ManagerAgentDetail = () => {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Earnings</CardTitle>
+              <CardTitle className="text-sm font-medium">Average Commission</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                UGX {parseFloat(agent.monthly_earnings?.toString() || '0').toLocaleString()}
+                UGX {collections.filter(c => c.status === "completed").length > 0 
+                  ? (totalCommissions / collections.filter(c => c.status === "completed").length).toLocaleString(undefined, { maximumFractionDigits: 0 })
+                  : 0}
               </div>
-              <p className="text-xs text-muted-foreground">From commissions</p>
+              <p className="text-xs text-muted-foreground">Per payment</p>
             </CardContent>
           </Card>
 
