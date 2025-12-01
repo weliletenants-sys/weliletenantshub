@@ -29,6 +29,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { BackgroundSyncIndicator } from "@/components/BackgroundSyncIndicator";
 import { MoneyFlowAnimation, WalletRippleEffect } from "@/components/MoneyFlowAnimation";
+import { WalletTransactionTimeline } from "@/components/WalletTransactionTimeline";
 
 const AgentDashboard = () => {
   const navigate = useNavigate();
@@ -706,6 +707,11 @@ const AgentDashboard = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Wallet Transaction Timeline */}
+          {agentId && (
+            <WalletTransactionTimeline agentId={agentId} limit={5} />
+          )}
 
           {/* Tenant Search Widget */}
           {agentId && <TenantSearchWidget agentId={agentId} />}
