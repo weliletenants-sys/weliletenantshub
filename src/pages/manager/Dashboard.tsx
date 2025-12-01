@@ -117,6 +117,11 @@ const ManagerDashboard = () => {
   const [tenantAgentData, setTenantAgentData] = useState<any[]>([]);
   const [landlordSortBy, setLandlordSortBy] = useState<'count' | 'name'>('count');
   const [tenantSortBy, setTenantSortBy] = useState<'count' | 'name'>('count');
+  
+  // Earnings filter states
+  const [earningsFilterType, setEarningsFilterType] = useState<'all' | 'top' | 'low' | 'range'>('all');
+  const [minEarningsFilter, setMinEarningsFilter] = useState<string>("");
+  const [maxEarningsFilter, setMaxEarningsFilter] = useState<string>("");
 
   // Fetch payment report data with date range
   const fetchPaymentReportData = async (startDate?: Date, endDate?: Date) => {
@@ -1493,6 +1498,38 @@ const ManagerDashboard = () => {
   // Debounce the search query for autocomplete
   const debouncedSearchQuery = useDebounce(tenantSearchQuery, 300);
 
+  // Filter agents by earnings criteria
+  const getFilteredAgentsByEarnings = () => {
+    if (earningsFilterType === 'all') {
+      return topAgentsByCommission;
+    }
+
+    let filtered = [...topAgentsByCommission];
+
+    // Filter by top earners (top 30%)
+    if (earningsFilterType === 'top') {
+      const topCount = Math.max(1, Math.ceil(filtered.length * 0.3));
+      filtered = filtered.slice(0, topCount);
+    }
+
+    // Filter by low performers (bottom 30%)
+    if (earningsFilterType === 'low') {
+      const lowCount = Math.max(1, Math.ceil(filtered.length * 0.3));
+      filtered = filtered.slice(-lowCount);
+    }
+
+    // Filter by earning range
+    if (earningsFilterType === 'range') {
+      const minEarnings = parseFloat(minEarningsFilter) || 0;
+      const maxEarnings = parseFloat(maxEarningsFilter) || Infinity;
+      filtered = filtered.filter(agent => 
+        agent.totalCommission >= minEarnings && agent.totalCommission <= maxEarnings
+      );
+    }
+
+    return filtered;
+  };
+
   // Helper function to highlight matching text in autocomplete suggestions
   const highlightMatch = (text: string, query: string) => {
     if (!query.trim()) return text;
@@ -2857,6 +2894,116 @@ const ManagerDashboard = () => {
                   View All Agents →
                 </Button>
               </div>
+              
+              {/* Filter Controls */}
+              <div className="mt-4 space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={earningsFilterType === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setEarningsFilterType('all');
+                      haptics.light();
+                    }}
+                  >
+                    All Agents
+                  </Button>
+                  <Button
+                    variant={earningsFilterType === 'top' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setEarningsFilterType('top');
+                      haptics.light();
+                    }}
+                    className="bg-success/10 hover:bg-success/20 border-success/30"
+                  >
+                    <TrendingUp className="h-3 w-3 mr-1" />
+                    Top Earners
+                  </Button>
+                  <Button
+                    variant={earningsFilterType === 'low' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setEarningsFilterType('low');
+                      haptics.light();
+                    }}
+                    className="bg-orange-500/10 hover:bg-orange-500/20 border-orange-500/30"
+                  >
+                    <Target className="h-3 w-3 mr-1" />
+                    Low Performers
+                  </Button>
+                  <Button
+                    variant={earningsFilterType === 'range' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setEarningsFilterType('range');
+                      haptics.light();
+                    }}
+                  >
+                    <DollarSign className="h-3 w-3 mr-1" />
+                    Custom Range
+                  </Button>
+                </div>
+
+                {/* Earning Range Inputs */}
+                {earningsFilterType === 'range' && (
+                  <div className="flex flex-wrap gap-3 items-center p-3 bg-muted/50 rounded-lg border">
+                    <div className="flex-1 min-w-[140px]">
+                      <label className="text-xs text-muted-foreground mb-1 block">
+                        Min Earnings (UGX)
+                      </label>
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        value={minEarningsFilter}
+                        onChange={(e) => setMinEarningsFilter(e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-[140px]">
+                      <label className="text-xs text-muted-foreground mb-1 block">
+                        Max Earnings (UGX)
+                      </label>
+                      <Input
+                        type="number"
+                        placeholder="No limit"
+                        value={maxEarningsFilter}
+                        onChange={(e) => setMaxEarningsFilter(e.target.value)}
+                        className="h-8"
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setMinEarningsFilter("");
+                        setMaxEarningsFilter("");
+                        haptics.light();
+                      }}
+                      className="h-8 mt-5"
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Clear
+                    </Button>
+                  </div>
+                )}
+
+                {/* Filter Summary */}
+                {earningsFilterType !== 'all' && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="font-medium">
+                      Showing: {getFilteredAgentsByEarnings().length} agent{getFilteredAgentsByEarnings().length !== 1 ? 's' : ''}
+                    </span>
+                    {earningsFilterType === 'top' && <span>• Top 30% by commission earned</span>}
+                    {earningsFilterType === 'low' && <span>• Bottom 30% by commission earned</span>}
+                    {earningsFilterType === 'range' && (
+                      <span>
+                        • Range: UGX {minEarningsFilter || '0'} - {maxEarningsFilter || '∞'}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <SkeletonWrapper 
@@ -2880,9 +3027,9 @@ const ManagerDashboard = () => {
                   </div>
                 }
               >
-                {topAgentsByCommission.length > 0 ? (
+                {getFilteredAgentsByEarnings().length > 0 ? (
                   <div className="space-y-4">
-                    {topAgentsByCommission.map((agent, index) => (
+                    {getFilteredAgentsByEarnings().map((agent, index) => (
                       <div
                         key={agent.agentId}
                         className="p-4 border-2 rounded-lg hover:border-primary/40 transition-all cursor-pointer"
@@ -2988,8 +3135,34 @@ const ManagerDashboard = () => {
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <Coins className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                    <p>No earnings data available yet</p>
-                    <p className="text-xs mt-1">Agents will appear here once they start earning commissions</p>
+                    {earningsFilterType === 'all' ? (
+                      <>
+                        <p>No earnings data available yet</p>
+                        <p className="text-xs mt-1">Agents will appear here once they start earning commissions</p>
+                      </>
+                    ) : (
+                      <>
+                        <p>No agents match the selected filter</p>
+                        <p className="text-xs mt-1">
+                          {earningsFilterType === 'top' && 'No top earners found with current criteria'}
+                          {earningsFilterType === 'low' && 'No low performers found with current criteria'}
+                          {earningsFilterType === 'range' && 'No agents fall within the specified earning range'}
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-3"
+                          onClick={() => {
+                            setEarningsFilterType('all');
+                            setMinEarningsFilter("");
+                            setMaxEarningsFilter("");
+                            haptics.light();
+                          }}
+                        >
+                          Clear Filters
+                        </Button>
+                      </>
+                    )}
                   </div>
                 )}
               </SkeletonWrapper>
