@@ -10,6 +10,7 @@ import { useRipple } from "@/hooks/useRipple";
 import { useSwipeBack } from "@/hooks/useSwipeBack";
 import SwipeBackIndicator from "./SwipeBackIndicator";
 import BottomNavigation from "./BottomNavigation";
+import { LandlordSearchDialog } from "./LandlordSearchDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,10 +60,13 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
       
       <header className="bg-card border-b border-border p-6 flex justify-between items-center">
         <WelileLogo />
-        <Button variant="ghost" size="default" onClick={() => setShowLogoutDialog(true)}>
-          <LogOut className="h-5 w-5 mr-2" />
-          Logout
-        </Button>
+        <div className="flex items-center gap-2 md:gap-4">
+          <LandlordSearchDialog userRole="manager" />
+          <Button variant="ghost" size="default" onClick={() => setShowLogoutDialog(true)}>
+            <LogOut className="h-5 w-5 mr-2" />
+            Logout
+          </Button>
+        </div>
       </header>
 
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
