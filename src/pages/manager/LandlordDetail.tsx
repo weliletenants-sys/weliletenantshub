@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Phone, User, Building2, DollarSign, Calendar, TrendingUp, Users, UserCheck, Search } from "lucide-react";
+import { ArrowLeft, Phone, User, Building2, DollarSign, Calendar, TrendingUp, Users, UserCheck, Search, MapPin, MessageCircle, ExternalLink, CheckCircle, Clock } from "lucide-react";
 import { format } from "date-fns";
 
 interface LandlordData {
@@ -16,9 +16,18 @@ interface LandlordData {
   landlord_name: string;
   landlord_phone: string;
   landlord_id_url: string | null;
+  properties: string | null;
+  lc1_chairperson_name: string | null;
+  lc1_chairperson_phone: string | null;
+  village_cell_location: string | null;
+  google_maps_link: string | null;
+  is_verified: boolean;
+  verified_by: string | null;
+  verified_at: string | null;
   created_at: string;
   registered_by: string;
   agents?: {
+    id: string;
     profiles: {
       full_name: string;
       phone_number: string;
@@ -86,7 +95,8 @@ const ManagerLandlordDetail = () => {
         .from("landlords")
         .select(`
           *,
-          agents (
+          agents!landlords_registered_by_fkey (
+            id,
             profiles!agents_user_id_fkey (
               full_name,
               phone_number
@@ -145,6 +155,53 @@ const ManagerLandlordDetail = () => {
       navigate("/manager/dashboard");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerifyLandlord = async () => {
+    if (!landlord || landlord.is_verified) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Update landlord verification status
+      const { error: verifyError } = await supabase
+        .from("landlords")
+        .update({
+          is_verified: true,
+          verified_by: user.id,
+          verified_at: new Date().toISOString(),
+        })
+        .eq("id", landlord.id);
+
+      if (verifyError) throw verifyError;
+
+      // Award UGX 500 to the agent who registered this landlord
+      if (landlord.agents?.id) {
+        const { data: currentAgent, error: fetchError } = await supabase
+          .from("agents")
+          .select("wallet_balance")
+          .eq("id", landlord.agents.id)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        const { error: walletError } = await supabase
+          .from("agents")
+          .update({
+            wallet_balance: (currentAgent.wallet_balance || 0) + 500
+          })
+          .eq("id", landlord.agents.id);
+
+        if (walletError) throw walletError;
+      }
+
+      toast.success("Landlord verified! UGX 500 awarded to agent");
+      fetchLandlordData(); // Refresh data
+    } catch (error) {
+      console.error("Error verifying landlord:", error);
+      toast.error("Failed to verify landlord");
     }
   };
 
@@ -211,32 +268,129 @@ const ManagerLandlordDetail = () => {
           </div>
         </div>
 
-        {/* Contact Info & Registration */}
+        {/* Contact Info & Verification */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Contact Information
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Contact & Verification
+                </CardTitle>
+                {landlord.is_verified ? (
+                  <Badge variant="default" className="gap-1">
+                    <CheckCircle className="h-3 w-3" />
+                    Verified
+                  </Badge>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={handleVerifyLandlord}
+                    className="gap-2"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    Verify
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
                 <Phone className="h-5 w-5 text-muted-foreground" />
-                <div>
+                <div className="flex-1">
                   <p className="text-sm text-muted-foreground">Phone Number</p>
                   <p className="text-lg font-semibold">{landlord.landlord_phone}</p>
                 </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.location.href = `tel:${landlord.landlord_phone}`}
+                  >
+                    <Phone className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.open(`https://wa.me/${landlord.landlord_phone.replace(/^0/, '256')}`, '_blank')}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
+
+              {landlord.properties && (
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Properties</p>
+                    <p className="font-semibold">{landlord.properties}</p>
+                  </div>
+                </div>
+              )}
+
+              {landlord.village_cell_location && (
+                <div className="flex items-center gap-3">
+                  <MapPin className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">Location</p>
+                    <p className="font-semibold">{landlord.village_cell_location}</p>
+                  </div>
+                  {landlord.google_maps_link && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(landlord.google_maps_link!, '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {landlord.lc1_chairperson_name && (
+                <div className="flex items-center gap-3">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">LC1 Chairperson</p>
+                    <p className="font-semibold">{landlord.lc1_chairperson_name}</p>
+                    {landlord.lc1_chairperson_phone && (
+                      <p className="text-sm text-muted-foreground">{landlord.lc1_chairperson_phone}</p>
+                    )}
+                  </div>
+                  {landlord.lc1_chairperson_phone && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.location.href = `tel:${landlord.lc1_chairperson_phone}`}
+                    >
+                      <Phone className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-center gap-3">
                 <Calendar className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Registered</p>
-                  <p className="text-lg font-semibold">
+                  <p className="font-semibold">
                     {format(new Date(landlord.created_at), "MMM d, yyyy")}
                   </p>
                 </div>
               </div>
+
+              {landlord.is_verified && landlord.verified_at && (
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Verified On</p>
+                    <p className="font-semibold">
+                      {format(new Date(landlord.verified_at), "MMM d, yyyy")}
+                    </p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

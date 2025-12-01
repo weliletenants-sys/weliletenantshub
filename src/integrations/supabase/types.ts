@@ -308,30 +308,54 @@ export type Database = {
       landlords: {
         Row: {
           created_at: string
+          google_maps_link: string | null
           id: string
+          is_verified: boolean | null
           landlord_id_url: string | null
           landlord_name: string
           landlord_phone: string
+          lc1_chairperson_name: string | null
+          lc1_chairperson_phone: string | null
+          properties: string | null
           registered_by: string
           updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+          village_cell_location: string | null
         }
         Insert: {
           created_at?: string
+          google_maps_link?: string | null
           id?: string
+          is_verified?: boolean | null
           landlord_id_url?: string | null
           landlord_name: string
           landlord_phone: string
+          lc1_chairperson_name?: string | null
+          lc1_chairperson_phone?: string | null
+          properties?: string | null
           registered_by: string
           updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          village_cell_location?: string | null
         }
         Update: {
           created_at?: string
+          google_maps_link?: string | null
           id?: string
+          is_verified?: boolean | null
           landlord_id_url?: string | null
           landlord_name?: string
           landlord_phone?: string
+          lc1_chairperson_name?: string | null
+          lc1_chairperson_phone?: string | null
+          properties?: string | null
           registered_by?: string
           updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          village_cell_location?: string | null
         }
         Relationships: [
           {
@@ -339,6 +363,13 @@ export type Database = {
             columns: ["registered_by"]
             isOneToOne: false
             referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "landlords_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Phone, User, Building2, DollarSign, Calendar, TrendingUp, Users, Search } from "lucide-react";
+import { ArrowLeft, Phone, User, Building2, DollarSign, Calendar, TrendingUp, Users, Search, MapPin, MessageCircle, ExternalLink, CheckCircle, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -17,6 +17,14 @@ interface LandlordData {
   landlord_name: string;
   landlord_phone: string;
   landlord_id_url: string | null;
+  properties: string | null;
+  lc1_chairperson_name: string | null;
+  lc1_chairperson_phone: string | null;
+  village_cell_location: string | null;
+  google_maps_link: string | null;
+  is_verified: boolean;
+  verified_by: string | null;
+  verified_at: string | null;
   created_at: string;
   registered_by: string;
 }
@@ -173,22 +181,111 @@ const AgentLandlordDetail = () => {
           </div>
         </div>
 
-        {/* Contact Info */}
+        {/* Contact Info & Verification Status */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Contact Information
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Contact Information
+              </CardTitle>
+              {landlord.is_verified ? (
+                <Badge variant="default" className="gap-1">
+                  <CheckCircle className="h-3 w-3" />
+                  Verified
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="gap-1">
+                  <Clock className="h-3 w-3" />
+                  Pending Verification
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">
               <Phone className="h-5 w-5 text-muted-foreground" />
-              <div>
+              <div className="flex-1">
                 <p className="text-sm text-muted-foreground">Phone Number</p>
                 <p className="text-lg font-semibold">{landlord.landlord_phone}</p>
               </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => window.location.href = `tel:${landlord.landlord_phone}`}
+                >
+                  <Phone className="h-4 w-4" />
+                  Call
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => window.open(`https://wa.me/${landlord.landlord_phone.replace(/^0/, '256')}`, '_blank')}
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  WhatsApp
+                </Button>
+              </div>
             </div>
+
+            {landlord.properties && (
+              <div className="flex items-center gap-3">
+                <Building2 className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Properties</p>
+                  <p className="text-lg font-semibold">{landlord.properties}</p>
+                </div>
+              </div>
+            )}
+
+            {landlord.village_cell_location && (
+              <div className="flex items-center gap-3">
+                <MapPin className="h-5 w-5 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Location</p>
+                  <p className="text-lg font-semibold">{landlord.village_cell_location}</p>
+                </div>
+                {landlord.google_maps_link && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => window.open(landlord.google_maps_link!, '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    View Map
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {landlord.lc1_chairperson_name && (
+              <div className="flex items-center gap-3">
+                <User className="h-5 w-5 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">LC1 Chairperson</p>
+                  <p className="text-lg font-semibold">{landlord.lc1_chairperson_name}</p>
+                  {landlord.lc1_chairperson_phone && (
+                    <p className="text-sm text-muted-foreground">{landlord.lc1_chairperson_phone}</p>
+                  )}
+                </div>
+                {landlord.lc1_chairperson_phone && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => window.location.href = `tel:${landlord.lc1_chairperson_phone}`}
+                  >
+                    <Phone className="h-4 w-4" />
+                    Call
+                  </Button>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center gap-3">
               <Calendar className="h-5 w-5 text-muted-foreground" />
               <div>
@@ -198,6 +295,18 @@ const AgentLandlordDetail = () => {
                 </p>
               </div>
             </div>
+
+            {landlord.is_verified && landlord.verified_at && (
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Verified On</p>
+                  <p className="text-lg font-semibold">
+                    {format(new Date(landlord.verified_at), "MMM d, yyyy")}
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
