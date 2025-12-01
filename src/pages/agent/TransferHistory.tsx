@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import AgentLayout from "@/components/AgentLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRightLeft, User, Phone, Calendar, Loader2, ArrowRight, ArrowLeft } from "lucide-react";
+import { Send, User, Phone, Calendar, Loader2, ArrowRight, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -52,7 +52,7 @@ export default function AgentTransferHistory() {
     <AgentLayout>
       <div className="space-y-6 p-6">
         <div>
-          <h1 className="text-3xl font-bold text-purple-900 mb-2">Transfer History</h1>
+          <h1 className="text-3xl font-bold text-purple-900 mb-2">💸 Money Sent History</h1>
           <p className="text-purple-600">Track money sent to and received from other agents</p>
         </div>
 
@@ -96,11 +96,11 @@ export default function AgentTransferHistory() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-blue-600 font-medium">Total Transfers</p>
+                  <p className="text-sm text-blue-600 font-medium">Total Transactions</p>
                   <p className="text-3xl font-bold text-blue-900">{transfers?.length || 0}</p>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-full">
-                  <ArrowRightLeft className="h-6 w-6 text-blue-600" />
+                  <Send className="h-6 w-6 text-blue-600" />
                 </div>
               </div>
             </CardContent>
@@ -210,10 +210,10 @@ export default function AgentTransferHistory() {
         ) : (
           <Card>
             <CardContent className="p-12 text-center">
-              <ArrowRightLeft className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Transfers Yet</h3>
+              <Send className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Transactions Yet</h3>
               <p className="text-muted-foreground">
-                You haven't sent or received any money transfers.
+                You haven't sent or received any money yet.
               </p>
             </CardContent>
           </Card>

@@ -590,59 +590,64 @@ const AgentDashboard = () => {
           </Card>
           </div>
 
-          {/* Wallet Balance Card - NEW FEATURE */}
-          <Card className="bg-gradient-to-br from-purple-600 via-purple-500 to-indigo-500 text-white overflow-hidden relative hover:shadow-2xl transition-all border-4 border-purple-400/50">
-            <div className="absolute top-0 right-0 w-56 h-56 bg-white/10 rounded-full -translate-y-20 translate-x-20" />
-            <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/10 rounded-full translate-y-16 -translate-x-16" />
+          {/* Wallet Balance Card - Modern Purple Design */}
+          <Card className="bg-gradient-to-br from-purple-600 via-purple-500 to-violet-600 text-white overflow-hidden relative hover:shadow-2xl transition-all border-0 shadow-purple-500/50">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-24 translate-x-24 blur-2xl" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-300/20 rounded-full translate-y-20 -translate-x-20 blur-xl" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-purple-700/30 via-transparent to-violet-500/20" />
             
-            <CardContent className="p-8 relative z-10">
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-white/25 backdrop-blur-sm rounded-2xl">
-                      <Wallet className="h-10 w-10" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium opacity-95 mb-1">💼 Live Wallet Balance</p>
-                      <h2 className="text-5xl font-black tracking-tight">
-                        {((agentData?.wallet_balance || 0) / 1000).toFixed(1)}K
-                      </h2>
-                    </div>
+            <CardContent className="p-6 relative z-10">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-white/20 backdrop-blur-md rounded-2xl shadow-lg border border-white/30">
+                    <Wallet className="h-8 w-8" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold opacity-90 uppercase tracking-wider mb-1">💼 Wallet Balance</p>
+                    <h2 className="text-4xl font-black tracking-tight">
+                      UGX {(agentData?.wallet_balance || 0).toLocaleString()}
+                    </h2>
                   </div>
                 </div>
                 
-                <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4">
-                  <p className="text-xs opacity-90 mb-1">Available for Withdrawal</p>
-                  <p className="text-3xl font-bold">
-                    UGX {(agentData?.wallet_balance || 0).toLocaleString()}
+                <div className="bg-white/15 backdrop-blur-md rounded-xl p-4 border border-white/20 shadow-lg">
+                  <p className="text-xs font-medium opacity-90 mb-2">💰 Available Balance</p>
+                  <p className="text-2xl font-bold">
+                    {((agentData?.wallet_balance || 0) / 1000).toFixed(1)}K UGX
                   </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <Button 
                     variant="secondary"
-                    className="font-bold text-base py-6 bg-white text-purple-600 hover:bg-white/90 flex flex-col items-center gap-1"
-                    onClick={() => navigate("/agent/register-landlord")}
+                    className="font-bold text-sm py-5 bg-white text-purple-600 hover:bg-purple-50 flex flex-col items-center gap-1 shadow-md border-2 border-white/30"
+                    onClick={() => {
+                      navigate("/agent/register-landlord");
+                      haptics.light();
+                    }}
                   >
                     <UserPlus className="h-5 w-5" />
                     <span>+ Landlord</span>
-                    <span className="text-xs">+UGX 500</span>
+                    <span className="text-xs font-semibold">+UGX 500</span>
                   </Button>
                   <Button 
                     variant="secondary"
-                    className="font-bold text-base py-6 bg-white text-purple-600 hover:bg-white/90 flex flex-col items-center gap-1"
-                    onClick={() => navigate("/agent/register-tenant")}
+                    className="font-bold text-sm py-5 bg-white text-purple-600 hover:bg-purple-50 flex flex-col items-center gap-1 shadow-md border-2 border-white/30"
+                    onClick={() => {
+                      navigate("/agent/register-tenant");
+                      haptics.light();
+                    }}
                   >
                     <Plus className="h-5 w-5" />
                     <span>+ Tenant</span>
-                    <span className="text-xs">+UGX 5,000</span>
+                    <span className="text-xs font-semibold">+UGX 5,000</span>
                   </Button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 pt-2">
                   <Button 
                     variant="secondary"
-                    className="font-bold text-sm py-5 bg-green-600 text-white hover:bg-green-700 flex flex-col items-center gap-1"
+                    className="font-bold text-sm py-5 bg-white/20 backdrop-blur-sm text-white hover:bg-white/30 border-2 border-white/40 flex flex-col items-center gap-1 shadow-lg"
                     onClick={() => {
                       setWithdrawDialogOpen(true);
                       haptics.light();
@@ -653,14 +658,14 @@ const AgentDashboard = () => {
                   </Button>
                   <Button 
                     variant="secondary"
-                    className="font-bold text-sm py-5 bg-blue-600 text-white hover:bg-blue-700 flex flex-col items-center gap-1"
+                    className="font-bold text-sm py-5 bg-white text-purple-600 hover:bg-white/90 border-2 border-white flex flex-col items-center gap-1 shadow-lg"
                     onClick={() => {
                       setTransferDialogOpen(true);
                       haptics.light();
                     }}
                   >
-                    <ArrowRightLeft className="h-5 w-5" />
-                    <span>Transfer</span>
+                    <Send className="h-5 w-5" />
+                    <span>Send Money</span>
                   </Button>
                 </div>
               </div>
