@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Wallet, ArrowRightLeft, User } from "lucide-react";
+import { Loader2, Wallet, Send, User } from "lucide-react";
 import { haptics } from "@/utils/haptics";
 
 interface TransferMoneyDialogProps {
@@ -159,7 +159,7 @@ export function TransferMoneyDialog({
       if (recipientUpdateError) throw recipientUpdateError;
 
       haptics.success(); // Success feedback
-      toast.success(`UGX ${transferAmount.toLocaleString()} transferred successfully`, {
+      toast.success(`UGX ${transferAmount.toLocaleString()} sent successfully`, {
         description: `Sent to ${recipientName || phone}`,
       });
 
@@ -169,9 +169,9 @@ export function TransferMoneyDialog({
       onOpenChange(false);
       onSuccess?.();
     } catch (error: any) {
-      console.error("Error transferring funds:", error);
+      console.error("Error sending funds:", error);
       haptics.error(); // Error feedback
-      toast.error("Failed to transfer funds");
+      toast.error("Failed to send funds");
     } finally {
       setIsSubmitting(false);
     }
@@ -184,18 +184,18 @@ export function TransferMoneyDialog({
         className="flex-1 w-full sm:w-auto"
         onClick={() => onOpenChange(true)}
       >
-        <ArrowRightLeft className="h-5 w-5 mr-2" />
-        Transfer
+        <Send className="h-5 w-5 mr-2" />
+        Send Money
       </Button>
       
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-gradient-to-br from-blue-100 to-cyan-100 rounded-lg">
-              <ArrowRightLeft className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-gradient-to-br from-purple-100 to-violet-100 rounded-lg">
+              <Send className="h-5 w-5 text-purple-600" />
             </div>
-            <DialogTitle className="text-xl">Transfer Money</DialogTitle>
+            <DialogTitle className="text-xl">Send Money</DialogTitle>
           </div>
           <DialogDescription>
             Send money to another agent instantly using their phone number
@@ -235,7 +235,7 @@ export function TransferMoneyDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">Transfer Amount (UGX)</Label>
+            <Label htmlFor="amount">Amount to Send (UGX)</Label>
             <Input
               id="amount"
               type="number"
@@ -263,16 +263,16 @@ export function TransferMoneyDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
+            <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700">
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Processing...
+                  Sending...
                 </>
               ) : (
                 <>
-                  <ArrowRightLeft className="mr-2 h-5 w-5" />
-                  Transfer Now
+                  <Send className="mr-2 h-5 w-5" />
+                  Send Now
                 </>
               )}
             </Button>

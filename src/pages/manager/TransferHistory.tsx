@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRightLeft, User, Phone, Calendar, Loader2, ArrowRight } from "lucide-react";
+import { Send, User, Phone, Calendar, Loader2, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 
 export default function TransferHistory() {
@@ -44,8 +44,8 @@ export default function TransferHistory() {
     <ManagerLayout>
       <div className="space-y-6 p-6">
         <div>
-          <h1 className="text-3xl font-bold text-purple-900 mb-2">Agent Transfer History</h1>
-          <p className="text-purple-600">View all money transfers between agents</p>
+          <h1 className="text-3xl font-bold text-purple-900 mb-2">💸 Agent Money Sent History</h1>
+          <p className="text-purple-600">View all money sent between agents</p>
         </div>
 
         {/* Summary Cards */}
@@ -54,11 +54,11 @@ export default function TransferHistory() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-blue-600 font-medium">Total Transfers</p>
+                  <p className="text-sm text-blue-600 font-medium">Total Transactions</p>
                   <p className="text-3xl font-bold text-blue-900">{totalTransfers}</p>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-full">
-                  <ArrowRightLeft className="h-6 w-6 text-blue-600" />
+                  <Send className="h-6 w-6 text-blue-600" />
                 </div>
               </div>
             </CardContent>
@@ -72,7 +72,7 @@ export default function TransferHistory() {
                   <p className="text-3xl font-bold text-green-900">{completedTransfers}</p>
                 </div>
                 <div className="p-3 bg-green-100 rounded-full">
-                  <ArrowRightLeft className="h-6 w-6 text-green-600" />
+                  <Send className="h-6 w-6 text-green-600" />
                 </div>
               </div>
             </CardContent>
@@ -88,7 +88,7 @@ export default function TransferHistory() {
                   </p>
                 </div>
                 <div className="p-3 bg-purple-100 rounded-full">
-                  <ArrowRightLeft className="h-6 w-6 text-purple-600" />
+                  <Send className="h-6 w-6 text-purple-600" />
                 </div>
               </div>
             </CardContent>
@@ -144,7 +144,7 @@ export default function TransferHistory() {
 
                       <div className="grid grid-cols-3 gap-4 pt-3 border-t">
                         <div>
-                          <p className="text-xs text-muted-foreground">Amount Transferred</p>
+                          <p className="text-xs text-muted-foreground">Amount Sent</p>
                           <p className="text-lg font-bold text-purple-900">
                             UGX {Number(transfer.amount).toLocaleString()}
                           </p>
@@ -176,8 +176,8 @@ export default function TransferHistory() {
         ) : (
           <Card>
             <CardContent className="p-12 text-center">
-              <ArrowRightLeft className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No transfers found</p>
+              <Send className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No transactions found</p>
             </CardContent>
           </Card>
         )}
