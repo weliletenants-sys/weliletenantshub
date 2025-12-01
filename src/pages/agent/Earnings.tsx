@@ -8,11 +8,13 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TrendingUp, Wallet, Target, DollarSign, Award, Calendar, TrendingDown, CalendarIcon, Clock, CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 const AgentEarnings = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [earnings, setEarnings] = useState({
     thisMonth: 0,
@@ -194,6 +196,17 @@ const AgentEarnings = () => {
             </AlertDescription>
           </Alert>
         )}
+
+        {/* Quick Action Buttons */}
+        <div className="flex gap-3 flex-wrap">
+          <Button
+            onClick={() => navigate("/agent/commission-history")}
+            className="flex items-center gap-2"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            View Commission History
+          </Button>
+        </div>
 
         {/* Lifetime Commission Hero Card */}
         <Card className="bg-gradient-to-br from-amber-600 via-amber-500 to-yellow-500 text-white overflow-hidden relative shadow-xl">
