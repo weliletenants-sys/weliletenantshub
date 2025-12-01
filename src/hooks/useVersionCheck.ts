@@ -25,10 +25,8 @@ export const useVersionCheck = () => {
       // Dispatch event for UI indicator
       window.dispatchEvent(new Event('version-check-start'));
       
-      // Fetch the current deployed version by requesting the main HTML
-      // with cache-busting query param
-      const response = await fetch(`/?v=${Date.now()}`, {
-        method: 'HEAD',
+      // Fetch version.json with cache-busting
+      const response = await fetch(`/version.json?v=${Date.now()}`, {
         cache: 'no-cache',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -36,37 +34,46 @@ export const useVersionCheck = () => {
         },
       });
 
-      // Check ETag or Last-Modified headers for version changes
-      const etag = response.headers.get('etag');
-      const lastModified = response.headers.get('last-modified');
-      const versionIdentifier = etag || lastModified || '';
+      if (!response.ok) {
+        throw new Error('Failed to fetch version');
+      }
+
+      const versionData = await response.json();
+      const serverVersion = versionData.version || versionData.buildTime;
 
       // Get stored version
       const storedVersion = localStorage.getItem(VERSION_STORAGE_KEY);
 
-      if (storedVersion && versionIdentifier && storedVersion !== versionIdentifier) {
-        console.log('New version detected:', versionIdentifier, 'Current:', storedVersion);
+      if (storedVersion && serverVersion && storedVersion !== serverVersion) {
+        console.log('🔄 New version detected!', {
+          server: serverVersion,
+          current: storedVersion
+        });
+        setNewVersion(serverVersion);
         setUpdateRequired(true);
         
-        // Show update notification
-        toast.success('🔄 New Version Available!', {
-          description: 'Updating to the latest version now...',
+        // Show update notification with more info
+        toast.success('🎉 New Update Available!', {
+          description: 'Applying latest version in 3 seconds...',
           duration: 3000,
         });
 
         // Auto-update after 3 seconds
         setTimeout(() => {
-          forceUpdate(versionIdentifier);
+          forceUpdate(serverVersion);
         }, 3000);
-      } else if (versionIdentifier && !storedVersion) {
+      } else if (serverVersion && !storedVersion) {
         // First time visit, store version
-        localStorage.setItem(VERSION_STORAGE_KEY, versionIdentifier);
+        console.log('📦 First load - storing version:', serverVersion);
+        localStorage.setItem(VERSION_STORAGE_KEY, serverVersion);
+      } else {
+        console.log('✅ App is up to date:', serverVersion);
       }
       
       // Dispatch completion event
       window.dispatchEvent(new Event('version-check-complete'));
     } catch (error) {
-      console.error('Version check failed:', error);
+      console.error('❌ Version check failed:', error);
       window.dispatchEvent(new Event('version-check-complete'));
     } finally {
       setIsChecking(false);
