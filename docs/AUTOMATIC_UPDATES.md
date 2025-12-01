@@ -66,18 +66,30 @@ Edit `public/version.json` and increment the version:
 - **Minor** (2.1.0): New features, no breaking changes  
 - **Patch** (2.0.1): Bug fixes, small improvements
 
-### Step 2: Publish via Lovable
+### Step 2: Add Version to Database (Optional but Recommended)
+
+For tracking in the Version History page, manually add the new version to the database:
+
+```sql
+INSERT INTO public.version_history (version, deployed_at, description, deployed_by)
+VALUES ('2.0.2', now(), 'Brief description of changes', '[your-user-id]');
+```
+
+Or managers can view and track all deployments in the **Version History** page at `/manager/version-history`.
+
+### Step 3: Publish via Lovable
 
 1. Click **Publish** button (top right on desktop, bottom-right on mobile)
 2. Click **Update** in the publish dialog
 3. Wait for deployment (usually 1-2 minutes)
 
-### Step 3: Verify Automatic Updates
+### Step 4: Verify Automatic Updates
 
 After publishing:
 - All connected users will detect the update **within 2 minutes** automatically
 - Users see: "🎉 New Update Available! Applying latest version in 3 seconds..."
 - App auto-reloads with new version
+- Version adoption is automatically logged to database
 - Changelog dialog shows what's new
 - **No user action required!** 🎉
 
@@ -277,6 +289,16 @@ Version checking follows best practices:
 - 💨 No user action required
 - 🎉 Users always see latest features and fixes
 - 🔒 Secure and reliable update delivery
+- 📊 Version adoption tracking via Version History page
+
+**Key Features:**
+- **Automatic version checking** every 2 minutes + on focus + reconnect
+- **Version adoption tracking** - logs when users update to new versions
+- **Version History page** at `/manager/version-history` shows:
+  - All deployed versions with dates
+  - User adoption rates and percentages
+  - Deployment timeline
+  - Adopter counts per version
 
 **Just remember one thing:** 
 ### 🚨 Update `public/version.json` before every publish! 🚨

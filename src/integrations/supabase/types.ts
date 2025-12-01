@@ -772,6 +772,73 @@ export type Database = {
         }
         Relationships: []
       }
+      version_adoptions: {
+        Row: {
+          adopted_at: string
+          device_info: Json | null
+          id: string
+          user_id: string
+          version: string
+        }
+        Insert: {
+          adopted_at?: string
+          device_info?: Json | null
+          id?: string
+          user_id: string
+          version: string
+        }
+        Update: {
+          adopted_at?: string
+          device_info?: Json | null
+          id?: string
+          user_id?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "version_adoptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      version_history: {
+        Row: {
+          created_at: string
+          deployed_at: string
+          deployed_by: string | null
+          description: string | null
+          id: string
+          version: string
+        }
+        Insert: {
+          created_at?: string
+          deployed_at?: string
+          deployed_by?: string | null
+          description?: string | null
+          id?: string
+          version: string
+        }
+        Update: {
+          created_at?: string
+          deployed_at?: string
+          deployed_by?: string | null
+          description?: string | null
+          id?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "version_history_deployed_by_fkey"
+            columns: ["deployed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       withdrawal_requests: {
         Row: {
           agent_id: string

@@ -80,6 +80,39 @@ export const useVersionCheck = () => {
     }
   };
 
+  const logVersionAdoption = async (version: string) => {
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) return;
+
+      // Gather device info
+      const deviceInfo = {
+        browser: navigator.userAgent,
+        os: navigator.platform,
+        screenResolution: `${window.screen.width}x${window.screen.height}`,
+        language: navigator.language,
+      };
+
+      // Log version adoption (will be unique per user per version)
+      await supabase
+        .from('version_adoptions')
+        .insert({
+          user_id: user.id,
+          version,
+          device_info: deviceInfo,
+        })
+        .select()
+        .single();
+
+      console.log('📊 Version adoption logged:', version);
+    } catch (error) {
+      // Silently fail - don't block update flow
+      console.error('Failed to log version adoption:', error);
+    }
+  };
+
   const forceUpdate = async (newVersionId?: string) => {
     try {
       // Clear all caches
@@ -91,11 +124,13 @@ export const useVersionCheck = () => {
         console.log('All caches cleared for update');
       }
 
-      // Update stored version
+      // Update stored version and log adoption
       if (newVersionId) {
         localStorage.setItem(VERSION_STORAGE_KEY, newVersionId);
-        // Mark that we should show changelog after reload
         localStorage.setItem('show_changelog_on_load', 'true');
+        
+        // Log adoption in background (don't wait)
+        logVersionAdoption(newVersionId).catch(console.error);
       }
 
       // Force reload with cache bypass
