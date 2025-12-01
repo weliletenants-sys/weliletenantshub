@@ -6,7 +6,7 @@ import OfflineSyncIndicator from "./OfflineSyncIndicator";
 import { CacheIndicator } from "./CacheIndicator";
 import Breadcrumbs from "./Breadcrumbs";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Users, Plus, DollarSign, TrendingUp, LogOut, MessageSquare, BarChart3, Settings, Receipt, FileText, BookOpen, Calculator } from "lucide-react";
+import { Home, Users, Plus, DollarSign, TrendingUp, LogOut, MessageSquare, BarChart3, Settings, Receipt, FileText, BookOpen, Calculator, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useRipple } from "@/hooks/useRipple";
 import { useSwipeBack } from "@/hooks/useSwipeBack";
@@ -44,13 +44,14 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
   const navItems = [
     { icon: Home, label: "Dashboard", path: "/agent/dashboard" },
     { icon: Users, label: "Tenants", path: "/agent/tenants" },
-    { icon: Plus, label: "New Tenant", path: "/agent/new-tenant" },
+    { icon: UserPlus, label: "+ Register Landlord", path: "/agent/register-landlord" },
+    { icon: Plus, label: "+ Register Tenant", path: "/agent/register-tenant" },
     { icon: DollarSign, label: "Collections", path: "/agent/collections" },
-    { icon: TrendingUp, label: "Earnings", path: "/agent/earnings" },
-    { icon: Calculator, label: "Daily Calculator", path: "/agent/calculator" },
   ];
 
   const moreNavItems = [
+    { icon: TrendingUp, label: "Earnings", path: "/agent/earnings" },
+    { icon: Calculator, label: "Daily Calculator", path: "/agent/calculator" },
     { icon: BarChart3, label: "Weekly Report", path: "/agent/weekly-summary" },
     { icon: MessageSquare, label: "AI Assistant", path: "/agent/ai-assistant" },
     { icon: Receipt, label: "Receipt History", path: "/agent/receipt-history" },

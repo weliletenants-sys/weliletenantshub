@@ -32,6 +32,7 @@ export type Database = {
           total_tenants: number | null
           updated_at: string
           user_id: string
+          wallet_balance: number | null
         }
         Insert: {
           active_tenants?: number | null
@@ -50,6 +51,7 @@ export type Database = {
           total_tenants?: number | null
           updated_at?: string
           user_id: string
+          wallet_balance?: number | null
         }
         Update: {
           active_tenants?: number | null
@@ -68,6 +70,7 @@ export type Database = {
           total_tenants?: number | null
           updated_at?: string
           user_id?: string
+          wallet_balance?: number | null
         }
         Relationships: [
           {
@@ -298,6 +301,44 @@ export type Database = {
             columns: ["manager_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      landlords: {
+        Row: {
+          created_at: string
+          id: string
+          landlord_id_url: string | null
+          landlord_name: string
+          landlord_phone: string
+          registered_by: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          landlord_id_url?: string | null
+          landlord_name: string
+          landlord_phone: string
+          registered_by: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          landlord_id_url?: string | null
+          landlord_name?: string
+          landlord_phone?: string
+          registered_by?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "landlords_registered_by_fkey"
+            columns: ["registered_by"]
+            isOneToOne: false
+            referencedRelation: "agents"
             referencedColumns: ["id"]
           },
         ]
@@ -540,6 +581,7 @@ export type Database = {
           days_remaining: number | null
           due_date: string | null
           id: string
+          landlord_id: string | null
           landlord_id_url: string | null
           landlord_name: string | null
           landlord_phone: string | null
@@ -565,6 +607,7 @@ export type Database = {
           days_remaining?: number | null
           due_date?: string | null
           id?: string
+          landlord_id?: string | null
           landlord_id_url?: string | null
           landlord_name?: string | null
           landlord_phone?: string | null
@@ -590,6 +633,7 @@ export type Database = {
           days_remaining?: number | null
           due_date?: string | null
           id?: string
+          landlord_id?: string | null
           landlord_id_url?: string | null
           landlord_name?: string | null
           landlord_phone?: string | null
@@ -614,6 +658,13 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenants_landlord_id_fkey"
+            columns: ["landlord_id"]
+            isOneToOne: false
+            referencedRelation: "landlords"
             referencedColumns: ["id"]
           },
         ]

@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X, Reply, Send, MessageCircle, Calculator } from "lucide-react";
+import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X, Reply, Send, MessageCircle, Calculator, Wallet, UserPlus } from "lucide-react";
 import MessageThreadDialog from "@/components/MessageThreadDialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { toast } from "sonner";
@@ -84,9 +84,9 @@ const AgentDashboard = () => {
     
     initCache();
 
-    // Set up realtime subscription for notifications
+    // Set up realtime subscription for notifications AND agent wallet updates
     const channel = supabase
-      .channel("dashboard-notifications")
+      .channel("dashboard-updates")
       .on(
         "postgres_changes",
         {
@@ -96,6 +96,33 @@ const AgentDashboard = () => {
         },
         () => {
           fetchManagerNotifications();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "agents",
+          filter: `id=eq.${agentId}`,
+        },
+        (payload) => {
+          // Update wallet balance in real-time
+          if (payload.new && payload.new.wallet_balance !== payload.old?.wallet_balance) {
+            setAgentData((prev: any) => ({
+              ...prev,
+              wallet_balance: payload.new.wallet_balance
+            }));
+            
+            // Show toast notification for wallet changes
+            const change = (payload.new.wallet_balance || 0) - (payload.old?.wallet_balance || 0);
+            if (change > 0) {
+              haptics.success();
+              toast.success(`💰 Wallet Updated! +UGX ${change.toLocaleString()}`, {
+                duration: 4000,
+              });
+            }
+          }
         }
       )
       .subscribe();
@@ -128,7 +155,7 @@ const AgentDashboard = () => {
 
       const { data: agent, error } = await supabase
         .from("agents")
-        .select("*")
+        .select("*, wallet_balance")
         .eq("id", agentId)
         .single();
 
@@ -541,6 +568,58 @@ const AgentDashboard = () => {
             </CardContent>
           </Card>
           </div>
+
+          {/* Wallet Balance Card - NEW FEATURE */}
+          <Card className="bg-gradient-to-br from-purple-600 via-purple-500 to-indigo-500 text-white overflow-hidden relative hover:shadow-2xl transition-all border-4 border-purple-400/50">
+            <div className="absolute top-0 right-0 w-56 h-56 bg-white/10 rounded-full -translate-y-20 translate-x-20" />
+            <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/10 rounded-full translate-y-16 -translate-x-16" />
+            
+            <CardContent className="p-8 relative z-10">
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-white/25 backdrop-blur-sm rounded-2xl">
+                      <Wallet className="h-10 w-10" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium opacity-95 mb-1">💼 Live Wallet Balance</p>
+                      <h2 className="text-5xl font-black tracking-tight">
+                        {((agentData?.wallet_balance || 0) / 1000).toFixed(1)}K
+                      </h2>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4">
+                  <p className="text-xs opacity-90 mb-1">Available for Withdrawal</p>
+                  <p className="text-3xl font-bold">
+                    UGX {(agentData?.wallet_balance || 0).toLocaleString()}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Button 
+                    variant="secondary"
+                    className="font-bold text-base py-6 bg-white text-purple-600 hover:bg-white/90 flex flex-col items-center gap-1"
+                    onClick={() => navigate("/agent/register-landlord")}
+                  >
+                    <UserPlus className="h-5 w-5" />
+                    <span>+ Landlord</span>
+                    <span className="text-xs">+UGX 500</span>
+                  </Button>
+                  <Button 
+                    variant="secondary"
+                    className="font-bold text-base py-6 bg-white text-purple-600 hover:bg-white/90 flex flex-col items-center gap-1"
+                    onClick={() => navigate("/agent/register-tenant")}
+                  >
+                    <Plus className="h-5 w-5" />
+                    <span>+ Tenant</span>
+                    <span className="text-xs">+UGX 5,000</span>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Manager Messages - ULTRA PROMINENT DISPLAY */}
           <Card
