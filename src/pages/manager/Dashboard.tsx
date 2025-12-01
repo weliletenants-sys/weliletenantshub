@@ -8,7 +8,7 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save, DollarSign, Download, FileText, X, UserPlus, Hash } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save, DollarSign, Download, FileText, X, UserPlus, Hash, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -829,12 +829,24 @@ const ManagerDashboard = () => {
       const agentIds = Array.from(agentCommissionMap.keys());
       const { data: agents } = await supabase
         .from("agents")
-        .select("id, total_tenants")
+        .select("id, total_tenants, wallet_balance, monthly_earnings, portfolio_value, collection_rate")
         .in("id", agentIds);
 
-      // Create tenant count map
+      // Create maps for agent data
       const tenantCountMap = new Map(
         agents?.map(agent => [agent.id, agent.total_tenants || 0]) || []
+      );
+      const walletBalanceMap = new Map(
+        agents?.map(agent => [agent.id, agent.wallet_balance || 0]) || []
+      );
+      const monthlyEarningsMap = new Map(
+        agents?.map(agent => [agent.id, agent.monthly_earnings || 0]) || []
+      );
+      const portfolioValueMap = new Map(
+        agents?.map(agent => [agent.id, agent.portfolio_value || 0]) || []
+      );
+      const collectionRateMap = new Map(
+        agents?.map(agent => [agent.id, agent.collection_rate || 0]) || []
       );
 
       // Convert to array and calculate metrics
@@ -862,6 +874,10 @@ const ManagerDashboard = () => {
           averageCommission,
           tenantCount,
           efficiencyScore,
+          walletBalance: walletBalanceMap.get(agent.agentId) || 0,
+          monthlyEarnings: monthlyEarningsMap.get(agent.agentId) || 0,
+          portfolioValue: portfolioValueMap.get(agent.agentId) || 0,
+          collectionRate: collectionRateMap.get(agent.agentId) || 0,
         };
       });
 
@@ -2817,6 +2833,166 @@ const ManagerDashboard = () => {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Comprehensive Agent Earnings Breakdown */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Coins className="h-5 w-5 text-success" />
+                    Agent Earnings Breakdown
+                  </CardTitle>
+                  <CardDescription>
+                    Complete financial overview for all agents
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate("/manager/agents")}
+                >
+                  View All Agents →
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <SkeletonWrapper 
+                loading={isLoading}
+                skeleton={
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="p-4 border rounded-lg">
+                        <div className="flex items-center gap-3 mb-3">
+                          <Skeleton className="h-10 w-10 rounded-full" />
+                          <Skeleton className="h-5 w-32" />
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <Skeleton className="h-16 w-full" />
+                          <Skeleton className="h-16 w-full" />
+                          <Skeleton className="h-16 w-full" />
+                          <Skeleton className="h-16 w-full" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                }
+              >
+                {topAgentsByCommission.length > 0 ? (
+                  <div className="space-y-4">
+                    {topAgentsByCommission.map((agent, index) => (
+                      <div
+                        key={agent.agentId}
+                        className="p-4 border-2 rounded-lg hover:border-primary/40 transition-all cursor-pointer"
+                        onClick={() => {
+                          navigate(`/manager/agents/${agent.agentId}`);
+                          haptics.light();
+                        }}
+                      >
+                        {/* Agent Header */}
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="flex items-center justify-center h-10 w-10 rounded-full bg-success/10 font-bold text-success">
+                            #{index + 1}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-lg group-hover:text-primary transition-colors">
+                              {agent.agentName}
+                            </h4>
+                            <p className="text-xs text-muted-foreground">
+                              {agent.tenantCount} tenants · {agent.paymentCount} verified payments
+                            </p>
+                          </div>
+                          {index === 0 && (
+                            <Badge variant="default" className="bg-success text-white">
+                              🏆 Top Earner
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Earnings Grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          {/* Total Commission */}
+                          <div className="p-3 rounded-lg bg-success/10 border border-success/20">
+                            <div className="flex items-center gap-2 mb-1">
+                              <TrendingUp className="h-4 w-4 text-success" />
+                              <p className="text-xs text-muted-foreground font-medium">Commission Earned</p>
+                            </div>
+                            <p className="text-xl font-bold text-success">
+                              UGX {agent.totalCommission.toLocaleString()}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Avg: UGX {agent.averageCommission.toLocaleString()} per payment
+                            </p>
+                          </div>
+
+                          {/* Wallet Balance */}
+                          <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Wallet className="h-4 w-4 text-primary" />
+                              <p className="text-xs text-muted-foreground font-medium">Wallet Balance</p>
+                            </div>
+                            <p className="text-xl font-bold text-primary">
+                              UGX {(agent.walletBalance || 0).toLocaleString()}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Available for withdrawal
+                            </p>
+                          </div>
+
+                          {/* Total Earnings (Commission) */}
+                          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                            <div className="flex items-center gap-2 mb-1">
+                              <DollarSign className="h-4 w-4 text-amber-600" />
+                              <p className="text-xs text-muted-foreground font-medium">Monthly Earnings</p>
+                            </div>
+                            <p className="text-xl font-bold text-amber-600">
+                              UGX {(agent.monthlyEarnings || 0).toLocaleString()}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              This billing cycle
+                            </p>
+                          </div>
+
+                          {/* Preferred Payment Method */}
+                          <div className="p-3 rounded-lg bg-muted border">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className={`h-3 w-3 rounded-full ${
+                                agent.preferredMethod === 'Cash' ? 'bg-blue-500' :
+                                agent.preferredMethod === 'MTN Mobile Money' ? 'bg-yellow-500' :
+                                'bg-red-500'
+                              }`} />
+                              <p className="text-xs text-muted-foreground font-medium">Preferred Method</p>
+                            </div>
+                            <p className="text-lg font-bold">
+                              {agent.preferredMethod}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Most used channel
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Quick Stats Bar */}
+                        <div className="mt-3 pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Portfolio: UGX {(agent.portfolioValue || 0).toLocaleString()}</span>
+                          <span>Collection Rate: {(agent.collectionRate || 0).toFixed(1)}%</span>
+                          <span className="text-success font-medium">
+                            Total Commission: UGX {agent.totalCommission.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Coins className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p>No earnings data available yet</p>
+                    <p className="text-xs mt-1">Agents will appear here once they start earning commissions</p>
+                  </div>
+                )}
+              </SkeletonWrapper>
             </CardContent>
           </Card>
         </div>

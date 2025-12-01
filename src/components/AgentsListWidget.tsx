@@ -15,6 +15,7 @@ interface Agent {
   portfolio_value: number;
   collection_rate: number;
   monthly_earnings: number;
+  wallet_balance: number;
   profiles: {
     full_name: string | null;
     phone_number: string;
@@ -46,9 +47,10 @@ export default function AgentsList({ onPaymentClick }: AgentsListProps) {
           portfolio_value,
           collection_rate,
           monthly_earnings,
+          wallet_balance,
           profiles!agents_user_id_fkey(full_name, phone_number)
         `)
-        .order("total_tenants", { ascending: false })
+        .order("monthly_earnings", { ascending: false })
         .limit(5);
 
       if (error) throw error;
@@ -107,24 +109,27 @@ export default function AgentsList({ onPaymentClick }: AgentsListProps) {
               <h4 className="font-semibold text-base group-hover:text-primary transition-colors truncate">
                 {agent.profiles?.full_name || "Unknown Agent"}
               </h4>
-              {agent.active_tenants >= 30 && (
+              {agent.monthly_earnings >= 50000 && (
                 <Badge variant="default" className="text-xs">
-                  Top Performer
+                  Top Earner
                 </Badge>
               )}
             </div>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+              <div className="flex items-center gap-1 text-muted-foreground">
                 <Users className="h-3 w-3" />
                 <span>{agent.total_tenants || 0} tenants</span>
               </div>
-              <div className="flex items-center gap-1">
-                <Wallet className="h-3 w-3" />
-                <span>UGX {(agent.portfolio_value || 0).toLocaleString()}</span>
-              </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 text-success font-medium">
                 <TrendingUp className="h-3 w-3" />
-                <span>{(agent.collection_rate || 0).toFixed(1)}%</span>
+                <span>UGX {(agent.monthly_earnings || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <Wallet className="h-3 w-3" />
+                <span>UGX {(agent.wallet_balance || 0).toLocaleString()}</span>
+              </div>
+              <div className="text-muted-foreground text-right">
+                Portfolio: UGX {(agent.portfolio_value || 0).toLocaleString()}
               </div>
             </div>
           </div>
