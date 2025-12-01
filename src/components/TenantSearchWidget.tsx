@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,9 @@ export const TenantSearchWidget = ({ agentId }: TenantSearchWidgetProps) => {
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
   const [showRecent, setShowRecent] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  
+  // Ref to store debounce timeout
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load recent searches from localStorage on mount
   useEffect(() => {
@@ -72,10 +75,8 @@ export const TenantSearchWidget = ({ agentId }: TenantSearchWidgetProps) => {
     toast.success("Search history cleared");
   };
 
-  const handleSearch = async (query: string) => {
-    setSearchQuery(query);
-    
-    // Reset states when query is empty
+  // Debounced search function
+  const performSearch = useCallback(async (query: string) => {
     if (query.trim().length === 0) {
       setSearchResults([]);
       setSuggestions([]);
@@ -89,7 +90,6 @@ export const TenantSearchWidget = ({ agentId }: TenantSearchWidgetProps) => {
       setIsSearching(true);
       setShowRecent(false);
       setShowSuggestions(true);
-      haptics.light();
 
       try {
         const { data, error } = await supabase
@@ -117,7 +117,44 @@ export const TenantSearchWidget = ({ agentId }: TenantSearchWidgetProps) => {
         setIsSearching(false);
       }
     }
+  }, [agentId]);
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Reset states immediately when query is empty
+    if (query.trim().length === 0) {
+      setSearchResults([]);
+      setSuggestions([]);
+      setShowRecent(false);
+      setShowSuggestions(false);
+      setIsSearching(false);
+      return;
+    }
+
+    // Show loading state immediately for better UX
+    setIsSearching(true);
+    haptics.light();
+
+    // Debounce the actual search by 300ms
+    searchTimeoutRef.current = setTimeout(() => {
+      performSearch(query);
+    }, 300);
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSelectTenant = (tenant: any) => {
     haptics.success();
