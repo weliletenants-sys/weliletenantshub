@@ -8,7 +8,7 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save, DollarSign, Download, FileText, X } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save, DollarSign, Download, FileText, X, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -46,6 +46,8 @@ const ManagerDashboard = () => {
     totalAgents: 0,
     activeAgents: 0,
     totalTenants: 0,
+    totalLandlords: 0,
+    totalTenantsRegistered: 0,
     pendingVerifications: 0,
     pendingPayments: 0,
     verifiedPayments: 0,
@@ -105,6 +107,12 @@ const ManagerDashboard = () => {
   const [paymentMethodTimePeriod, setPaymentMethodTimePeriod] = useState<'7d' | '30d' | '90d' | 'all' | 'custom'>('30d');
   const [paymentMethodCustomStartDate, setPaymentMethodCustomStartDate] = useState<Date | undefined>();
   const [paymentMethodCustomEndDate, setPaymentMethodCustomEndDate] = useState<Date | undefined>();
+  const [landlordBreakdownOpen, setLandlordBreakdownOpen] = useState(false);
+  const [tenantBreakdownOpen, setTenantBreakdownOpen] = useState(false);
+  const [landlordAgentData, setLandlordAgentData] = useState<any[]>([]);
+  const [tenantAgentData, setTenantAgentData] = useState<any[]>([]);
+  const [landlordSortBy, setLandlordSortBy] = useState<'count' | 'name'>('count');
+  const [tenantSortBy, setTenantSortBy] = useState<'count' | 'name'>('count');
 
   // Fetch payment report data with date range
   const fetchPaymentReportData = async (startDate?: Date, endDate?: Date) => {
@@ -517,15 +525,30 @@ const ManagerDashboard = () => {
         setIsLoading(false);
         
         // Fetch only essential counts first (parallel + optimized)
-        const [agentsCount, tenantsCount, pendingVerificationsCount, collectionsData] = await Promise.all([
+        const [agentsCount, tenantsCount, pendingVerificationsCount, collectionsData, landlordsData, tenantsRegisteredData] = await Promise.all([
           supabase.from("agents").select("*", { count: 'exact', head: false }),
           supabase.from("tenants").select("outstanding_balance, status"),
           supabase.from("tenants").select("*", { count: 'exact', head: true }).eq("status", "pending"),
-          supabase.from("collections").select("status")
+          supabase.from("collections").select("status"),
+          supabase.from("landlords").select(`
+            id,
+            landlord_name,
+            landlord_phone,
+            registered_by,
+            created_at
+          `),
+          supabase.from("tenants").select(`
+            id,
+            tenant_name,
+            agent_id,
+            created_at
+          `)
         ]);
 
         const totalAgents = agentsCount.data?.length || 0;
         const totalTenants = tenantsCount.data?.length || 0;
+        const totalLandlords = landlordsData.data?.length || 0;
+        const totalTenantsRegistered = tenantsRegisteredData.data?.length || 0;
         const pendingVerifications = pendingVerificationsCount.count || 0;
 
         // Calculate portfolio value from fetched tenant balances
@@ -571,6 +594,8 @@ const ManagerDashboard = () => {
           totalAgents,
           activeAgents: totalAgents,
           totalTenants,
+          totalLandlords,
+          totalTenantsRegistered,
           pendingVerifications,
           pendingPayments,
           verifiedPayments,
@@ -937,6 +962,104 @@ const ManagerDashboard = () => {
       setPaymentMethodData(chartData);
     } catch (error) {
       console.error("Error fetching payment method breakdown:", error);
+    }
+  };
+
+  const fetchLandlordAgentBreakdown = async () => {
+    try {
+      const { data: landlords, error } = await supabase
+        .from("landlords")
+        .select(`
+          id,
+          landlord_name,
+          registered_by,
+          created_at,
+          agents!landlords_registered_by_fkey(
+            id,
+            profiles!agents_user_id_fkey(full_name)
+          )
+        `);
+
+      if (error) throw error;
+
+      // Group by agent
+      const agentMap = new Map();
+      landlords?.forEach((landlord: any) => {
+        const agentId = landlord.registered_by;
+        const agentName = landlord.agents?.profiles?.full_name || 'Unknown Agent';
+        
+        if (!agentMap.has(agentId)) {
+          agentMap.set(agentId, {
+            agentId,
+            agentName,
+            count: 0,
+            landlords: []
+          });
+        }
+        
+        const agentData = agentMap.get(agentId);
+        agentData.count += 1;
+        agentData.landlords.push({
+          name: landlord.landlord_name,
+          registeredAt: landlord.created_at
+        });
+      });
+
+      const breakdown = Array.from(agentMap.values());
+      setLandlordAgentData(breakdown);
+      setLandlordBreakdownOpen(true);
+    } catch (error) {
+      console.error('Error fetching landlord breakdown:', error);
+      toast.error('Failed to load landlord breakdown');
+    }
+  };
+
+  const fetchTenantAgentBreakdown = async () => {
+    try {
+      const { data: tenants, error } = await supabase
+        .from("tenants")
+        .select(`
+          id,
+          tenant_name,
+          agent_id,
+          created_at,
+          agents!tenants_agent_id_fkey(
+            id,
+            profiles!agents_user_id_fkey(full_name)
+          )
+        `);
+
+      if (error) throw error;
+
+      // Group by agent
+      const agentMap = new Map();
+      tenants?.forEach((tenant: any) => {
+        const agentId = tenant.agent_id;
+        const agentName = tenant.agents?.profiles?.full_name || 'Unknown Agent';
+        
+        if (!agentMap.has(agentId)) {
+          agentMap.set(agentId, {
+            agentId,
+            agentName,
+            count: 0,
+            tenants: []
+          });
+        }
+        
+        const agentData = agentMap.get(agentId);
+        agentData.count += 1;
+        agentData.tenants.push({
+          name: tenant.tenant_name,
+          registeredAt: tenant.created_at
+        });
+      });
+
+      const breakdown = Array.from(agentMap.values());
+      setTenantAgentData(breakdown);
+      setTenantBreakdownOpen(true);
+    } catch (error) {
+      console.error('Error fetching tenant breakdown:', error);
+      toast.error('Failed to load tenant breakdown');
     }
   };
 
@@ -2295,6 +2418,44 @@ const ManagerDashboard = () => {
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalTenants}</div>
               <p className="text-xs text-success mt-1">Across all agents</p>
+            </CardContent>
+          </Card>
+
+          <Card 
+            id="stats-total-landlords"
+            className="cursor-pointer hover:shadow-lg transition-all"
+            onClick={() => fetchLandlordAgentBreakdown()}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Users className="h-4 w-4 text-purple-500" />
+                Total Landlords
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">{stats.totalLandlords}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Click to view by agent
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card 
+            id="stats-total-tenants-registered"
+            className="cursor-pointer hover:shadow-lg transition-all"
+            onClick={() => fetchTenantAgentBreakdown()}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <UserPlus className="h-4 w-4 text-indigo-500" />
+                Tenants Registered
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-indigo-600">{stats.totalTenantsRegistered}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Click to view by agent
+              </p>
             </CardContent>
           </Card>
 
@@ -3858,6 +4019,174 @@ const ManagerDashboard = () => {
                     </CardContent>
                   </Card>
                 ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Landlord Agent Breakdown Dialog */}
+      <Dialog open={landlordBreakdownOpen} onOpenChange={setLandlordBreakdownOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-purple-500" />
+              Landlord Registrations by Agent
+            </DialogTitle>
+            <DialogDescription>
+              Breakdown of {stats.totalLandlords} landlords registered by each agent
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            {/* Sorting Controls */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Sort by:</span>
+              <Button
+                size="sm"
+                variant={landlordSortBy === 'count' ? 'default' : 'outline'}
+                onClick={() => setLandlordSortBy('count')}
+              >
+                Count
+              </Button>
+              <Button
+                size="sm"
+                variant={landlordSortBy === 'name' ? 'default' : 'outline'}
+                onClick={() => setLandlordSortBy('name')}
+              >
+                Agent Name
+              </Button>
+            </div>
+
+            {/* Agent Breakdown */}
+            {landlordAgentData
+              .sort((a, b) => {
+                if (landlordSortBy === 'count') {
+                  return b.count - a.count;
+                } else {
+                  return a.agentName.localeCompare(b.agentName);
+                }
+              })
+              .map((agent) => (
+                <Card key={agent.agentId} className="hover:shadow-md transition-all">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">{agent.agentName}</CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {agent.count} landlord{agent.count !== 1 ? 's' : ''} registered
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="text-xl px-4 py-2">
+                        {agent.count}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {agent.landlords.map((landlord: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-2 bg-muted/30 rounded border"
+                        >
+                          <span className="font-medium text-sm">{landlord.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(landlord.registeredAt), 'MMM dd, yyyy')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+
+            {landlordAgentData.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No landlord registrations yet</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tenant Agent Breakdown Dialog */}
+      <Dialog open={tenantBreakdownOpen} onOpenChange={setTenantBreakdownOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-indigo-500" />
+              Tenant Registrations by Agent
+            </DialogTitle>
+            <DialogDescription>
+              Breakdown of {stats.totalTenantsRegistered} tenants registered by each agent
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            {/* Sorting Controls */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Sort by:</span>
+              <Button
+                size="sm"
+                variant={tenantSortBy === 'count' ? 'default' : 'outline'}
+                onClick={() => setTenantSortBy('count')}
+              >
+                Count
+              </Button>
+              <Button
+                size="sm"
+                variant={tenantSortBy === 'name' ? 'default' : 'outline'}
+                onClick={() => setTenantSortBy('name')}
+              >
+                Agent Name
+              </Button>
+            </div>
+
+            {/* Agent Breakdown */}
+            {tenantAgentData
+              .sort((a, b) => {
+                if (tenantSortBy === 'count') {
+                  return b.count - a.count;
+                } else {
+                  return a.agentName.localeCompare(b.agentName);
+                }
+              })
+              .map((agent) => (
+                <Card key={agent.agentId} className="hover:shadow-md transition-all">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">{agent.agentName}</CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {agent.count} tenant{agent.count !== 1 ? 's' : ''} registered
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="text-xl px-4 py-2">
+                        {agent.count}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {agent.tenants.map((tenant: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-2 bg-muted/30 rounded border"
+                        >
+                          <span className="font-medium text-sm">{tenant.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(tenant.registeredAt), 'MMM dd, yyyy')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+
+            {tenantAgentData.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No tenant registrations yet</p>
               </div>
             )}
           </div>
