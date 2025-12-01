@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X, Reply, Send, MessageCircle, Calculator, Wallet, UserPlus } from "lucide-react";
+import { Bike, TrendingUp, Users, DollarSign, AlertCircle, Plus, Zap, ArrowUp, ArrowDown, Minus, Bell, MessageSquare, X, Reply, Send, MessageCircle, Calculator, Wallet, UserPlus, UserCheck } from "lucide-react";
 import MessageThreadDialog from "@/components/MessageThreadDialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { toast } from "sonner";
@@ -30,6 +30,8 @@ const AgentDashboard = () => {
   const navigate = useNavigate();
   const { user, agentId, isLoading: authLoading } = useAuth();
   const [agentData, setAgentData] = useState<any>(null);
+  const [activeTenantCount, setActiveTenantCount] = useState(0);
+  const [pipelineTenantCount, setPipelineTenantCount] = useState(0);
   const [todaysCollections, setTodaysCollections] = useState(0);
   const [todaysTarget, setTodaysTarget] = useState(0);
   const [tenantsDueToday, setTenantsDueToday] = useState(0);
@@ -179,7 +181,8 @@ const AgentDashboard = () => {
         rejectedResult,
         paymentMethodResult,
         commissionResult,
-        thisMonthCommissionResult
+        thisMonthCommissionResult,
+        allTenantsResult
       ] = await Promise.all([
         supabase
           .from("collections")
@@ -237,7 +240,12 @@ const AgentDashboard = () => {
           .select("commission")
           .eq("agent_id", agentId)
           .eq("status", "verified")
-          .gte("collection_date", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0])
+          .gte("collection_date", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]),
+        
+        supabase
+          .from("tenants")
+          .select("outstanding_balance")
+          .eq("agent_id", agentId)
       ]);
 
       // Process results
@@ -262,6 +270,14 @@ const AgentDashboard = () => {
       setPendingVerifications(pendingResult.data?.length || 0);
       setVerifiedPayments(verifiedResult.data?.length || 0);
       setRejectedPayments(rejectedResult.data?.length || 0);
+
+      // Calculate active vs pipeline tenants
+      if (allTenantsResult.data) {
+        const active = allTenantsResult.data.filter(t => parseFloat(t.outstanding_balance?.toString() || '0') > 0).length;
+        const pipeline = allTenantsResult.data.filter(t => parseFloat(t.outstanding_balance?.toString() || '0') === 0).length;
+        setActiveTenantCount(active);
+        setPipelineTenantCount(pipeline);
+      }
 
       // Process payment method breakdown
       if (paymentMethodResult.data) {
@@ -1014,15 +1030,26 @@ const AgentDashboard = () => {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Total Tenants
+                <DollarSign className="h-4 w-4 text-primary" />
+                💰 Active Tenants
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{agentData?.total_tenants || 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {agentData?.active_tenants || 0} active
-              </p>
+              <div className="text-2xl font-bold text-primary">{activeTenantCount}</div>
+              <p className="text-xs text-success mt-1">With outstanding balances</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <UserCheck className="h-4 w-4 text-indigo-500" />
+                📋 Pipeline Tenants
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-indigo-600">{pipelineTenantCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">Registered, no balance</p>
             </CardContent>
           </Card>
 

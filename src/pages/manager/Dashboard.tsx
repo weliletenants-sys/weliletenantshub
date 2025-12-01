@@ -46,6 +46,8 @@ const ManagerDashboard = () => {
     totalAgents: 0,
     activeAgents: 0,
     totalTenants: 0,
+    activeTenants: 0,
+    pipelineTenants: 0,
     totalLandlords: 0,
     totalTenantsRegistered: 0,
     pendingVerifications: 0,
@@ -547,6 +549,8 @@ const ManagerDashboard = () => {
 
         const totalAgents = agentsCount.data?.length || 0;
         const totalTenants = tenantsCount.data?.length || 0;
+        const activeTenants = tenantsCount.data?.filter(t => (parseFloat(t.outstanding_balance?.toString() || '0') > 0)).length || 0;
+        const pipelineTenants = tenantsCount.data?.filter(t => (parseFloat(t.outstanding_balance?.toString() || '0') === 0)).length || 0;
         const totalLandlords = landlordsData.data?.length || 0;
         const totalTenantsRegistered = tenantsRegisteredData.data?.length || 0;
         const pendingVerifications = pendingVerificationsCount.count || 0;
@@ -594,6 +598,8 @@ const ManagerDashboard = () => {
           totalAgents,
           activeAgents: totalAgents,
           totalTenants,
+          activeTenants,
+          pipelineTenants,
           totalLandlords,
           totalTenantsRegistered,
           pendingVerifications,
@@ -684,6 +690,8 @@ const ManagerDashboard = () => {
 
     const totalAgents = agentsResult.data?.length || 0;
     const totalTenants = tenantsResult.data?.length || 0;
+    const activeTenants = tenantsResult.data?.filter(t => (parseFloat(t.outstanding_balance?.toString() || '0') > 0)).length || 0;
+    const pipelineTenants = tenantsResult.data?.filter(t => (parseFloat(t.outstanding_balance?.toString() || '0') === 0)).length || 0;
     const pendingVerifications = tenantsResult.data?.filter(t => t.status === 'pending').length || 0;
 
     const totalPortfolioValue = tenantsResult.data?.reduce((sum, tenant) => {
@@ -728,6 +736,8 @@ const ManagerDashboard = () => {
       totalAgents,
       activeAgents: totalAgents,
       totalTenants,
+      activeTenants,
+      pipelineTenants,
       pendingVerifications,
       pendingPayments,
       verifiedPayments,
@@ -2408,16 +2418,29 @@ const ManagerDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card id="stats-total-tenants">
+          <Card id="stats-active-tenants">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <UserCheck className="h-4 w-4" />
-                Total Tenants
+                <DollarSign className="h-4 w-4 text-primary" />
+                💰 Active Tenants
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalTenants}</div>
-              <p className="text-xs text-success mt-1">Across all agents</p>
+              <div className="text-2xl font-bold text-primary">{stats.activeTenants}</div>
+              <p className="text-xs text-success mt-1">With outstanding balances</p>
+            </CardContent>
+          </Card>
+
+          <Card id="stats-pipeline-tenants">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <UserCheck className="h-4 w-4 text-indigo-500" />
+                📋 Pipeline Tenants
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-indigo-600">{stats.pipelineTenants}</div>
+              <p className="text-xs text-muted-foreground mt-1">Registered, no balance</p>
             </CardContent>
           </Card>
 

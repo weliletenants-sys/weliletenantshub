@@ -108,6 +108,16 @@ const AgentTenants = () => {
     [tenantsWithOverdue]
   );
 
+  const activeTenants = useMemo(() =>
+    tenantsWithOverdue.filter(t => (t.outstanding_balance || 0) > 0),
+    [tenantsWithOverdue]
+  );
+
+  const pipelineTenants = useMemo(() =>
+    tenantsWithOverdue.filter(t => (t.outstanding_balance || 0) === 0),
+    [tenantsWithOverdue]
+  );
+
   const renderTenantTable = (tenantList: any[]) => (
     <div className="overflow-x-auto -mx-2 sm:mx-0">
       {tenantList.length > 20 ? (
@@ -177,11 +187,17 @@ const AgentTenants = () => {
           </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 h-12">
-            <TabsTrigger value="all" className="text-base">
+          <TabsList className="grid w-full grid-cols-4 h-12">
+            <TabsTrigger value="all" className="text-sm">
               All ({tenantsWithOverdue.length})
             </TabsTrigger>
-            <TabsTrigger value="overdue" className="text-base text-destructive data-[state=active]:text-destructive">
+            <TabsTrigger value="active" className="text-sm">
+              💰 Active ({activeTenants.length})
+            </TabsTrigger>
+            <TabsTrigger value="pipeline" className="text-sm">
+              📋 Pipeline ({pipelineTenants.length})
+            </TabsTrigger>
+            <TabsTrigger value="overdue" className="text-sm text-destructive data-[state=active]:text-destructive">
               <AlertCircle className="h-4 w-4 mr-1" />
               Overdue ({overdueTenants.length})
             </TabsTrigger>
@@ -208,6 +224,56 @@ const AgentTenants = () => {
                   </div>
                 ) : (
                   renderTenantTable(tenantsWithOverdue)
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="active">
+            <Card className="border-primary/30 hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-primary flex items-center gap-2 text-base">
+                  💰 Active Tenants
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  {activeTenants.length} tenant{activeTenants.length !== 1 ? 's' : ''} with outstanding balances
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <TenantListSkeleton />
+                ) : activeTenants.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-4xl mb-2">💰</p>
+                    <p className="text-muted-foreground text-sm">No active tenants yet</p>
+                  </div>
+                ) : (
+                  renderTenantTable(activeTenants)
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="pipeline">
+            <Card className="border-indigo-500/30 hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-indigo-600 flex items-center gap-2 text-base">
+                  📋 Pipeline Tenants
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  {pipelineTenants.length} tenant{pipelineTenants.length !== 1 ? 's' : ''} registered without outstanding balance
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <TenantListSkeleton />
+                ) : pipelineTenants.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-4xl mb-2">📋</p>
+                    <p className="text-muted-foreground text-sm">No pipeline tenants</p>
+                  </div>
+                ) : (
+                  renderTenantTable(pipelineTenants)
                 )}
               </CardContent>
             </Card>
