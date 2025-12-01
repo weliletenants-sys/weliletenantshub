@@ -611,6 +611,33 @@ const AgentDashboard = () => {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <Button 
+                    variant="secondary"
+                    className="font-bold text-sm py-5 bg-white text-emerald-600 hover:bg-emerald-50 flex flex-col items-center gap-1 shadow-md border-2 border-white/30"
+                    onClick={() => {
+                      navigate("/agent/register-landlord");
+                      haptics.light();
+                    }}
+                  >
+                    <UserPlus className="h-5 w-5" />
+                    <span>+ Landlord</span>
+                    <span className="text-xs font-semibold">+UGX 500</span>
+                  </Button>
+                  <Button 
+                    variant="secondary"
+                    className="font-bold text-sm py-5 bg-white text-emerald-600 hover:bg-emerald-50 flex flex-col items-center gap-1 shadow-md border-2 border-white/30"
+                    onClick={() => {
+                      navigate("/agent/register-tenant");
+                      haptics.light();
+                    }}
+                  >
+                    <Plus className="h-5 w-5" />
+                    <span>+ Tenant</span>
+                    <span className="text-xs font-semibold">+UGX 5,000</span>
+                  </Button>
+                </div>
+
                 <div className="grid grid-cols-2 gap-2">
                   <Button 
                     variant="secondary"
@@ -664,33 +691,6 @@ const AgentDashboard = () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Button 
-                    variant="secondary"
-                    className="font-bold text-sm py-5 bg-white text-purple-600 hover:bg-purple-50 flex flex-col items-center gap-1 shadow-md border-2 border-white/30"
-                    onClick={() => {
-                      navigate("/agent/register-landlord");
-                      haptics.light();
-                    }}
-                  >
-                    <UserPlus className="h-5 w-5" />
-                    <span>+ Landlord</span>
-                    <span className="text-xs font-semibold">+UGX 500</span>
-                  </Button>
-                  <Button 
-                    variant="secondary"
-                    className="font-bold text-sm py-5 bg-white text-purple-600 hover:bg-purple-50 flex flex-col items-center gap-1 shadow-md border-2 border-white/30"
-                    onClick={() => {
-                      navigate("/agent/register-tenant");
-                      haptics.light();
-                    }}
-                  >
-                    <Plus className="h-5 w-5" />
-                    <span>+ Tenant</span>
-                    <span className="text-xs font-semibold">+UGX 5,000</span>
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 pt-2">
                   <Button 
                     variant="secondary"
                     className="font-bold text-sm py-5 bg-white/20 backdrop-blur-sm text-white hover:bg-white/30 border-2 border-white/40 flex flex-col items-center gap-1 shadow-lg"
