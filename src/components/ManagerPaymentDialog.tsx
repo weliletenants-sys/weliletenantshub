@@ -80,17 +80,35 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
     e.preventDefault();
     haptics.light(); // Form submission attempt
     
-    if (!selectedTenant || !amount) {
+    if (!selectedTenant || !amount || !paymentId) {
       haptics.error(); // Validation error
       toast({
         title: "Missing information",
-        description: "Please select a tenant and enter an amount",
+        description: "Please fill in all required fields including Transaction ID",
         variant: "destructive",
       });
       return;
     }
 
     setIsSubmitting(true);
+
+    // Check for duplicate Transaction ID
+    const { data: existingPayment } = await supabase
+      .from("collections")
+      .select("id")
+      .eq("payment_id", paymentId)
+      .single();
+
+    if (existingPayment) {
+      setIsSubmitting(false);
+      haptics.error();
+      toast({
+        title: "Duplicate Transaction ID",
+        description: "This Transaction ID (TID) already exists. Please use a unique TID to avoid double entry.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       const paymentAmount = parseFloat(amount);
@@ -284,14 +302,16 @@ You can generate and share the receipt with your tenant from the payment notific
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="payment-id">Payment ID (Optional)</Label>
+            <Label htmlFor="payment-id">Transaction ID (TID) *</Label>
             <Input
               id="payment-id"
               type="text"
-              placeholder="Enter payment reference ID"
+              placeholder="Enter unique transaction ID"
               value={paymentId}
               onChange={(e) => setPaymentId(e.target.value)}
+              required
             />
+            <p className="text-xs text-muted-foreground">Required to prevent double entry</p>
           </div>
 
           <div className="space-y-2">
