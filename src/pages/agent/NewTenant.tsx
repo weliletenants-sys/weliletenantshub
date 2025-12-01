@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { haptics } from "@/utils/haptics";
 import { isOnline } from "@/lib/offlineSync";
 import { CloudOff } from "lucide-react";
 import { useOptimisticTenantCreation } from "@/hooks/useOptimisticPayment";
@@ -41,8 +42,10 @@ const AgentNewTenant = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    haptics.light(); // Form submission attempt
 
     if (!agentId) {
+      haptics.error();
       return;
     }
 
@@ -55,7 +58,11 @@ const AgentNewTenant = () => {
 
     createTenantMutation.mutate(tenantData, {
       onSuccess: () => {
+        haptics.success(); // Success feedback
         navigate("/agent/tenants");
+      },
+      onError: () => {
+        haptics.error(); // Error feedback
       },
     });
   };
