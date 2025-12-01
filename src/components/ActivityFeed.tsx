@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Activity, UserPlus, DollarSign, Edit, Trash2, Clock, Filter, X, CalendarIcon, ChevronDown, Search } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { registerSyncCallback } from "@/hooks/useRealtimeSubscription";
+import { useNavigate } from "react-router-dom";
+import { ClickableAgentName } from "./ClickableAgentName";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -18,6 +20,7 @@ interface ActivityItem {
   id: string;
   type: 'tenant_added' | 'tenant_updated' | 'tenant_deleted' | 'payment_recorded' | 'profile_updated';
   agentName: string;
+  agentId?: string;
   description: string;
   timestamp: string;
   metadata?: any;
@@ -77,7 +80,7 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
       // Get unique user IDs from audit logs
       const userIds = [...new Set(auditLogs?.map(log => log.user_id) || [])];
       
-      // Fetch profiles for audit log users
+      // Fetch profiles and agent IDs for audit log users
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name')
@@ -85,12 +88,22 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
 
       if (profilesError) throw profilesError;
 
+      // Fetch agents to map user_id to agent_id
+      const { data: agents, error: agentsError } = await supabase
+        .from('agents')
+        .select('id, user_id')
+        .in('user_id', userIds);
+
+      if (agentsError) throw agentsError;
+
       const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]) || []);
+      const userToAgentMap = new Map(agents?.map(a => [a.user_id, a.id]) || []);
 
       // Transform audit logs into activities
       const auditActivities: ActivityItem[] = (auditLogs || [])
         .map(log => {
           const agentName = profileMap.get(log.user_id) || 'Unknown Agent';
+          const agentId = userToAgentMap.get(log.user_id);
           const oldData = log.old_data as any;
           const newData = log.new_data as any;
 
@@ -100,6 +113,7 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
                 id: `audit-${log.id}`,
                 type: 'tenant_added' as const,
                 agentName,
+                agentId,
                 description: `added tenant ${newData?.tenant_name || 'Unknown'}`,
                 timestamp: log.created_at,
                 metadata: { tenantName: newData?.tenant_name }
@@ -109,6 +123,7 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
                 id: `audit-${log.id}`,
                 type: 'tenant_updated' as const,
                 agentName,
+                agentId,
                 description: `updated tenant ${newData?.tenant_name || oldData?.tenant_name || 'Unknown'}`,
                 timestamp: log.created_at,
                 metadata: { tenantName: newData?.tenant_name || oldData?.tenant_name }
@@ -118,6 +133,7 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
                 id: `audit-${log.id}`,
                 type: 'tenant_deleted' as const,
                 agentName,
+                agentId,
                 description: `deleted tenant ${oldData?.tenant_name || 'Unknown'}`,
                 timestamp: log.created_at,
                 metadata: { tenantName: oldData?.tenant_name }
@@ -128,6 +144,7 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
               id: `audit-${log.id}`,
               type: 'profile_updated' as const,
               agentName,
+              agentId,
               description: `updated their profile`,
               timestamp: log.created_at,
             } as ActivityItem;
@@ -147,6 +164,7 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
             id: `payment-${collection.id}`,
             type: 'payment_recorded' as const,
             agentName,
+            agentId: collection.agent_id,
             description: `recorded payment of UGX ${Number(collection.amount).toLocaleString()} from ${tenantName}`,
             timestamp: collection.created_at,
             metadata: { amount: collection.amount, tenantName }
@@ -538,32 +556,40 @@ export const ActivityFeed = ({ maxItems = 15, className }: ActivityFeedProps) =>
                   <div className="mt-0.5 p-2 rounded-full bg-background border">
                     {getActivityIcon(activity.type)}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm">
-                        <span className="font-semibold text-foreground">
-                          {activity.agentName}
-                        </span>{' '}
-                        <span className="text-muted-foreground">
-                          {activity.description}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm">
+                          {activity.agentId ? (
+                            <ClickableAgentName
+                              agentId={activity.agentId}
+                              agentName={activity.agentName}
+                              className="font-semibold"
+                            />
+                          ) : (
+                            <span className="font-semibold text-foreground">
+                              {activity.agentName}
+                            </span>
+                          )}{' '}
+                          <span className="text-muted-foreground">
+                            {activity.description}
+                          </span>
+                        </p>
+                        <Badge
+                          variant={getActivityBadgeVariant(activity.type)}
+                          className="text-xs shrink-0"
+                        >
+                          {activity.type.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>
+                          {formatDistanceToNow(new Date(activity.timestamp), {
+                            addSuffix: true,
+                          })}
                         </span>
-                      </p>
-                      <Badge
-                        variant={getActivityBadgeVariant(activity.type)}
-                        className="text-xs shrink-0"
-                      >
-                        {activity.type.replace('_', ' ')}
-                      </Badge>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      <span>
-                        {formatDistanceToNow(new Date(activity.timestamp), {
-                          addSuffix: true,
-                        })}
-                      </span>
-                    </div>
-                  </div>
                 </div>
               ))}
             </div>
