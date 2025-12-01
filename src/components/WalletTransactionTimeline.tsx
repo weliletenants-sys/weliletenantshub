@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Send, ArrowDownToLine, Clock, TrendingUp, TrendingDown, User } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Transaction {
   id: string;
@@ -30,6 +31,7 @@ export function WalletTransactionTimeline({
   compact = false 
 }: WalletTransactionTimelineProps) {
   const [realtimeUpdate, setRealtimeUpdate] = useState(0);
+  const [filter, setFilter] = useState<"all" | "sent" | "received" | "withdrawal">("all");
 
   // Fetch transfers (sent and received)
   const { data: transfers } = useQuery({
@@ -122,7 +124,7 @@ export function WalletTransactionTimeline({
   }, [agentId]);
 
   // Combine and sort transactions
-  const transactions: Transaction[] = [
+  const allTransactions: Transaction[] = [
     ...(transfers || []).map(t => ({
       id: t.id,
       type: (t.from_agent_id === agentId ? "sent" : "received") as "sent" | "received",
@@ -143,8 +145,14 @@ export function WalletTransactionTimeline({
       timestamp: w.requested_at,
       status: w.status,
     })),
-  ]
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+  ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  // Filter transactions based on selected filter
+  const transactions = allTransactions
+    .filter(t => {
+      if (filter === "all") return true;
+      return t.type === filter;
+    })
     .slice(0, limit);
 
   const getTransactionIcon = (type: string) => {
@@ -208,10 +216,28 @@ export function WalletTransactionTimeline({
   return (
     <Card className={cn("border-purple-200/50 overflow-hidden", compact && "shadow-sm")}>
       <CardHeader className={cn("bg-gradient-to-r from-purple-50 to-violet-50", compact && "pb-3")}>
-        <CardTitle className={cn("text-lg flex items-center gap-2", compact && "text-base")}>
-          <Clock className="h-5 w-5 text-purple-600" />
-          Recent Activity
-        </CardTitle>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className={cn("text-lg flex items-center gap-2", compact && "text-base")}>
+            <Clock className="h-5 w-5 text-purple-600" />
+            Recent Activity
+          </CardTitle>
+          <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)} className="w-auto">
+            <TabsList className="h-8 bg-purple-100/50">
+              <TabsTrigger value="all" className="text-xs data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+                All
+              </TabsTrigger>
+              <TabsTrigger value="sent" className="text-xs data-[state=active]:bg-red-600 data-[state=active]:text-white">
+                Sent
+              </TabsTrigger>
+              <TabsTrigger value="received" className="text-xs data-[state=active]:bg-green-600 data-[state=active]:text-white">
+                Received
+              </TabsTrigger>
+              <TabsTrigger value="withdrawal" className="text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+                Withdrawals
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </CardHeader>
       <CardContent className={cn("p-0", !compact && "pt-2")}>
         <div className="relative">
