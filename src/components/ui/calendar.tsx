@@ -4,10 +4,26 @@ import { DayPicker } from "react-day-picker";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { haptics } from "@/utils/haptics";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
 function Calendar({ className, classNames, showOutsideDays = true, ...props }: CalendarProps) {
+  // Wrap the onSelect handler with haptic feedback
+  const wrappedProps = React.useMemo(() => {
+    if ('onSelect' in props && props.onSelect) {
+      const originalOnSelect = props.onSelect as any;
+      return {
+        ...props,
+        onSelect: (...args: any[]) => {
+          haptics.light();
+          (originalOnSelect as any)(...args);
+        },
+      };
+    }
+    return props;
+  }, [props]);
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
@@ -45,7 +61,7 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         IconLeft: ({ ..._props }) => <ChevronLeft className="h-4 w-4" />,
         IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />,
       }}
-      {...props}
+      {...wrappedProps}
     />
   );
 }
