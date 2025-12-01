@@ -13,6 +13,8 @@ import { useSwipeBack } from "@/hooks/useSwipeBack";
 import SwipeBackIndicator from "./SwipeBackIndicator";
 import BottomNavigation from "./BottomNavigation";
 import { NotificationsPanel } from "./NotificationsPanel";
+import { LandlordSearchDialog } from "./LandlordSearchDialog";
+import { useAuth } from "@/hooks/useAuth";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +36,7 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
   const createRipple = useRipple();
   const { swipeProgress } = useSwipeBack();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const { agentId } = useAuth();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -66,7 +69,8 @@ const AgentLayout = ({ children, currentPage }: AgentLayoutProps) => {
       
       <header className="bg-card border-b border-border p-6 flex justify-between items-center">
         <WelileLogo />
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
+          <LandlordSearchDialog userRole="agent" agentId={agentId} />
           <OfflineSyncIndicator />
           <CacheIndicator />
           <NotificationsPanel />
