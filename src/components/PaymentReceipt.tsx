@@ -9,6 +9,7 @@ interface PaymentReceiptProps {
     commission: number;
     collectionDate: string;
     paymentMethod: string;
+    paymentId?: string;
   };
   tenantData: {
     tenant_name: string;
@@ -33,8 +34,9 @@ const PaymentReceipt = ({ paymentData, tenantData, agentData, receiptNumber }: P
 🧾 *PAYMENT RECEIPT*
 ━━━━━━━━━━━━━━━━━
 
-📋 Receipt No: ${receiptNumber}
+📋 Receipt No: ${receiptNumber}${paymentData.paymentId ? `\n🆔 Payment ID: ${paymentData.paymentId}` : ''}
 📅 Date: ${format(new Date(paymentData.collectionDate), "MMM dd, yyyy")}
+🕒 Time: ${format(new Date(paymentData.collectionDate), "hh:mm a")}
 
 👤 *TENANT DETAILS*
 Name: ${tenantData.tenant_name}
@@ -80,12 +82,25 @@ Thank you for your payment!
               <p className="font-semibold">{receiptNumber}</p>
             </div>
             <div className="text-right">
-              <p className="text-muted-foreground">Date</p>
+              <p className="text-muted-foreground">Payment Date & Time</p>
               <p className="font-semibold">
                 {format(new Date(paymentData.collectionDate), "MMM dd, yyyy")}
               </p>
+              <p className="font-semibold text-xs">
+                {format(new Date(paymentData.collectionDate), "hh:mm a")}
+              </p>
             </div>
           </div>
+
+          {/* Payment ID if available */}
+          {paymentData.paymentId && (
+            <div className="bg-muted/50 rounded-lg p-3 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Payment ID:</span>
+                <span className="font-mono font-semibold">{paymentData.paymentId}</span>
+              </div>
+            </div>
+          )}
 
           {/* Tenant Details */}
           <div className="border-t pt-4">

@@ -44,6 +44,7 @@ interface Notification {
     amount: number;
     payment_method: string;
     payment_date: string;
+    payment_id?: string;
     applied: boolean;
   };
   profiles?: {
@@ -84,6 +85,7 @@ export const NotificationsPanel = () => {
       commission: number;
       collectionDate: string;
       paymentMethod: string;
+      paymentId?: string;
     };
     tenantData: {
       tenant_name: string;
@@ -677,6 +679,7 @@ export const NotificationsPanel = () => {
           commission: commission,
           collectionDate: paymentData.payment_date,
           paymentMethod: paymentData.payment_method,
+          paymentId: paymentData.payment_id,
         },
         tenantData: {
           tenant_name: tenantData.tenant_name,

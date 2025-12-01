@@ -35,6 +35,7 @@ interface Payment {
   commission: number;
   collection_date: string;
   payment_method: string | null;
+  payment_id: string | null;
   status: string | null;
   created_at: string;
   verified_at: string | null;
@@ -893,6 +894,7 @@ const PaymentVerifications = () => {
                 commission: previewPayment.commission,
                 collectionDate: previewPayment.collection_date,
                 paymentMethod: previewPayment.payment_method || "cash",
+                paymentId: previewPayment.payment_id,
               }}
               tenantData={{
                 tenant_name: previewPayment.tenants.tenant_name,
