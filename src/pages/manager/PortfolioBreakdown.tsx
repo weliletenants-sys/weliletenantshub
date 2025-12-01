@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import ManagerLayout from "@/components/ManagerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,8 @@ interface AgentPortfolio {
 
 const ManagerPortfolioBreakdown = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const filterType = searchParams.get("filter");
   const [loading, setLoading] = useState(true);
   const [agentPortfolios, setAgentPortfolios] = useState<AgentPortfolio[]>([]);
   const [filteredPortfolios, setFilteredPortfolios] = useState<AgentPortfolio[]>([]);
@@ -136,7 +138,15 @@ const ManagerPortfolioBreakdown = () => {
 
       // Build agent portfolios
       const portfolios: AgentPortfolio[] = agents?.map(agent => {
-        const agentTenants = tenants?.filter(t => t.agent_id === agent.id) || [];
+        let agentTenants = tenants?.filter(t => t.agent_id === agent.id) || [];
+        
+        // Apply active/pipeline filter if specified
+        if (filterType === 'active') {
+          agentTenants = agentTenants.filter(t => parseFloat(t.outstanding_balance?.toString() || '0') > 0);
+        } else if (filterType === 'pipeline') {
+          agentTenants = agentTenants.filter(t => parseFloat(t.outstanding_balance?.toString() || '0') === 0);
+        }
+        
         const portfolioValue = agentTenants.reduce(
           (sum, t) => sum + (parseFloat(t.outstanding_balance?.toString() || '0')),
           0
@@ -591,9 +601,19 @@ const ManagerPortfolioBreakdown = () => {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">Portfolio Breakdown</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-bold">Portfolio Breakdown</h1>
+                {filterType && (
+                  <Badge variant="default" className="text-sm">
+                    {filterType === 'active' ? '💰 Active Tenants' : '📋 Pipeline Tenants'}
+                  </Badge>
+                )}
+              </div>
               <p className="text-muted-foreground">
-                Detailed view of agents and tenant portfolios
+                {filterType 
+                  ? `Showing ${filterType === 'active' ? 'active tenants with outstanding balances' : 'pipeline tenants with no balance'}`
+                  : 'Detailed view of agents and tenant portfolios'
+                }
               </p>
             </div>
           </div>

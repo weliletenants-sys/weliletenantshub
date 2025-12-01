@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TenantRow } from "@/components/TenantRow";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, AlertCircle } from "lucide-react";
 import { useTenantListPrefetch } from "@/hooks/useTenantPrefetch";
 import { useRealtimeTenants } from "@/hooks/useRealtimeSubscription";
@@ -23,7 +23,8 @@ import type { Tables } from "@/integrations/supabase/types";
 type Tenant = Tables<'tenants'>;
 
 const AgentTenants = () => {
-  const [activeTab, setActiveTab] = useState("all");
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "all");
   const [agentId, setAgentId] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -44,6 +45,14 @@ const AgentTenants = () => {
 
     fetchAgentId();
   }, []);
+
+  // Update active tab when URL search params change
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   // Fetch tenants with React Query (supports optimistic updates)
   const { data: tenants = [], isLoading, isFetching } = useQuery({
