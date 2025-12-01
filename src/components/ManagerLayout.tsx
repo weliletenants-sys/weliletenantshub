@@ -8,6 +8,7 @@ import { LayoutDashboard, Users, CheckSquare, LogOut, Settings, Home, TrendingUp
 import { toast } from "sonner";
 import { useRipple } from "@/hooks/useRipple";
 import { useSwipeBack } from "@/hooks/useSwipeBack";
+import { useRealtimeLandlordNotifications } from "@/hooks/useRealtimeLandlordNotifications";
 import SwipeBackIndicator from "./SwipeBackIndicator";
 import BottomNavigation from "./BottomNavigation";
 import { LandlordSearchDialog } from "./LandlordSearchDialog";
@@ -32,6 +33,9 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
   const createRipple = useRipple();
   const { swipeProgress } = useSwipeBack();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+
+  // Enable realtime notifications for landlord registrations
+  useRealtimeLandlordNotifications(true);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

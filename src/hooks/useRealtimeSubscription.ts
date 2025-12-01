@@ -8,6 +8,7 @@ type Tenant = Tables<'tenants'>;
 type Collection = Tables<'collections'>;
 type Agent = Tables<'agents'>;
 type Profile = Tables<'profiles'>;
+type Landlord = Tables<'landlords'>;
 
 // Global sync state management
 let syncCallbacks: Set<(table: string) => void> = new Set();
@@ -384,6 +385,66 @@ export const useRealtimeNotifications = () => {
           
           // Invalidate notifications queries
           queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          isSubscribed = true;
+        }
+      });
+
+    return () => {
+      isMounted = false;
+      isSubscribed = false;
+      channel.unsubscribe().then(() => {
+        supabase.removeChannel(channel).catch(console.error);
+      });
+    };
+  }, [queryClient]);
+};
+
+/**
+ * Real-time subscription hook for landlords (managers only)
+ * Automatically updates React Query cache when landlords change
+ */
+export const useRealtimeLandlords = () => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    let isMounted = true;
+    let isSubscribed = false;
+
+    const channel = supabase
+      .channel('landlords-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'landlords',
+        },
+        (payload: RealtimePostgresChangesPayload<Landlord>) => {
+          if (!isMounted || !isSubscribed) return;
+          
+          console.log('Realtime landlord change:', payload);
+          
+          // Notify sync indicators to refresh dashboard stats
+          notifySyncEvent('landlords');
+          
+          // Invalidate landlords queries
+          queryClient.invalidateQueries({ queryKey: ['landlords'] });
+          
+          // Invalidate specific landlord if updated or inserted
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+            const landlord = payload.new as Landlord;
+            queryClient.invalidateQueries({ queryKey: ['landlord', landlord.id] });
+          }
+          
+          // Remove from cache if deleted
+          if (payload.eventType === 'DELETE') {
+            const landlord = payload.old as Landlord;
+            queryClient.invalidateQueries({ queryKey: ['landlord', landlord.id] });
+          }
         }
       )
       .subscribe((status) => {
