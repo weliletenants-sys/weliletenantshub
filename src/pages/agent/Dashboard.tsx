@@ -1027,7 +1027,13 @@ const AgentDashboard = () => {
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-          <Card>
+          <Card 
+            className="cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all active:scale-95"
+            onClick={() => {
+              haptics.light();
+              navigate("/agent/tenants?tab=active");
+            }}
+          >
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-primary" />
@@ -1040,7 +1046,13 @@ const AgentDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card 
+            className="cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all active:scale-95"
+            onClick={() => {
+              haptics.light();
+              navigate("/agent/tenants?tab=pipeline");
+            }}
+          >
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <UserCheck className="h-4 w-4 text-indigo-500" />

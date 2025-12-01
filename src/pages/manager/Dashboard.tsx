@@ -2418,7 +2418,14 @@ const ManagerDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card id="stats-active-tenants">
+          <Card 
+            id="stats-active-tenants" 
+            className="cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all active:scale-95"
+            onClick={() => {
+              haptics.light();
+              navigate("/manager/portfolio-breakdown?filter=active");
+            }}
+          >
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <DollarSign className="h-4 w-4 text-primary" />
@@ -2431,7 +2438,14 @@ const ManagerDashboard = () => {
             </CardContent>
           </Card>
 
-          <Card id="stats-pipeline-tenants">
+          <Card 
+            id="stats-pipeline-tenants"
+            className="cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all active:scale-95"
+            onClick={() => {
+              haptics.light();
+              navigate("/manager/portfolio-breakdown?filter=pipeline");
+            }}
+          >
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <UserCheck className="h-4 w-4 text-indigo-500" />
