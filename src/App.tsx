@@ -30,6 +30,8 @@ const AgentTenants = lazy(() => import("./pages/agent/Tenants"));
 const AgentNewTenant = lazy(() => import("./pages/agent/NewTenant"));
 const AgentRegisterLandlord = lazy(() => import("./pages/agent/RegisterLandlord"));
 const AgentRegisterTenant = lazy(() => import("./pages/agent/RegisterTenant"));
+const AgentLandlordDetail = lazy(() => import("./pages/agent/LandlordDetail"));
+const ManagerLandlordDetail = lazy(() => import("./pages/manager/LandlordDetail"));
 const AgentTenantDetail = lazy(() => import("./pages/agent/TenantDetail"));
 const AgentCollections = lazy(() => import("./pages/agent/Collections"));
 const AgentEarnings = lazy(() => import("./pages/agent/Earnings"));
@@ -159,6 +161,11 @@ const AppContent = () => {
                 <AgentRegisterTenant />
               </ProtectedRoute>
             } />
+            <Route path="/agent/landlord/:landlordId" element={
+              <ProtectedRoute requiredRole="agent">
+                <AgentLandlordDetail />
+              </ProtectedRoute>
+            } />
             <Route path="/agent/collections" element={
               <ProtectedRoute requiredRole="agent">
                 <AgentCollections />
@@ -247,6 +254,11 @@ const AppContent = () => {
             <Route path="/manager/weekly-report" element={
               <ProtectedRoute requiredRole="manager">
                 <ManagerWeeklyReport />
+              </ProtectedRoute>
+            } />
+            <Route path="/manager/landlord/:landlordId" element={
+              <ProtectedRoute requiredRole="manager">
+                <ManagerLandlordDetail />
               </ProtectedRoute>
             } />
             <Route path="/manager/audit-log" element={
