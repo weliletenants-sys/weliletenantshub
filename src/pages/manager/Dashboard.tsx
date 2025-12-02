@@ -543,11 +543,6 @@ const ManagerDashboard = () => {
           supabase.from("tenants").select("outstanding_balance, status, next_payment_date"),
           supabase.from("tenants").select("*", { count: 'exact', head: true }).eq("status", "pending"),
           supabase.from("collections").select("status"),
-          supabase.from("landlords").select("*", { count: 'exact', head: true }),
-          supabase.from("tenants").select("*", { count: 'exact', head: true }),
-          supabase.from("password_change_requests").select("*", { count: 'exact', head: true }).eq("status", "pending"),
-        ]);
-          supabase.from("collections").select("status"),
           supabase.from("landlords").select(`
             id,
             landlord_name,
@@ -561,7 +556,8 @@ const ManagerDashboard = () => {
             tenant_name,
             agent_id,
             created_at
-          `)
+          `),
+          supabase.from("password_change_requests").select("*", { count: 'exact', head: true }).eq("status", "pending"),
         ]);
 
         const totalAgents = agentsCount.data?.length || 0;
@@ -641,6 +637,7 @@ const ManagerDashboard = () => {
           portfolioWeekChange: 0,
           portfolioWeekChangePercent: 0,
           totalVerifiedCommission,
+          pendingPasswordRequests: passwordRequestsData.count || 0,
         });
 
         // Load secondary data in background (non-blocking)
