@@ -8,7 +8,7 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save, DollarSign, Download, FileText, X, UserPlus, Hash, Coins } from "lucide-react";
+import { Users, UserCheck, AlertCircle, TrendingUp, Shield, Search, CheckCircle2, XCircle, Clock, Wallet, ArrowUp, ArrowDown, Award, Target, Minus, HelpCircle, Calculator, Save, DollarSign, Download, FileText, X, UserPlus, Hash, Coins, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -37,6 +37,8 @@ import AgentsList from "@/components/AgentsListWidget";
 import { SkeletonWrapper } from "@/components/SkeletonWrapper";
 import { useDebounce } from "@/hooks/useDebounce";
 import { ManagerCommissionSummaryDialog } from "@/components/ManagerCommissionSummaryDialog";
+import { Building2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -62,6 +64,7 @@ const ManagerDashboard = () => {
     portfolioWeekChange: 0,
     portfolioWeekChangePercent: 0,
     totalVerifiedCommission: 0,
+    pendingPasswordRequests: 0,
   });
   const [commissionByMethod, setCommissionByMethod] = useState<any[]>([]);
   const [topAgentsByCommission, setTopAgentsByCommission] = useState<any[]>([]);
@@ -535,10 +538,15 @@ const ManagerDashboard = () => {
         setIsLoading(false);
         
         // Fetch only essential counts first (parallel + optimized)
-        const [agentsCount, tenantsCount, pendingVerificationsCount, collectionsData, landlordsData, tenantsRegisteredData] = await Promise.all([
+        const [agentsCount, tenantsCount, pendingVerificationsCount, collectionsData, landlordsData, tenantsRegisteredData, passwordRequestsData] = await Promise.all([
           supabase.from("agents").select("*", { count: 'exact', head: false }),
           supabase.from("tenants").select("outstanding_balance, status, next_payment_date"),
           supabase.from("tenants").select("*", { count: 'exact', head: true }).eq("status", "pending"),
+          supabase.from("collections").select("status"),
+          supabase.from("landlords").select("*", { count: 'exact', head: true }),
+          supabase.from("tenants").select("*", { count: 'exact', head: true }),
+          supabase.from("password_change_requests").select("*", { count: 'exact', head: true }).eq("status", "pending"),
+        ]);
           supabase.from("collections").select("status"),
           supabase.from("landlords").select(`
             id,
@@ -2567,31 +2575,19 @@ const ManagerDashboard = () => {
           </Card>
 
           <Card 
-            id="stats-pending-landlord-verifications"
-            className="cursor-pointer hover:shadow-lg transition-all group"
-            onClick={() => navigate('/manager/landlords/unverified')}
+            className="cursor-pointer hover:shadow-md transition-all hover:scale-105"
+            onClick={() => navigate("/manager/password-requests")}
           >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4 text-orange-500" />
-                Pending Landlord Verifications
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{stats.pendingLandlordVerifications}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stats.pendingLandlordVerifications === 0 ? 'All landlords verified' : 'Click to review and verify'}
-              </p>
-              <Button 
-                variant="link" 
-                className="p-0 h-auto text-xs mt-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate('/manager/landlords/notifications');
-                }}
-              >
-                View History →
-              </Button>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Password Change Requests</p>
+                  <p className="text-3xl font-bold">{stats.pendingPasswordRequests}</p>
+                </div>
+                <div className="p-3 bg-indigo-100 rounded-full">
+                  <KeyRound className="w-6 h-6 text-indigo-600" />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
