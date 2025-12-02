@@ -215,6 +215,13 @@ const Login = () => {
                         )}
                       </button>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordResetDialog(true)}
+                      className="text-xs text-primary hover:text-primary/80 font-medium transition-colors text-right"
+                    >
+                      Forgot Password?
+                    </button>
                   </div>
                   <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
                     <Shield className="h-4 w-4 text-primary flex-shrink-0" />
