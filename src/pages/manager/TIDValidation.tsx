@@ -99,14 +99,14 @@ export default function TIDValidation() {
     }
 
     if (method === "mtn") {
-      const mtnPattern = /^MTN-\d{5}$/;
+      const mtnPattern = /^MTN-\d{11}$/;
       if (!mtnPattern.test(tid)) {
-        return "MTN format: MTN-XXXXX (e.g., MTN-12345)";
+        return "MTN format: MTN-XXXXXXXXXXX (11 digits, e.g., MTN-12345678901)";
       }
     } else if (method === "airtel") {
-      const airtelPattern = /^ATL-\d{5}$/;
+      const airtelPattern = /^ATL-\d{12}$/;
       if (!airtelPattern.test(tid)) {
-        return "Airtel format: ATL-XXXXX (e.g., ATL-12345)";
+        return "Airtel format: ATL-XXXXXXXXXXXX (12 digits, e.g., ATL-123456789012)";
       }
     }
 
@@ -339,8 +339,8 @@ export default function TIDValidation() {
                                   payment.payment_method === "cash"
                                     ? "Enter TID"
                                     : payment.payment_method === "mtn"
-                                    ? "MTN-12345"
-                                    : "ATL-12345"
+                                    ? "MTN-12345678901"
+                                    : "ATL-123456789012"
                                 }
                                 value={editing?.newTid || ""}
                                 onChange={(e) =>

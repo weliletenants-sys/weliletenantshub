@@ -64,14 +64,14 @@ export default function ManagerPaymentDialog({ open, onOpenChange }: ManagerPaym
     if (!tid) return "";
     
     if (method === "mtn") {
-      const mtnPattern = /^MTN-\d{5}$/;
+      const mtnPattern = /^MTN-\d{11}$/;
       if (!mtnPattern.test(tid)) {
-        return "MTN Transaction ID must follow format: MTN-XXXXX (e.g., MTN-12345)";
+        return "MTN Transaction ID must be 11 digits: MTN-XXXXXXXXXXX (e.g., MTN-12345678901)";
       }
     } else if (method === "airtel") {
-      const airtelPattern = /^ATL-\d{5}$/;
+      const airtelPattern = /^ATL-\d{12}$/;
       if (!airtelPattern.test(tid)) {
-        return "Airtel Transaction ID must follow format: ATL-XXXXX (e.g., ATL-12345)";
+        return "Airtel Transaction ID must be 12 digits: ATL-XXXXXXXXXXXX (e.g., ATL-123456789012)";
       }
     }
     return "";
@@ -439,8 +439,8 @@ You can generate and share the receipt with your tenant from the payment notific
             )}
             {!tidExists && !tidFormatError && (
               <p className="text-xs text-muted-foreground">
-                {paymentMethod === "mtn" && "Format: MTN-XXXXX (e.g., MTN-12345)"}
-                {paymentMethod === "airtel" && "Format: ATL-XXXXX (e.g., ATL-12345)"}
+                {paymentMethod === "mtn" && "Format: MTN-XXXXXXXXXXX (11 digits, e.g., MTN-12345678901)"}
+                {paymentMethod === "airtel" && "Format: ATL-XXXXXXXXXXXX (12 digits, e.g., ATL-123456789012)"}
                 {paymentMethod === "cash" && "Required to prevent double entry"}
               </p>
             )}
