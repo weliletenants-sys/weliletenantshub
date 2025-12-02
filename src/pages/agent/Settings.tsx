@@ -8,14 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { User, Phone, Shield, Loader2, Lock, Eye, EyeOff, RefreshCw, CheckCircle, FileText, Bell, Volume2, Vibrate } from "lucide-react";
+import { User, Phone, Shield, Loader2, Lock, Eye, EyeOff, RefreshCw, CheckCircle, FileText, Bell, Volume2, Vibrate, Info, KeyRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { ChangelogDialog } from "@/components/ChangelogDialog";
+import { PasswordChangeRequestDialog } from "@/components/PasswordChangeRequestDialog";
 import { changelog } from "@/data/changelog";
 import { getNotificationPreferences, setNotificationPreferences } from "@/hooks/useNotificationAlerts";
+import { useQuery } from "@tanstack/react-query";
 
 const AgentSettings = () => {
   const navigate = useNavigate();
@@ -40,11 +42,15 @@ const AgentSettings = () => {
     newPassword: '',
     confirmPassword: '',
   });
+  const [passwordRequestDialogOpen, setPasswordRequestDialogOpen] = useState(false);
   
   // Version checking for manual updates
   const { isChecking, checkVersion, currentVersion } = useVersionCheck();
   const [manualCheckLoading, setManualCheckLoading] = useState(false);
   const [showChangelogDialog, setShowChangelogDialog] = useState(false);
+
+  // Fetch user ID
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProfile();
@@ -62,6 +68,8 @@ const AgentSettings = () => {
         navigate('/login');
         return;
       }
+
+      setUserId(user.id);
 
       const { data: profileData, error } = await supabase
         .from('profiles')
@@ -90,6 +98,38 @@ const AgentSettings = () => {
       setLoading(false);
     }
   };
+
+  // Fetch agent data to get agent_id
+  const { data: agentData } = useQuery({
+    queryKey: ["agent-profile", userId],
+    queryFn: async () => {
+      if (!userId) return null;
+      const { data, error } = await supabase
+        .from("agents")
+        .select("id")
+        .eq("user_id", userId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!userId,
+  });
+
+  // Fetch password change requests
+  const { data: passwordRequests } = useQuery({
+    queryKey: ["password-change-requests", agentData?.id],
+    queryFn: async () => {
+      if (!agentData?.id) return [];
+      const { data, error } = await supabase
+        .from("password_change_requests")
+        .select("*")
+        .eq("agent_id", agentData.id)
+        .order("requested_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!agentData?.id,
+  });
 
   const handleSave = async () => {
     try {
@@ -302,96 +342,67 @@ const AgentSettings = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Change Password</CardTitle>
-            <CardDescription>Update your password to keep your account secure</CardDescription>
+            <CardTitle>Password Management</CardTitle>
+            <CardDescription>Request a password change from your manager</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="current_password" className="flex items-center gap-2">
-                <Lock className="h-4 w-4" />
-                Current Password
-              </Label>
-              <div className="relative">
-                <Input
-                  id="current_password"
-                  type={showPasswords.current ? "text" : "password"}
-                  value={passwordForm.currentPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                  placeholder="Enter current password"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3"
-                  onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
-                >
-                  {showPasswords.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
+            <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+              <div className="flex items-start gap-3">
+                <Info className="w-5 h-5 text-muted-foreground mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Forgot Your Password?</p>
+                  <p className="text-xs text-muted-foreground">
+                    Submit a password change request to your manager. Once approved, you'll receive a password reset link via email.
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="new_password">New Password</Label>
-              <div className="relative">
-                <Input
-                  id="new_password"
-                  type={showPasswords.new ? "text" : "password"}
-                  value={passwordForm.newPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                  placeholder="Enter new password (min 6 characters)"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3"
-                  onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
-                >
-                  {showPasswords.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
+            {passwordRequests && passwordRequests.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Recent Requests</Label>
+                <div className="space-y-2">
+                  {passwordRequests.slice(0, 3).map((req) => (
+                    <div key={req.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-md">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">
+                          {req.status === "pending" && "⏳ Pending Review"}
+                          {req.status === "approved" && "✅ Approved"}
+                          {req.status === "rejected" && "❌ Rejected"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(req.requested_at).toLocaleDateString()}
+                        </p>
+                        {req.status === "rejected" && req.rejection_reason && (
+                          <p className="text-xs text-destructive mt-1">{req.rejection_reason}</p>
+                        )}
+                      </div>
+                      <Badge
+                        variant={
+                          req.status === "pending"
+                            ? "default"
+                            : req.status === "approved"
+                            ? "default"
+                            : "destructive"
+                        }
+                      >
+                        {req.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirm_password">Confirm New Password</Label>
-              <div className="relative">
-                <Input
-                  id="confirm_password"
-                  type={showPasswords.confirm ? "text" : "password"}
-                  value={passwordForm.confirmPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                  placeholder="Confirm new password"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3"
-                  onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
-                >
-                  {showPasswords.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
+            )}
 
             <Button 
-              onClick={handlePasswordChange} 
-              disabled={changingPassword}
+              onClick={() => setPasswordRequestDialogOpen(true)}
               className="w-full"
-              variant="secondary"
+              disabled={passwordRequests?.some(r => r.status === "pending")}
             >
-              {changingPassword ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Changing Password...
-                </>
-              ) : (
-                <>
-                  <Lock className="h-4 w-4 mr-2" />
-                  Change Password
-                </>
-              )}
+              <KeyRound className="w-4 h-4 mr-2" />
+              {passwordRequests?.some(r => r.status === "pending") 
+                ? "Request Pending..."
+                : "Request Password Change"}
             </Button>
           </CardContent>
         </Card>
@@ -489,55 +500,55 @@ const AgentSettings = () => {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
               <div className="space-y-1">
-                <p className="font-medium text-sm flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  Current Version
-                </p>
-                <p className="text-xs text-muted-foreground font-mono">
-                  v{currentVersion.slice(0, 10)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  App automatically checks for updates every 2 minutes
-                </p>
+                <p className="text-sm font-medium">Current Version</p>
+                <p className="text-xs text-muted-foreground">{currentVersion}</p>
               </div>
+              <Badge variant="outline" className="gap-1">
+                <CheckCircle className="h-3 w-3" />
+                Active
+              </Badge>
             </div>
 
             <Button 
               onClick={handleManualUpdateCheck}
               disabled={manualCheckLoading || isChecking}
               className="w-full"
-              variant="outline"
+              variant="secondary"
             >
               {manualCheckLoading || isChecking ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Checking for updates...
+                  Checking...
                 </>
               ) : (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  Check for Updates Now
+                  Check for Updates
                 </>
               )}
             </Button>
-            
-            <p className="text-xs text-muted-foreground text-center">
-              If an update is available, the app will automatically reload with the latest version
-            </p>
 
-            <Separator className="my-4" />
-
-            <Button 
-              onClick={() => setShowChangelogDialog(true)}
-              variant="ghost"
-              className="w-full"
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              View Release Notes
-            </Button>
+            <div className="pt-2">
+              <Button
+                onClick={() => setShowChangelogDialog(true)}
+                variant="ghost"
+                className="w-full"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                View Release Notes
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      {agentData && (
+        <PasswordChangeRequestDialog
+          open={passwordRequestDialogOpen}
+          onOpenChange={setPasswordRequestDialogOpen}
+          agentId={agentData.id}
+        />
+      )}
     </AgentLayout>
   );
 };
