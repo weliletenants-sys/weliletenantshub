@@ -40,6 +40,68 @@ const Login = () => {
   const [accessCode, setAccessCode] = useState("");
   const [requestPhoneNumber, setRequestPhoneNumber] = useState("");
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [pendingRequest, setPendingRequest] = useState<{
+    status: string;
+    requested_at: string;
+  } | null>(null);
+  const [checkingRequest, setCheckingRequest] = useState(false);
+
+  // Check for pending password change request
+  useEffect(() => {
+    const checkPendingRequest = async () => {
+      if (!phoneNumber || phoneNumber.length < 10) {
+        setPendingRequest(null);
+        return;
+      }
+
+      setCheckingRequest(true);
+      try {
+        // Look up profile by phone number
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, role')
+          .eq('phone_number', phoneNumber)
+          .eq('role', 'agent')
+          .single();
+
+        if (!profile) {
+          setPendingRequest(null);
+          return;
+        }
+
+        // Get agent record
+        const { data: agent } = await supabase
+          .from('agents')
+          .select('id')
+          .eq('user_id', profile.id)
+          .single();
+
+        if (!agent) {
+          setPendingRequest(null);
+          return;
+        }
+
+        // Check for pending password change request
+        const { data: request } = await supabase
+          .from('password_change_requests')
+          .select('status, requested_at')
+          .eq('agent_id', agent.id)
+          .eq('status', 'pending')
+          .order('requested_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        setPendingRequest(request);
+      } catch (error) {
+        setPendingRequest(null);
+      } finally {
+        setCheckingRequest(false);
+      }
+    };
+
+    const timer = setTimeout(checkPendingRequest, 500);
+    return () => clearTimeout(timer);
+  }, [phoneNumber]);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -256,6 +318,25 @@ const Login = () => {
                       onChange={(e) => setPhoneNumber(e.target.value)}
                       required
                     />
+                    {checkingRequest && phoneNumber.length >= 10 && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <span className="inline-block animate-spin">⏳</span>
+                        Checking for pending requests...
+                      </p>
+                    )}
+                    {pendingRequest && (
+                      <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                        <KeyRound className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 space-y-1">
+                          <p className="text-xs font-semibold text-amber-900 dark:text-amber-100">
+                            Password Change Request Pending
+                          </p>
+                          <p className="text-xs text-amber-700 dark:text-amber-200">
+                            Your password change request from {new Date(pendingRequest.requested_at).toLocaleDateString()} is being reviewed by your manager.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password-login">Password</Label>
