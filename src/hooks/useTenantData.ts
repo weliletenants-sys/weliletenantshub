@@ -33,18 +33,18 @@ export const useTenantData = (tenantId: string | undefined) => {
 
         if (!agent) return null;
 
-        const { data: tenant, error } = await supabase
-          .from('tenants')
-          .select('*')
-          .eq('id', tenantId)
-          .eq('agent_id', agent.id)
-          .maybeSingle();
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('id', tenantId)
+        .eq('agent_id', agent.id)
+        .maybeSingle();
 
-        const duration = performance.now() - startTime;
-        trackApi('Get Tenant Detail', duration, { tenantId });
+      const duration = performance.now() - startTime;
+      trackApi('Get Tenant Detail', duration, { tenantId });
 
-        if (error) throw error;
-        return tenant;
+      if (error) throw error;
+      return data;
       } catch (error) {
         const duration = performance.now() - startTime;
         trackApi('Get Tenant Detail', duration, { 

@@ -23,13 +23,13 @@ import { cn } from "@/lib/utils";
 import PaymentReceipt from "@/components/PaymentReceipt";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff, Receipt, Edit, History, Zap, Loader2, Trash2, CalendarIcon } from "lucide-react";
+import { ArrowLeft, Phone, User, DollarSign, Calendar, Plus, CloudOff, Receipt, Edit, History, Zap, Loader2, Archive } from "lucide-react";
 import { format } from "date-fns";
 import { isOnline } from "@/lib/offlineSync";
 import { haptics } from "@/utils/haptics";
 import { useTenantData, useCollectionsData, useAgentInfo } from "@/hooks/useTenantData";
 import { useOptimisticPayment, useOptimisticTenantUpdate } from "@/hooks/useOptimisticPayment";
-import { useOptimisticTenantDeletion } from "@/hooks/useOptimisticTenant";
+import { useOptimisticTenantArchive, useOptimisticTenantRestore } from "@/hooks/useOptimisticTenant";
 import { useRealtimeCollections } from "@/hooks/useRealtimeSubscription";
 import { useRealtimeSyncStatus } from "@/hooks/useRealtimeSyncStatus";
 
@@ -49,7 +49,7 @@ const AgentTenantDetail = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [lastPayment, setLastPayment] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("details");
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
@@ -76,7 +76,8 @@ const AgentTenantDetail = () => {
   // Optimistic mutations
   const paymentMutation = useOptimisticPayment();
   const tenantUpdateMutation = useOptimisticTenantUpdate();
-  const deleteTenantMutation = useOptimisticTenantDeletion();
+  const archiveTenantMutation = useOptimisticTenantArchive();
+  const restoreTenantMutation = useOptimisticTenantRestore();
   
   // Enable real-time updates for collections
   useRealtimeCollections(tenantId);
@@ -259,24 +260,41 @@ const AgentTenantDetail = () => {
     });
   };
 
-  const handleDeleteTenant = async () => {
+  const handleArchiveTenant = async () => {
     if (!tenantId || !tenant) return;
     
     haptics.heavy();
     
     try {
-      await deleteTenantMutation.mutateAsync({
+      await archiveTenantMutation.mutateAsync({
         tenantId,
         tenantName: tenant.tenant_name,
         agentId: tenant.agent_id,
-        deletionReason: "Deleted by agent"
       });
       
-      navigate("/agent/tenants");
+      navigate("/agent/tenants?tab=archived");
     } catch (error: any) {
-      console.error('Error deleting tenant:', error);
+      console.error('Error archiving tenant:', error);
     } finally {
-      setDeleteDialogOpen(false);
+      setArchiveDialogOpen(false);
+    }
+  };
+
+  const handleRestoreTenant = async () => {
+    if (!tenantId || !tenant) return;
+    
+    haptics.heavy();
+    
+    try {
+      await restoreTenantMutation.mutateAsync({
+        tenantId,
+        tenantName: tenant.tenant_name,
+        agentId: tenant.agent_id,
+      });
+      
+      toast.success("Tenant restored successfully");
+    } catch (error: any) {
+      console.error('Error restoring tenant:', error);
     }
   };
 
@@ -315,6 +333,11 @@ const AgentTenantDetail = () => {
           <div className="flex-1">
             <h1 className="text-2xl font-bold flex items-center gap-2">
               🏠 {tenant.tenant_name}
+              {tenant.is_archived && (
+                <Badge variant="secondary" className="text-xs">
+                  🗃️ Archived
+                </Badge>
+              )}
               <RealtimeSyncIndicator lastSyncTime={lastSyncTime} compact />
             </h1>
             <p className="text-muted-foreground text-sm">Portfolio Details</p>
@@ -874,7 +897,7 @@ const AgentTenantDetail = () => {
                               variant={dateRangeFilter === "custom" ? "default" : "outline"}
                               className={cn("gap-2")}
                             >
-                              <CalendarIcon className="h-4 w-4" />
+                              <Calendar className="h-4 w-4" />
                               {dateRangeFilter === "custom" && customDateRange.from ? (
                                 customDateRange.to ? (
                                   <>
@@ -1064,15 +1087,37 @@ const AgentTenantDetail = () => {
                         Receipt
                       </Button>
                     <div className="pt-2 border-t">
-                      <Button
-                        variant="destructive"
-                        size="lg"
-                        className="w-full justify-start h-14 text-base hover:scale-[1.02] active:scale-98 transition-all"
-                        onClick={() => setDeleteDialogOpen(true)}
-                      >
-                        <span className="text-xl mr-3">🗑️</span>
-                        Delete
-                      </Button>
+                      {tenant.is_archived ? (
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          className="w-full justify-start h-14 text-base hover:scale-[1.02] active:scale-98 transition-all border-primary text-primary"
+                          onClick={handleRestoreTenant}
+                          disabled={restoreTenantMutation.isPending}
+                        >
+                          {restoreTenantMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-5 w-5 mr-3 animate-spin" />
+                              Restoring...
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-xl mr-3">♻️</span>
+                              Restore Tenant
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          className="w-full justify-start h-14 text-base hover:scale-[1.02] active:scale-98 transition-all border-orange-500 text-orange-500"
+                          onClick={() => setArchiveDialogOpen(true)}
+                        >
+                          <span className="text-xl mr-3">🗃️</span>
+                          Archive Tenant
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1123,31 +1168,31 @@ const AgentTenantDetail = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        {/* Archive Confirmation Dialog */}
+        <AlertDialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Tenant</AlertDialogTitle>
+              <AlertDialogTitle>Archive Tenant</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete <strong>{tenant.tenant_name}</strong>? This action cannot be undone and will remove all payment history associated with this tenant.
+                Are you sure you want to archive <strong>{tenant.tenant_name}</strong>? The tenant and all payment history will be preserved, and you can restore them anytime from the Archived tab.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleteTenantMutation.isPending}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={archiveTenantMutation.isPending}>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                onClick={handleDeleteTenant}
-                disabled={deleteTenantMutation.isPending}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={handleArchiveTenant}
+                disabled={archiveTenantMutation.isPending}
+                className="bg-orange-500 text-white hover:bg-orange-600"
               >
-                {deleteTenantMutation.isPending ? (
+                {archiveTenantMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Deleting...
+                    Archiving...
                   </>
                 ) : (
                   <>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
+                    <span className="mr-2">🗃️</span>
+                    Archive
                   </>
                 )}
               </AlertDialogAction>

@@ -658,11 +658,14 @@ export type Database = {
       tenants: {
         Row: {
           agent_id: string
+          archived_at: string | null
+          archived_by: string | null
           created_at: string
           daily_payment_amount: number | null
           days_remaining: number | null
           due_date: string | null
           id: string
+          is_archived: boolean | null
           landlord_id: string | null
           landlord_id_url: string | null
           landlord_name: string | null
@@ -684,11 +687,14 @@ export type Database = {
         }
         Insert: {
           agent_id: string
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
           daily_payment_amount?: number | null
           days_remaining?: number | null
           due_date?: string | null
           id?: string
+          is_archived?: boolean | null
           landlord_id?: string | null
           landlord_id_url?: string | null
           landlord_name?: string | null
@@ -710,11 +716,14 @@ export type Database = {
         }
         Update: {
           agent_id?: string
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
           daily_payment_amount?: number | null
           days_remaining?: number | null
           due_date?: string | null
           id?: string
+          is_archived?: boolean | null
           landlord_id?: string | null
           landlord_id_url?: string | null
           landlord_name?: string | null
