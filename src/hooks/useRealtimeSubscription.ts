@@ -9,6 +9,7 @@ type Collection = Tables<'collections'>;
 type Agent = Tables<'agents'>;
 type Profile = Tables<'profiles'>;
 type Landlord = Tables<'landlords'>;
+type PasswordChangeRequest = Tables<'password_change_requests'>;
 
 // Global sync state management
 let syncCallbacks: Set<(table: string) => void> = new Set();
@@ -445,6 +446,56 @@ export const useRealtimeLandlords = () => {
             const landlord = payload.old as Landlord;
             queryClient.invalidateQueries({ queryKey: ['landlord', landlord.id] });
           }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          isSubscribed = true;
+        }
+      });
+
+    return () => {
+      isMounted = false;
+      isSubscribed = false;
+      channel.unsubscribe().then(() => {
+        supabase.removeChannel(channel).catch(console.error);
+      });
+    };
+  }, [queryClient]);
+};
+
+/**
+ * Real-time subscription hook for password change requests
+ * Automatically updates React Query cache when password requests change
+ * Used by managers to get instant notifications of new password change requests
+ */
+export const useRealtimePasswordRequests = () => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    let isMounted = true;
+    let isSubscribed = false;
+
+    const channel = supabase
+      .channel('password-requests-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'password_change_requests',
+        },
+        (payload: RealtimePostgresChangesPayload<PasswordChangeRequest>) => {
+          if (!isMounted || !isSubscribed) return;
+          
+          console.log('Realtime password request change:', payload);
+
+          // Notify sync indicators
+          notifySyncEvent('password_change_requests');
+
+          // Invalidate password request queries
+          queryClient.invalidateQueries({ queryKey: ['passwordRequests'] });
+          queryClient.invalidateQueries({ queryKey: ['passwordRequestsCount'] });
         }
       )
       .subscribe((status) => {
