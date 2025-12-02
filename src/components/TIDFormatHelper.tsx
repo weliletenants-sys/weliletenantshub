@@ -4,6 +4,7 @@ import { Progress } from "@/components/ui/progress";
 import { Loader2, AlertCircle, CheckCircle2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useEffect, useRef } from "react";
 
 interface TIDFormatHelperProps {
   value: string;
@@ -28,6 +29,55 @@ export function TIDFormatHelper({
   disabled = false,
   id = "payment-id",
 }: TIDFormatHelperProps) {
+  const previousMethodRef = useRef(paymentMethod);
+
+  // Auto-prefix when payment method changes
+  useEffect(() => {
+    const previousMethod = previousMethodRef.current;
+    
+    // Only auto-prefix if payment method actually changed and is MTN or Airtel
+    if (previousMethod !== paymentMethod && (paymentMethod === "mtn" || paymentMethod === "airtel")) {
+      const prefix = paymentMethod === "mtn" ? "MTN-" : "ATL-";
+      
+      // Remove old prefix if switching between MTN/Airtel
+      let cleanValue = value;
+      if (previousMethod === "mtn" && value.startsWith("MTN-")) {
+        cleanValue = value.substring(4);
+      } else if (previousMethod === "airtel" && value.startsWith("ATL-")) {
+        cleanValue = value.substring(4);
+      }
+      
+      // Add new prefix if not already present
+      if (!cleanValue.startsWith(prefix)) {
+        onChange(prefix + cleanValue);
+      }
+    }
+    
+    previousMethodRef.current = paymentMethod;
+  }, [paymentMethod, value, onChange]);
+
+  // Handle input changes with prefix preservation
+  const handleInputChange = (newValue: string) => {
+    const prefix = paymentMethod === "mtn" ? "MTN-" : paymentMethod === "airtel" ? "ATL-" : "";
+    
+    // For MTN/Airtel, ensure prefix is always present
+    if (prefix) {
+      // If user tries to delete the prefix, restore it
+      if (!newValue.startsWith(prefix)) {
+        // Check if they're trying to type the prefix manually
+        if (prefix.startsWith(newValue) || newValue === "") {
+          onChange(prefix);
+        } else {
+          // Otherwise keep whatever they typed but ensure prefix
+          onChange(prefix + newValue.replace(prefix, ""));
+        }
+      } else {
+        onChange(newValue);
+      }
+    } else {
+      onChange(newValue);
+    }
+  };
   // Extract digit count (after prefix)
   const getDigitCount = () => {
     if (!value) return 0;
@@ -102,7 +152,7 @@ export function TIDFormatHelper({
           type="text"
           placeholder={`Enter ${hint.format}`}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => handleInputChange(e.target.value)}
           required={required}
           disabled={disabled}
           className={cn(
@@ -180,6 +230,14 @@ export function TIDFormatHelper({
       {/* Format hint for cash */}
       {paymentMethod === "cash" && !tidFormatError && (
         <p className="text-xs text-muted-foreground">{hint.description}</p>
+      )}
+
+      {/* Auto-prefix notification */}
+      {(paymentMethod === "mtn" || paymentMethod === "airtel") && !value && (
+        <div className="flex items-center gap-2 text-xs text-primary">
+          <Info className="h-3 w-3" />
+          <span>Prefix "{hint.prefix}" will be added automatically</span>
+        </div>
       )}
     </div>
   );
