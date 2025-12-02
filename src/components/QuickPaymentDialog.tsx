@@ -15,6 +15,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils";
 import { useOptimisticPayment } from "@/hooks/useOptimisticPayment";
 import { format } from "date-fns";
+import { TIDFormatHelper } from "@/components/TIDFormatHelper";
 
 interface Tenant {
   id: string;
@@ -307,58 +308,17 @@ const QuickPaymentDialog = ({ open, onOpenChange, onSuccess, tenant: preselected
             />
           </div>
 
-          {/* Transaction ID */}
-          <div className="space-y-2">
-            <Label htmlFor="payment-id">Transaction ID (TID) *</Label>
-            <div className="relative">
-              <Input
-                id="payment-id"
-                type="text"
-                placeholder="Enter unique transaction ID"
-                value={paymentId}
-                onChange={(e) => setPaymentId(e.target.value)}
-                required
-                className={cn(
-                  (tidExists || tidFormatError) && "border-destructive focus-visible:ring-destructive",
-                  checkingTid && "pr-10"
-                )}
-              />
-              {checkingTid && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                </div>
-              )}
-            </div>
-            {tidFormatError && (
-              <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-destructive font-medium">
-                  {tidFormatError}
-                </p>
-              </div>
-            )}
-            {tidExists && !tidFormatError && (
-              <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-destructive font-medium">
-                  This Transaction ID already exists in the system. Please use a different TID to avoid double entry.
-                </p>
-              </div>
-            )}
-            {!tidExists && !tidFormatError && paymentId && !checkingTid && (
-              <div className="flex items-center gap-2 text-xs text-success">
-                <CheckCircle2 className="h-3 w-3" />
-                TID available
-              </div>
-            )}
-            {!tidExists && !tidFormatError && (
-              <p className="text-xs text-muted-foreground">
-                {paymentMethod === "mtn" && "Format: MTN-XXXXXXXXXXX (11 digits, e.g., MTN-12345678901)"}
-                {paymentMethod === "airtel" && "Format: ATL-XXXXXXXXXXXX (12 digits, e.g., ATL-123456789012)"}
-                {paymentMethod === "cash" && "Required to prevent double entry"}
-              </p>
-            )}
-          </div>
+          {/* Transaction ID with Format Helper */}
+          <TIDFormatHelper
+            value={paymentId}
+            onChange={setPaymentId}
+            paymentMethod={paymentMethod}
+            tidExists={tidExists}
+            checkingTid={checkingTid}
+            tidFormatError={tidFormatError}
+            required={true}
+            id="payment-id"
+          />
 
           {/* Payment Method */}
           <div className="space-y-2">

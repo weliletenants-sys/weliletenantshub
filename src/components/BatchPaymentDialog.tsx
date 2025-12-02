@@ -15,6 +15,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TIDFormatHelper } from "@/components/TIDFormatHelper";
 
 interface Tenant {
   id: string;
@@ -503,57 +504,17 @@ You can generate and share the receipt with your tenant from the payment notific
                         />
                       </div>
 
-                      <div className="space-y-2">
-                        <Label>Transaction ID (TID) *</Label>
-                        <div className="relative">
-                          <Input
-                            type="text"
-                            placeholder="Enter unique transaction ID"
-                            value={payment.paymentId}
-                            onChange={(e) => updatePaymentEntry(payment.id, "paymentId", e.target.value)}
-                            disabled={isProcessing}
-                      required
-                      className={cn(
-                        (payment.tidExists || payment.tidFormatError) && "border-destructive focus-visible:ring-destructive",
-                        payment.checkingTid && "pr-10"
-                      )}
-                          />
-                          {payment.checkingTid && (
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            </div>
-                          )}
-                        </div>
-                         {payment.tidFormatError && (
-                          <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                            <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
-                            <p className="text-xs text-destructive font-medium">
-                              {payment.tidFormatError}
-                            </p>
-                          </div>
-                        )}
-                        {payment.tidExists && !payment.tidFormatError && (
-                          <div className="flex items-start gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-                            <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
-                            <p className="text-xs text-destructive font-medium">
-                              This Transaction ID already exists in the system. Please use a different TID.
-                            </p>
-                          </div>
-                        )}
-                        {!payment.tidExists && !payment.tidFormatError && payment.paymentId && !payment.checkingTid && payment.paymentId.length >= 3 && (
-                          <div className="flex items-center gap-2 text-xs text-success">
-                            <CheckCircle2 className="h-3 w-3" />
-                            TID available
-                          </div>
-                        )}
-                        {!payment.tidExists && !payment.tidFormatError && (
-                          <p className="text-xs text-muted-foreground">
-                            {payment.paymentMethod === "mtn" && "Format: MTN-XXXXX (e.g., MTN-12345)"}
-                            {payment.paymentMethod === "airtel" && "Format: ATL-XXXXX (e.g., ATL-12345)"}
-                            {payment.paymentMethod === "cash" && "Required to prevent double entry"}
-                          </p>
-                        )}
-                      </div>
+                      <TIDFormatHelper
+                        value={payment.paymentId}
+                        onChange={(value) => updatePaymentEntry(payment.id, "paymentId", value)}
+                        paymentMethod={payment.paymentMethod}
+                        tidExists={payment.tidExists}
+                        checkingTid={payment.checkingTid}
+                        tidFormatError={payment.tidFormatError}
+                        required={true}
+                        disabled={isProcessing}
+                        id={`payment-id-${payment.id}`}
+                      />
 
                       <div className="space-y-2">
                         <Label>Payment Method</Label>
