@@ -64,18 +64,15 @@ export function AgentPasswordResetDialog({ open, onOpenChange, agent }: AgentPas
     haptics.light();
 
     try {
-      // Update password in auth.users table
-      const { error } = await supabase.rpc('exec_sql', {
-        sql: `
-          UPDATE auth.users 
-          SET encrypted_password = crypt($1, gen_salt('bf')),
-              updated_at = now()
-          WHERE id = $2
-        `,
-        params: [newPassword, agent.user_id]
+      const { data, error } = await supabase.functions.invoke('reset-agent-password', {
+        body: {
+          agent_user_id: agent.user_id,
+          new_password: newPassword
+        }
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       toast.success("Password reset successful", {
         description: `Password updated for ${agent.profiles?.full_name || agent.profiles?.phone_number}`
@@ -85,26 +82,9 @@ export function AgentPasswordResetDialog({ open, onOpenChange, agent }: AgentPas
       onOpenChange(false);
     } catch (error: any) {
       console.error("Error resetting password:", error);
-      
-      // If rpc doesn't exist, try direct SQL execution
-      try {
-        const { error: directError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', agent.user_id)
-          .single();
-
-        if (!directError) {
-          // Use alternative method - this requires service role key
-          toast.error("Password reset unavailable", {
-            description: "This operation requires additional database permissions. Please contact support."
-          });
-        }
-      } catch (fallbackError) {
-        toast.error("Failed to reset password", {
-          description: error.message || "Please try again later"
-        });
-      }
+      toast.error("Failed to reset password", {
+        description: error.message || "Please try again later"
+      });
     } finally {
       setLoading(false);
     }

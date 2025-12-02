@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.daily-commission-summary]
 verify_jwt = false
+
+[functions.reset-agent-password]
+verify_jwt = true
