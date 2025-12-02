@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import WelileLogo from "@/components/WelileLogo";
-import { UserCog, Users, Download } from "lucide-react";
+import { UserCog, Users, Download, KeyRound } from "lucide-react";
 import { haptics } from "@/utils/haptics";
 
 const Index = () => {
@@ -59,6 +59,20 @@ const Index = () => {
             >
               <UserCog className="h-8 w-8" />
               Manager Portal
+            </Button>
+          </div>
+
+          <div className="mt-8 flex justify-center">
+            <Button
+              variant="outline"
+              onClick={() => {
+                haptics.light();
+                navigate("/login?forgot=true");
+              }}
+              className="gap-2"
+            >
+              <KeyRound className="h-4 w-4" />
+              Forgot Password?
             </Button>
           </div>
         </div>
