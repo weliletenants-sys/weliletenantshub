@@ -46,6 +46,13 @@ const Login = () => {
   } | null>(null);
   const [checkingRequest, setCheckingRequest] = useState(false);
 
+  // Check for forgot password parameter in URL
+  useEffect(() => {
+    if (searchParams.get('forgot') === 'true') {
+      setShowPasswordRequestDialog(true);
+    }
+  }, [searchParams]);
+
   // Check for pending password change request
   useEffect(() => {
     const checkPendingRequest = async () => {
