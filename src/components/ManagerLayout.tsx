@@ -10,6 +10,8 @@ import { haptics } from "@/utils/haptics";
 import { useRipple } from "@/hooks/useRipple";
 import { useSwipeBack } from "@/hooks/useSwipeBack";
 import { useRealtimeLandlordNotifications } from "@/hooks/useRealtimeLandlordNotifications";
+import { useRealtimePasswordRequests } from "@/hooks/useRealtimePasswordRequests";
+import { useAuth } from "@/hooks/useAuth";
 import SwipeBackIndicator from "./SwipeBackIndicator";
 import BottomNavigation from "./BottomNavigation";
 import { LandlordSearchDialog } from "./LandlordSearchDialog";
@@ -34,9 +36,13 @@ const ManagerLayout = ({ children, currentPage }: ManagerLayoutProps) => {
   const createRipple = useRipple();
   const { swipeProgress } = useSwipeBack();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const { user } = useAuth();
 
   // Enable realtime notifications for landlord registrations
   useRealtimeLandlordNotifications(true);
+  
+  // Enable realtime notifications for password change requests
+  useRealtimePasswordRequests(user?.id, true);
 
   const handleLogout = async () => {
     haptics.success();
