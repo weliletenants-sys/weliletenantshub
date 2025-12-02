@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import AgentLayout from "@/components/AgentLayout";
 import { TenantListSkeleton } from "@/components/TenantDetailSkeleton";
 import { VirtualizedList } from "@/components/VirtualizedList";
@@ -27,6 +27,7 @@ const AgentTenants = () => {
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "all");
   const [agentId, setAgentId] = useState<string | null>(null);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Fetch agent ID
   useEffect(() => {
@@ -54,7 +55,7 @@ const AgentTenants = () => {
     }
   }, [searchParams]);
 
-  // Fetch tenants with React Query (supports optimistic updates)
+  // Fetch active (non-archived) tenants with React Query
   const { data: tenants = [], isLoading, isFetching } = useQuery({
     queryKey: ['tenants', agentId],
     queryFn: async () => {
@@ -64,6 +65,7 @@ const AgentTenants = () => {
         .from("tenants")
         .select("*")
         .eq("agent_id", agentId)
+        .eq("is_archived", false)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -71,6 +73,26 @@ const AgentTenants = () => {
     },
     enabled: !!agentId,
     placeholderData: (previousData) => previousData, // Show cached data while refetching
+  });
+
+  // Fetch archived tenants separately
+  const { data: archivedTenants = [], isLoading: archivedLoading } = useQuery({
+    queryKey: ['archivedTenants', agentId],
+    queryFn: async () => {
+      if (!agentId) return [];
+
+      const { data, error } = await supabase
+        .from("tenants")
+        .select("*")
+        .eq("agent_id", agentId)
+        .eq("is_archived", true)
+        .order("archived_at", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!agentId,
+    placeholderData: (previousData) => previousData,
   });
 
   // Calculate days overdue with useMemo
@@ -95,6 +117,33 @@ const AgentTenants = () => {
   
   // Enable real-time updates for tenants
   useRealtimeTenants(agentId);
+  
+  // Enable real-time updates for archived tenants
+  useEffect(() => {
+    if (!agentId) return;
+
+    const channel = supabase
+      .channel('archived-tenants')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tenants',
+          filter: `agent_id=eq.${agentId}`,
+        },
+        () => {
+          // Invalidate both queries on any change
+          queryClient.invalidateQueries({ queryKey: ['tenants', agentId] });
+          queryClient.invalidateQueries({ queryKey: ['archivedTenants', agentId] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe().then(() => supabase.removeChannel(channel));
+    };
+  }, [agentId, queryClient]);
   
   // Track sync status for visual indicators
   const { lastSyncTime } = useRealtimeSyncStatus('tenants');
@@ -196,19 +245,22 @@ const AgentTenants = () => {
           </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 h-12">
+          <TabsList className="grid w-full grid-cols-5 h-12">
             <TabsTrigger value="all" className="text-sm">
               All ({tenantsWithOverdue.length})
             </TabsTrigger>
             <TabsTrigger value="active" className="text-sm">
-              💰 Active ({activeTenants.length})
+              💰 ({activeTenants.length})
             </TabsTrigger>
             <TabsTrigger value="pipeline" className="text-sm">
-              📋 Pipeline ({pipelineTenants.length})
+              📋 ({pipelineTenants.length})
             </TabsTrigger>
             <TabsTrigger value="overdue" className="text-sm text-destructive data-[state=active]:text-destructive">
-              <AlertCircle className="h-4 w-4 mr-1" />
-              Overdue ({overdueTenants.length})
+              <AlertCircle className="h-4 w-4" />
+              ({overdueTenants.length})
+            </TabsTrigger>
+            <TabsTrigger value="archived" className="text-sm text-muted-foreground">
+              🗃️ ({archivedTenants.length})
             </TabsTrigger>
           </TabsList>
 
@@ -309,6 +361,31 @@ const AgentTenants = () => {
                   </div>
                 ) : (
                   renderTenantTable(overdueTenants)
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="archived">
+            <Card className="border-muted hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-muted-foreground flex items-center gap-2 text-base">
+                  🗃️ Archived Tenants
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  {archivedTenants.length} tenant{archivedTenants.length !== 1 ? 's' : ''} archived
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {archivedLoading ? (
+                  <TenantListSkeleton />
+                ) : archivedTenants.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-4xl mb-2">🗃️</p>
+                    <p className="text-muted-foreground text-sm">No archived tenants</p>
+                  </div>
+                ) : (
+                  renderTenantTable(archivedTenants)
                 )}
               </CardContent>
             </Card>

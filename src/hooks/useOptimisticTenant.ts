@@ -15,6 +15,19 @@ interface DeleteTenantData {
   managerId?: string;
 }
 
+interface ArchiveTenantData {
+  tenantId: string;
+  tenantName: string;
+  agentId: string;
+  archiveReason?: string;
+}
+
+interface RestoreTenantData {
+  tenantId: string;
+  tenantName: string;
+  agentId: string;
+}
+
 interface TransferTenantData {
   tenantId: string;
   tenantName: string;
@@ -146,6 +159,204 @@ export const useOptimisticTenantDeletion = () => {
     onSettled: (result, error, data) => {
       // Refetch to ensure sync
       queryClient.invalidateQueries({ queryKey: ['tenants', data.agentId] });
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    }
+  });
+};
+
+/**
+ * Hook for optimistic tenant archive with instant UI feedback
+ */
+export const useOptimisticTenantArchive = () => {
+  const queryClient = useQueryClient();
+  const { addOperation, updateOperation } = useOptimisticStatusStore();
+
+  return useMutation({
+    mutationFn: async (data: ArchiveTenantData) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Archive tenant instead of deleting
+      const { error } = await supabase
+        .from("tenants")
+        .update({
+          is_archived: true,
+          archived_at: new Date().toISOString(),
+          archived_by: user.id
+        })
+        .eq("id", data.tenantId);
+
+      if (error) throw error;
+
+      return { success: true };
+    },
+
+    onMutate: async (data) => {
+      // Track operation
+      const operationId = addOperation('archive-tenant', `Archiving ${data.tenantName}`);
+
+      // Cancel outgoing queries
+      await queryClient.cancelQueries({ queryKey: ['tenants', data.agentId] });
+      await queryClient.cancelQueries({ queryKey: ['tenant', data.tenantId] });
+
+      // Snapshot previous data
+      const previousTenants = queryClient.getQueryData<Tenant[]>(['tenants', data.agentId]);
+      const previousTenant = queryClient.getQueryData<Tenant>(['tenant', data.tenantId]);
+
+      // Optimistically remove from active list (will be filtered out)
+      queryClient.setQueryData<Tenant[]>(['tenants', data.agentId], (old = []) =>
+        old.filter((tenant) => tenant.id !== data.tenantId)
+      );
+
+      // Update tenant to archived state
+      queryClient.setQueryData<Tenant>(['tenant', data.tenantId], (old) =>
+        old ? { ...old, is_archived: true, archived_at: new Date().toISOString() } : old
+      );
+
+      // Instant haptic feedback
+      haptics.light();
+
+      return { previousTenants, previousTenant, operationId };
+    },
+
+    onError: (error, data, context) => {
+      // Update operation status
+      if (context?.operationId) {
+        updateOperation(context.operationId, 'error', error instanceof Error ? error.message : 'Failed to archive');
+      }
+
+      // Rollback on error
+      if (context?.previousTenants) {
+        queryClient.setQueryData(['tenants', data.agentId], context.previousTenants);
+      }
+      if (context?.previousTenant) {
+        queryClient.setQueryData(['tenant', data.tenantId], context.previousTenant);
+      }
+
+      haptics.error?.();
+      toast.error('Failed to archive tenant', {
+        description: error instanceof Error ? error.message : 'Please try again'
+      });
+    },
+
+    onSuccess: (result, data, context) => {
+      // Update operation status
+      if (context?.operationId) {
+        updateOperation(context.operationId, 'success');
+      }
+
+      haptics.success();
+      toast.success("Tenant archived successfully", {
+        description: "You can restore it anytime from the Archived tab"
+      });
+    },
+
+    onSettled: (result, error, data) => {
+      // Refetch to ensure sync
+      queryClient.invalidateQueries({ queryKey: ['tenants', data.agentId] });
+      queryClient.invalidateQueries({ queryKey: ['archivedTenants', data.agentId] });
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+    }
+  });
+};
+
+/**
+ * Hook for optimistic tenant restore with instant UI feedback
+ */
+export const useOptimisticTenantRestore = () => {
+  const queryClient = useQueryClient();
+  const { addOperation, updateOperation } = useOptimisticStatusStore();
+
+  return useMutation({
+    mutationFn: async (data: RestoreTenantData) => {
+      // Restore tenant
+      const { error } = await supabase
+        .from("tenants")
+        .update({
+          is_archived: false,
+          archived_at: null,
+          archived_by: null
+        })
+        .eq("id", data.tenantId);
+
+      if (error) throw error;
+
+      return { success: true };
+    },
+
+    onMutate: async (data) => {
+      // Track operation
+      const operationId = addOperation('restore-tenant', `Restoring ${data.tenantName}`);
+
+      // Cancel outgoing queries
+      await queryClient.cancelQueries({ queryKey: ['archivedTenants', data.agentId] });
+      await queryClient.cancelQueries({ queryKey: ['tenants', data.agentId] });
+      await queryClient.cancelQueries({ queryKey: ['tenant', data.tenantId] });
+
+      // Snapshot previous data
+      const previousArchivedTenants = queryClient.getQueryData<Tenant[]>(['archivedTenants', data.agentId]);
+      const previousActiveTenants = queryClient.getQueryData<Tenant[]>(['tenants', data.agentId]);
+      const previousTenant = queryClient.getQueryData<Tenant>(['tenant', data.tenantId]);
+
+      // Optimistically remove from archived list
+      queryClient.setQueryData<Tenant[]>(['archivedTenants', data.agentId], (old = []) =>
+        old.filter((tenant) => tenant.id !== data.tenantId)
+      );
+
+      // Optimistically add to active list (if we have the tenant data)
+      if (previousTenant) {
+        const restoredTenant = { ...previousTenant, is_archived: false, archived_at: null, archived_by: null };
+        queryClient.setQueryData<Tenant[]>(['tenants', data.agentId], (old = []) => [restoredTenant, ...old]);
+      }
+
+      // Update tenant detail
+      queryClient.setQueryData<Tenant>(['tenant', data.tenantId], (old) =>
+        old ? { ...old, is_archived: false, archived_at: null, archived_by: null } : old
+      );
+
+      // Instant haptic feedback
+      haptics.light();
+
+      return { previousArchivedTenants, previousActiveTenants, previousTenant, operationId };
+    },
+
+    onError: (error, data, context) => {
+      // Update operation status
+      if (context?.operationId) {
+        updateOperation(context.operationId, 'error', error instanceof Error ? error.message : 'Failed to restore');
+      }
+
+      // Rollback on error
+      if (context?.previousArchivedTenants) {
+        queryClient.setQueryData(['archivedTenants', data.agentId], context.previousArchivedTenants);
+      }
+      if (context?.previousActiveTenants) {
+        queryClient.setQueryData(['tenants', data.agentId], context.previousActiveTenants);
+      }
+      if (context?.previousTenant) {
+        queryClient.setQueryData(['tenant', data.tenantId], context.previousTenant);
+      }
+
+      haptics.error?.();
+      toast.error('Failed to restore tenant', {
+        description: error instanceof Error ? error.message : 'Please try again'
+      });
+    },
+
+    onSuccess: (result, data, context) => {
+      // Update operation status
+      if (context?.operationId) {
+        updateOperation(context.operationId, 'success');
+      }
+
+      haptics.success();
+      toast.success("Tenant restored successfully");
+    },
+
+    onSettled: (result, error, data) => {
+      // Refetch to ensure sync
+      queryClient.invalidateQueries({ queryKey: ['tenants', data.agentId] });
+      queryClient.invalidateQueries({ queryKey: ['archivedTenants', data.agentId] });
       queryClient.invalidateQueries({ queryKey: ['agents'] });
     }
   });
