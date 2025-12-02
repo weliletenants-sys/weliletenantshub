@@ -35,6 +35,11 @@ const Login = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
+  const [showPasswordRequestDialog, setShowPasswordRequestDialog] = useState(false);
+  const [requestStep, setRequestStep] = useState<'code' | 'phone'>('code');
+  const [accessCode, setAccessCode] = useState("");
+  const [requestPhoneNumber, setRequestPhoneNumber] = useState("");
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -155,6 +160,67 @@ const Login = () => {
     }
   };
 
+  const handlePasswordRequest = async () => {
+    if (requestStep === 'code') {
+      if (accessCode.trim().toUpperCase() === 'MYPART@WELILE') {
+        setRequestStep('phone');
+        setAccessCode("");
+      } else {
+        toast.error("Invalid access code. Please try again.");
+      }
+      return;
+    }
+
+    // Step 2: Submit phone number and create password change request
+    setIsSubmittingRequest(true);
+    try {
+      // Look up agent by phone number
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, role')
+        .eq('phone_number', requestPhoneNumber)
+        .eq('role', 'agent')
+        .single();
+
+      if (profileError || !profile) {
+        throw new Error("No agent found with this phone number");
+      }
+
+      // Get agent record
+      const { data: agent, error: agentError } = await supabase
+        .from('agents')
+        .select('id')
+        .eq('user_id', profile.id)
+        .single();
+
+      if (agentError || !agent) {
+        throw new Error("Agent record not found");
+      }
+
+      const agentId = agent.id;
+
+      // Create password change request
+      const { error: requestError } = await supabase
+        .from('password_change_requests')
+        .insert({
+          agent_id: agentId,
+          reason: 'Password reset requested via forgot password flow',
+          status: 'pending'
+        });
+
+      if (requestError) throw requestError;
+
+      toast.success("Password change request submitted successfully! Your manager will review it shortly.");
+      setShowPasswordRequestDialog(false);
+      setRequestStep('code');
+      setRequestPhoneNumber("");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to submit password change request");
+    } finally {
+      setIsSubmittingRequest(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-accent/5 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
@@ -215,13 +281,15 @@ const Login = () => {
                         )}
                       </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowPasswordResetDialog(true)}
-                      className="text-xs text-primary hover:text-primary/80 font-medium transition-colors text-right"
-                    >
-                      Forgot Password?
-                    </button>
+                    <div className="flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswordRequestDialog(true)}
+                        className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+                      >
+                        Forgot Password?
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
                     <Shield className="h-4 w-4 text-primary flex-shrink-0" />
@@ -286,7 +354,7 @@ const Login = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setShowPasswordResetDialog(true)}
+                      onClick={() => setShowPasswordRequestDialog(true)}
                       className="text-xs text-primary hover:text-primary/80 font-medium transition-colors text-right"
                     >
                       Already have an account? Forgot Password?
@@ -336,6 +404,73 @@ const Login = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Try Again</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showPasswordRequestDialog} onOpenChange={(open) => {
+        setShowPasswordRequestDialog(open);
+        if (!open) {
+          setRequestStep('code');
+          setAccessCode("");
+          setRequestPhoneNumber("");
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2 mb-2">
+              <KeyRound className="h-5 w-5 text-primary" />
+              <AlertDialogTitle>Request Password Change</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="space-y-4 text-left">
+              {requestStep === 'code' ? (
+                <>
+                  <p className="text-base">Enter the access code to proceed with your password change request.</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="access-code">Access Code</Label>
+                    <Input
+                      id="access-code"
+                      type="text"
+                      placeholder="Enter access code"
+                      value={accessCode}
+                      onChange={(e) => setAccessCode(e.target.value)}
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Use the code communicated to you by your manager
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-base">Enter your phone number to submit a password change request.</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="request-phone">Phone Number</Label>
+                    <Input
+                      id="request-phone"
+                      type="tel"
+                      placeholder="0700000000"
+                      value={requestPhoneNumber}
+                      onChange={(e) => setRequestPhoneNumber(e.target.value)}
+                    />
+                  </div>
+                  <div className="bg-primary/10 p-4 rounded-lg border border-primary/20">
+                    <p className="text-sm text-foreground">
+                      Your manager will review your request and approve a password reset link.
+                    </p>
+                  </div>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handlePasswordRequest}
+              disabled={isSubmittingRequest || (requestStep === 'code' ? !accessCode : !requestPhoneNumber)}
+            >
+              {isSubmittingRequest ? "Submitting..." : requestStep === 'code' ? "Verify Code" : "Submit Request"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
