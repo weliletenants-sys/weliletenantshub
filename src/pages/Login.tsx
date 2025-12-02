@@ -10,7 +10,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Session } from "@supabase/supabase-js";
 import { ensureProfileExists } from "@/lib/profileSync";
-import { Eye, EyeOff, Shield } from "lucide-react";
+import { Eye, EyeOff, Shield, KeyRound } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -24,6 +34,7 @@ const Login = () => {
   const [fullName, setFullName] = useState("");
   const [session, setSession] = useState<Session | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -92,7 +103,14 @@ const Login = () => {
         }
       }
     } catch (error: any) {
-      toast.error(error.message || "Login failed");
+      // Check if it's an invalid credentials error
+      if (error.message?.toLowerCase().includes('invalid') && 
+          (error.message?.toLowerCase().includes('credentials') || 
+           error.message?.toLowerCase().includes('login'))) {
+        setShowPasswordResetDialog(true);
+      } else {
+        toast.error(error.message || "Login failed");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -283,6 +301,30 @@ const Login = () => {
           Back to Home
         </Button>
       </div>
+
+      <AlertDialog open={showPasswordResetDialog} onOpenChange={setShowPasswordResetDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2 mb-2">
+              <KeyRound className="h-5 w-5 text-primary" />
+              <AlertDialogTitle>Invalid Password</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="space-y-3 text-left">
+              <p className="text-base">The password you entered is incorrect.</p>
+              <div className="bg-primary/10 p-4 rounded-lg space-y-2 border border-primary/20">
+                <p className="font-semibold text-foreground">Forgot your password?</p>
+                <p className="text-sm">Contact your manager to request a password change. They can send you a password reset link via email.</p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Or try entering your password again - make sure Caps Lock is off and check for any typing errors.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Try Again</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
