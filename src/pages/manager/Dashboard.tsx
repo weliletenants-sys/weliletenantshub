@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { haptics } from "@/utils/haptics";
-import { useRealtimeAllTenants, useRealtimeAllCollections, useRealtimeAgents, useRealtimeLandlords, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
+import { useRealtimeAllTenants, useRealtimeAllCollections, useRealtimeAgents, useRealtimeLandlords, useRealtimePasswordRequests, registerSyncCallback } from "@/hooks/useRealtimeSubscription";
 import { useRealtimeSyncStatus } from "@/hooks/useRealtimeSyncStatus";
 import { DataSyncBadge } from "@/components/RealtimeSyncIndicator";
 import { Input } from "@/components/ui/input";
@@ -425,15 +425,18 @@ const ManagerDashboard = () => {
   const [prevTotalTenants, setPrevTotalTenants] = useState<number | null>(null);
   const [prevPendingVerifications, setPrevPendingVerifications] = useState<number | null>(null);
   const [prevPendingPayments, setPrevPendingPayments] = useState<number | null>(null);
+  const [prevPasswordRequests, setPrevPasswordRequests] = useState<number | null>(null);
 
   // Subscribe to real-time updates for all agent activity
   useRealtimeAllTenants();
   useRealtimeAllCollections();
   useRealtimeAgents();
   useRealtimeLandlords();
+  useRealtimePasswordRequests();
 
   // Track sync status for tenants table (for portfolio value updates)
   const { lastSyncTime } = useRealtimeSyncStatus('tenants');
+  const { lastSyncTime: passwordRequestsSyncTime } = useRealtimeSyncStatus('password_change_requests');
 
   // Tutorial/onboarding flow
   const { hasCompletedTutorial, startTutorial } = useManagerTutorial();
@@ -530,6 +533,31 @@ const ManagerDashboard = () => {
     
     setPrevPendingPayments(stats.pendingPayments);
   }, [stats.pendingPayments]);
+
+  // Show toast notification when password change requests arrive
+  useEffect(() => {
+    if (prevPasswordRequests !== null && stats.pendingPasswordRequests !== prevPasswordRequests) {
+      const difference = stats.pendingPasswordRequests - prevPasswordRequests;
+      const isIncrease = difference > 0;
+      
+      if (isIncrease) {
+        toast.info(
+          `New Password Change Request${Math.abs(difference) > 1 ? 's' : ''}`,
+          {
+            description: `${Math.abs(difference)} agent${Math.abs(difference) > 1 ? 's' : ''} requesting password change`,
+            duration: 5000,
+            action: {
+              label: "Review",
+              onClick: () => navigate("/manager/password-requests"),
+            },
+          }
+        );
+        haptics.light();
+      }
+    }
+    
+    setPrevPasswordRequests(stats.pendingPasswordRequests);
+  }, [stats.pendingPasswordRequests]);
 
   useEffect(() => {
     const fetchStats = async () => {
