@@ -32,6 +32,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { haptics } from "@/utils/haptics";
 import { useOptimisticAgentSuspension, useOptimisticAgentReactivation, useOptimisticAgentUpdate, useOptimisticAgentDeletion } from "@/hooks/useOptimisticAgent";
+import { AgentPasswordResetDialog } from "@/components/AgentPasswordResetDialog";
+import { KeyRound } from "lucide-react";
 
 interface AgentWithDetails {
   id: string;
@@ -102,6 +104,9 @@ const ManagerAgents = () => {
   // Suspension state
   const [suspendingAgent, setSuspendingAgent] = useState<AgentWithDetails | null>(null);
   const [suspensionReason, setSuspensionReason] = useState("");
+  
+  // Password reset state
+  const [resetPasswordAgent, setResetPasswordAgent] = useState<AgentWithDetails | null>(null);
   
   // Optimistic mutations
   const suspendMutation = useOptimisticAgentSuspension();
