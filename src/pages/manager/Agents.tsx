@@ -1360,6 +1360,18 @@ const ManagerAgents = () => {
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setResetPasswordAgent(agent);
+                                haptics.light();
+                              }}
+                              title="Reset password"
+                            >
+                              <KeyRound className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={(e) => handleEditClick(agent, e)}
                               disabled={updateAgentMutation.isPending || deleteAgentMutation.isPending}
                             >
@@ -1595,6 +1607,13 @@ const ManagerAgents = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Password Reset Dialog */}
+      <AgentPasswordResetDialog
+        open={!!resetPasswordAgent}
+        onOpenChange={(open) => !open && setResetPasswordAgent(null)}
+        agent={resetPasswordAgent}
+      />
     </ManagerLayout>
   );
 };
